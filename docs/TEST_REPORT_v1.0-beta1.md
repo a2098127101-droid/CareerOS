@@ -1,6 +1,33 @@
 # Test Report · CareerOS v1.0-beta1
 
-## Local build regression
+## GitHub Actions P0 stabilization verification
+
+Verified on 2026-07-23 in
+[CareerOS CI run 29988693142](https://github.com/a2098127101-droid/CareerOS/actions/runs/29988693142):
+
+- commit: `bff734b82a23314dd719a6a9c287ace869d7ee50`;
+- runner: GitHub-hosted Ubuntu;
+- Python: `3.11.9`;
+- dependency installation: `pip install --require-hashes -r requirements.lock`;
+- dependency integrity: `pip check` passed;
+- test isolation: 32 test files, one subprocess per file;
+- result: **132/132 passed**, 0 failed files;
+- Python compileall: passed;
+- Repository Contract: 12/12 pairs, 0 missing methods;
+- Database Access Audit: 0 unexpected SQLite modules and 0 Store-owned DDL violations.
+
+The workflow explicitly asserts `passed_tests == 132`; a pytest output-format
+change cannot silently record a passing file as zero tests.
+
+P0 stabilization also verifies:
+
+- FastAPI modular routes through public OpenAPI paths and unique operation IDs,
+  without assuming `app.routes` is a flat internal list;
+- deterministic LF-only JSONL snapshot bytes and manifest SHA256 equality on
+  Windows;
+- pytest 9 pass counting through a pytest reporting hook.
+
+## Packaged local build regression
 
 The release candidate was tested in isolated pytest groups to avoid the known process-exit interaction of local background executors.
 
@@ -51,7 +78,9 @@ Warnings are Python 3.13 SQLite datetime-adapter deprecation warnings, not asser
 
 ## Live verification status
 
-The build environment does not provide Docker, `psycopg`, Redis client/runtime, PostgreSQL, MinIO/S3, semantic embedding credentials or generation-model credentials.
+The successful GitHub Actions regression is a code-level SQLite verification.
+It does not provide a live PostgreSQL/pgvector, Redis, MinIO/S3, semantic
+embedding provider, generation model, or complete staging topology.
 
 Therefore the following are **NOT VERIFIED in this build environment**:
 
