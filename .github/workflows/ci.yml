@@ -1,0 +1,24 @@
+name: CareerOS CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  sqlite-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python -m compileall -q app scripts tests
+      - run: python scripts/audit_database_access.py --json-out docs/CI_DATABASE_ACCESS_AUDIT.json
+      - run: python scripts/audit_repository_contract.py --json-out docs/CI_REPOSITORY_CONTRACT_AUDIT.json
+      - run: python scripts/run_test_matrix.py --timeout 120 --json-out docs/CI_TEST_MATRIX.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: careeros-ci-reports
+          path: docs/CI_*.json
