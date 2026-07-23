@@ -103,6 +103,8 @@ OPEN_CareerOS.cmd
 Cross-platform:
 
 ```bash
+python -m venv .venv
+pip install --require-hashes -r requirements.lock
 python -m uvicorn app.main:app --reload
 ```
 
@@ -116,7 +118,9 @@ CareerOS_H5_Showcase.html
 
 **This build is not claimed as Runtime Verified.** The current build environment does not provide Docker, a live PostgreSQL/pgvector instance, Redis, MinIO/S3, real semantic embedding credentials, or a real generation-model credential. The corresponding harnesses are implemented, but live certification remains `NOT VERIFIED` until executed in a real staging environment.
 
-The packaged test report records a code-level baseline of **132 automated tests passed in isolated groups**. During GitHub publication preflight on 2026-07-23, 132 tests were collected under the latest versions allowed by the unpinned dependency ranges; 130 passed and 2 failed. One failure is a FastAPI route-introspection compatibility test even though the target routes remain present in OpenAPI and HTTP smoke checks. The other is a Windows newline/checksum mismatch in the SQLite snapshot export/import dry run. This discrepancy is why the GitHub release is marked as a pre-release. See `docs/TEST_REPORT_v1.0-beta1.md` for the packaged baseline.
+The P0 stabilization fixes the route test's dependency on FastAPI's former flat internal route list, forces cross-platform LF snapshot bytes, counts pytest 9 results through a reporting hook, and adds a hash-locked dependency graph. The corresponding [GitHub Actions run](https://github.com/a2098127101-droid/CareerOS/actions/runs/29988693142) passed **132/132 tests** across 32 isolated test files on Python 3.11.9.
+
+The release remains a pre-release because live PostgreSQL/pgvector, Redis, MinIO/S3, semantic embeddings, generation models, and the complete staging certification are still not verified. See `docs/TEST_REPORT_v1.0-beta1.md` for the packaged and current verification records.
 
 Primary operational documentation:
 
@@ -125,3 +129,11 @@ Primary operational documentation:
 - `docs/MIGRATION_RECOVERY_CERTIFICATION_v1.0-beta1.md`
 - `docs/WORKER_RECOVERY_v1.0-beta1.md`
 - `docs/TEST_REPORT_v1.0-beta1.md`
+
+## License
+
+This repository is governed by the proprietary CareerOS license in `LICENSE`.
+The source is publicly viewable for evaluation and review only; no right to
+use, copy, modify, deploy, or distribute it is granted without prior written
+permission from the copyright holder. This project is not represented as
+open-source software.

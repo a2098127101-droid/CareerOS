@@ -14,18 +14,19 @@ CareerOS 是一个面向职业发展与人才智能场景的 AI 原生平台，�
 | --- | --- | --- |
 | 离线 Showcase | 可用 | 单个匿名静态 HTML；不需要后端、数据库、支付服务或 API Key |
 | 本地兼容运行时 | 已实现 | 默认使用 SQLite、本地私有文件、内存状态和进程内后台任务 |
-| 随包测试报告 | 记录为通过 | `docs/TEST_REPORT_v1.0-beta1.md` 记录 132 passed、12 warnings |
-| GitHub 发布前复验 | 130 passed、2 failed | 在当前允许的最新依赖和 Windows 环境下收集 132 项测试 |
+| 随包测试报告 | 记录为通过 | `docs/TEST_REPORT_v1.0-beta1.md` 记录原始分组基线 |
+| GitHub Actions 复验 | 132/132 通过 | Python 3.11.9、哈希锁定依赖、32 个隔离测试文件 |
 | Staging 认证框架 | 已实现 | PostgreSQL/pgvector、Redis、MinIO、API、独立 Worker 与 Certifier 拓扑 |
 | 真实外部运行时认证 | 尚未验证 | 未完成真实 PostgreSQL、Redis、MinIO、语义嵌入和生成模型认证 |
 | 商业生产就绪 | 不作声明 | 大规模并发、真实支付、企业 SSO 与完整可观测性摄取不在当前认证范围内 |
 
-本轮两项失败分别是：
+P0 稳定化已修复 FastAPI 路由测试的内部结构依赖、Windows 快照
+CRLF/LF 字节差异和 pytest 9 通过数统计，并加入可复现依赖锁。对应
+[GitHub Actions 运行](https://github.com/a2098127101-droid/CareerOS/actions/runs/29988693142)
+已通过 132/132。
 
-1. FastAPI 新版路由树不再保证 `app.routes` 是扁平路径列表，导致架构测试的路由枚举断言失败；目标路径仍存在于 OpenAPI，HTTP 冒烟检查也能到达对应路由。
-2. Windows 文本换行转换使 SQLite 快照导出阶段记录的 LF 哈希与落盘后的 CRLF 文件字节不一致，导致导入前校验失败。
-
-因此，本仓库和 `v1.0-beta1` Release 均按 Pre-release 发布。
+本仓库和 `v1.0-beta1` Release 仍按 Pre-release 发布，因为真实
+PostgreSQL、Redis、MinIO、语义嵌入、生成模型及完整 staging 认证尚未完成。
 
 ## 两种交付方式
 
@@ -124,7 +125,7 @@ OPEN_CareerOS.cmd
 
 ```bash
 python -m venv .venv
-pip install -r requirements.txt
+pip install --require-hashes -r requirements.lock
 python -m uvicorn app.main:app --reload
 ```
 
@@ -162,4 +163,4 @@ docker compose --env-file .env.staging -f docker-compose.staging.yml --profile c
 
 ## 许可证
 
-当前发布包没有仓库级 `LICENSE` 文件，因此本项目不宣称为开源软件。公开可见不等同于授予复制、修改或分发许可；允许复用或外部贡献前，应由项目所有者选择并添加明确许可证。
+本仓库采用 `LICENSE` 中的 CareerOS 专有许可证。源代码公开可见仅用于评估和审阅；未经版权所有者事先书面许可，不授予使用、复制、修改、部署或分发权。本项目不宣称为开源软件。

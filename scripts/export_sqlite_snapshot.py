@@ -45,7 +45,10 @@ def export_snapshot(db_path: Path, out_dir: Path) -> dict:
             target = out_dir / f"{table}.jsonl"
             h = hashlib.sha256()
             count = 0
-            with target.open("w", encoding="utf-8") as f:
+            # Force LF bytes on every platform. The manifest hashes the UTF-8
+            # payload bytes, so text-mode CRLF translation on Windows would
+            # otherwise make the file differ from the recorded checksum.
+            with target.open("w", encoding="utf-8", newline="\n") as f:
                 for row in conn.execute(f'SELECT * FROM "{table}"'):
                     payload = {k: encode(row[k]) for k in row.keys()}
                     line = json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n"

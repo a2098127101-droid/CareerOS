@@ -2,6 +2,21 @@
 
 ## Business Runtime Verification Candidate
 
+### P0 stabilization update
+
+- fixed FastAPI route verification to use public OpenAPI behavior instead of a
+  flat `app.routes` implementation detail;
+- made SQLite snapshot JSONL bytes and SHA256 manifests consistent across
+  Windows and Linux;
+- fixed pytest 9 pass counting in the isolated test matrix;
+- added a fully pinned, hash-verified `requirements.lock` and fixed CI to
+  Python 3.11.9;
+- added the proprietary `LICENSE` and `SECURITY.md`;
+- passed 132/132 tests in
+  [GitHub Actions run 29988693142](https://github.com/a2098127101-droid/CareerOS/actions/runs/29988693142).
+
+This update does not change the pre-release status or claim Runtime Verified.
+
 ### Added
 
 - signed Business E2E certificate and production readiness gate;

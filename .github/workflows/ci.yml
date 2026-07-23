@@ -1,4 +1,4 @@
-name: CareerOS CI
+name: CareerOS CI (locked 132-test matrix)
 
 on:
   push:
@@ -7,16 +7,21 @@ on:
 jobs:
   sqlite-regression:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      - run: pip install -r requirements.txt
+          python-version: '3.11.9'
+          cache: pip
+          cache-dependency-path: requirements.lock
+      - run: pip install --require-hashes -r requirements.lock
+      - run: python -m pip check
       - run: python -m compileall -q app scripts tests
       - run: python scripts/audit_database_access.py --json-out docs/CI_DATABASE_ACCESS_AUDIT.json
       - run: python scripts/audit_repository_contract.py --json-out docs/CI_REPOSITORY_CONTRACT_AUDIT.json
       - run: python scripts/run_test_matrix.py --timeout 120 --json-out docs/CI_TEST_MATRIX.json
+      - run: python -c "import json; report=json.load(open('docs/CI_TEST_MATRIX.json', encoding='utf-8')); assert report['ok'] and report['passed_tests'] == 132, report"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

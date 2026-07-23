@@ -18,11 +18,23 @@ def run_matrix(root: Path, timeout: int = 90) -> dict:
         rel = path.relative_to(root).as_posix()
         t0 = time.time()
         try:
-            runner = (
-                "import os,pytest; "
-                f"rc=pytest.main(['-q',{rel!r}]); "
-                "os._exit(int(rc))"
-            )
+            runner = f"""
+import os
+import pytest
+
+class _PassedCounter:
+    def __init__(self):
+        self.passed = 0
+
+    def pytest_runtest_logreport(self, report):
+        if report.when == "call" and report.passed:
+            self.passed += 1
+
+counter = _PassedCounter()
+rc = pytest.main(["-q", {rel!r}], plugins=[counter])
+print(f"CAREEROS_PASSED={{counter.passed}}", flush=True)
+os._exit(int(rc))
+"""
             proc = subprocess.run(
                 [sys.executable, "-c", runner],
                 cwd=root,
@@ -33,7 +45,14 @@ def run_matrix(root: Path, timeout: int = 90) -> dict:
                 check=False,
             )
             output = proc.stdout
-            passed = sum(int(x) for x in re.findall(r"(\d+) passed", output))
+            marker = re.search(r"CAREEROS_PASSED=(\d+)", output)
+            # Keep the summary fallback for older pytest versions and for
+            # diagnostic compatibility with historical matrix output.
+            passed = (
+                int(marker.group(1))
+                if marker
+                else sum(int(x) for x in re.findall(r"(\d+) passed", output))
+            )
             status = "passed" if proc.returncode == 0 else "failed"
             total_passed += passed if proc.returncode == 0 else 0
             results.append({
