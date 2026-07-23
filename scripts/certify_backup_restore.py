@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path as _BootstrapPath
+
+_ROOT = _BootstrapPath(__file__).resolve().parents[1]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 import argparse
 import json
 import shutil
@@ -35,11 +42,40 @@ def certify(database_url: str) -> dict:
                 raise RuntimeError("pg_dump did not produce a backup file")
             with engine.begin() as conn:
                 conn.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
-            subprocess.run([pg_restore, "--dbname", database_url, "--no-owner", str(dump)], check=True, capture_output=True, text=True)
+            restore = subprocess.run(
+                [pg_restore, "--dbname", database_url, "--no-owner", str(dump)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            restore_output = (restore.stderr or "") + (restore.stdout or "")
+            transaction_timeout_compat = (
+                restore.returncode == 1
+                and restore_output.count("pg_restore: error:") == 1
+                and 'unrecognized configuration parameter "transaction_timeout"' in restore_output
+                and "errors ignored on restore: 1" in restore_output
+            )
+            if restore.returncode != 0 and not transaction_timeout_compat:
+                raise subprocess.CalledProcessError(
+                    restore.returncode,
+                    restore.args,
+                    output=restore.stdout,
+                    stderr=restore.stderr,
+                )
             with engine.connect() as conn:
                 restored = conn.execute(text(f'SELECT marker FROM "{schema}".probe WHERE id=1')).scalar_one()
             ok = restored == marker
-            return {"ok": ok, "status": "PASS" if ok else "FAIL", "detail": "temporary-schema pg_dump/pg_restore round-trip succeeded" if ok else "restored marker mismatch", "schema": schema, "backup_bytes": dump.stat().st_size}
+            return {
+                "ok": ok,
+                "status": ("PASS_WITH_WARNING" if transaction_timeout_compat else "PASS") if ok else "FAIL",
+                "detail": "temporary-schema pg_dump/pg_restore round-trip succeeded" if ok else "restored marker mismatch",
+                "schema": schema,
+                "backup_bytes": dump.stat().st_size,
+                "client_server_compatibility_warning": (
+                    "pg_restore client is newer than PostgreSQL and the server ignored SET transaction_timeout; "
+                    "the restored marker was independently verified"
+                ) if transaction_timeout_compat else "",
+            }
         except subprocess.CalledProcessError as exc:
             return {"ok": False, "status": "FAIL", "detail": (exc.stderr or exc.stdout or str(exc))[-2000:], "schema": schema}
         except Exception as exc:
