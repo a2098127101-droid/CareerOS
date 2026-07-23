@@ -2,8 +2,6 @@ name: CareerOS supply-chain security
 
 on:
   push:
-    branches:
-      - main
   pull_request:
   workflow_dispatch:
 
