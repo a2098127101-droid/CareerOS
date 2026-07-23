@@ -52,19 +52,60 @@ print('OK')
 
 def test_production_security_is_fail_closed_and_valid_config_starts(tmp_path: Path):
     root = Path(__file__).parents[1]
-    bad_env = os.environ.copy()
-    bad_env.update({
+    anonymous_env = os.environ.copy()
+    anonymous_env.update({
         'APP_ENV': 'production',
         'AUTH_REQUIRED': 'false',
+        'COOKIE_SECURE': 'true',
+        'APP_SECRET_KEY': '0123456789abcdef0123456789abcdef0123456789abcdef',
+        'ALLOWED_ORIGINS': 'https://careeros.example.test',
         'APP_DB_PATH': str(tmp_path / 'bad-prod.db'),
         'AUTO_SEED_DEMO_USERS': 'false',
+        'DEMO_MODE': 'true',
     })
     failed = subprocess.run(
-        [sys.executable, '-c', 'import app.main'], cwd=root, env=bad_env,
+        [sys.executable, '-c', 'import app.main'], cwd=root, env=anonymous_env,
         text=True, capture_output=True, timeout=60,
     )
     assert failed.returncode != 0
-    assert 'Production security validation failed' in failed.stdout + failed.stderr
+    assert 'AUTH_REQUIRED must be true in production' in failed.stdout + failed.stderr
+
+    weak_secret_env = anonymous_env.copy()
+    weak_secret_env.update({
+        'AUTH_REQUIRED': 'true',
+        'APP_SECRET_KEY': 'weak-secret',
+        'APP_DB_PATH': str(tmp_path / 'weak-secret-prod.db'),
+    })
+    weak_secret = subprocess.run(
+        [sys.executable, '-c', 'import app.main'], cwd=root, env=weak_secret_env,
+        text=True, capture_output=True, timeout=60,
+    )
+    assert weak_secret.returncode != 0
+    assert 'APP_SECRET_KEY must be a strong random secret' in weak_secret.stdout + weak_secret.stderr
+
+    missing_dependencies_env = anonymous_env.copy()
+    missing_dependencies_env.update({
+        'AUTH_REQUIRED': 'true',
+        'DEMO_MODE': 'false',
+        'REPOSITORY_BACKEND': 'sqlite',
+        'DATABASE_URL': '',
+        'RUNTIME_STATE_BACKEND': 'memory',
+        'REDIS_URL': '',
+        'BACKGROUND_JOB_BACKEND': 'inprocess',
+        'STORAGE_PROVIDER': 'local',
+        'EMAIL_PROVIDER': 'console',
+        'APP_DB_PATH': str(tmp_path / 'missing-dependencies-prod.db'),
+    })
+    missing_dependencies = subprocess.run(
+        [sys.executable, '-c', 'import app.main'], cwd=root, env=missing_dependencies_env,
+        text=True, capture_output=True, timeout=60,
+    )
+    assert missing_dependencies.returncode != 0
+    dependency_errors = missing_dependencies.stdout + missing_dependencies.stderr
+    assert 'REPOSITORY_BACKEND must be postgresql' in dependency_errors
+    assert 'RUNTIME_STATE_BACKEND=redis and REDIS_URL are required' in dependency_errors
+    assert 'BACKGROUND_JOB_BACKEND=redis is required' in dependency_errors
+    assert 'STORAGE_PROVIDER=s3 is required' in dependency_errors
 
     good_env = os.environ.copy()
     good_env.update({
@@ -87,6 +128,7 @@ body=r.json()
 assert body['auth']['required'] is True
 assert body['auth']['environment'] == 'production'
 assert body['migrations']['current'] >= 3
+assert c.get('/api/admin/system/readiness').status_code == 401
 print('PROD_OK')
 '''
     started = subprocess.run(

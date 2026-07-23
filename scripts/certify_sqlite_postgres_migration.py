@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from app.embedding_gateway import EmbeddingConfig, EmbeddingGateway
+from app.core.database import normalize_database_url
 from app.repositories import RepositoryContainer
 from scripts.export_sqlite_snapshot import export_snapshot
 from scripts.import_snapshot_to_postgres import import_snapshot
@@ -24,7 +25,7 @@ from scripts.verify_migration import verify
 
 
 def _create_temp_database(database_url: str) -> tuple[str, str]:
-    url = make_url(database_url)
+    url = make_url(normalize_database_url(database_url, ""))
     temp_name = f"careeros_mig_{uuid4().hex[:10]}"
     admin_db = "postgres" if url.database != "postgres" else url.database
     admin_url = url.set(database=admin_db)
@@ -36,7 +37,7 @@ def _create_temp_database(database_url: str) -> tuple[str, str]:
 
 
 def _drop_temp_database(database_url: str, temp_name: str) -> None:
-    url = make_url(database_url)
+    url = make_url(normalize_database_url(database_url, ""))
     admin_db = "postgres" if url.database != "postgres" else url.database
     engine = create_engine(url.set(database=admin_db), isolation_level="AUTOCOMMIT", future=True)
     try:

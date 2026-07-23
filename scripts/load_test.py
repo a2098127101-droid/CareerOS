@@ -78,7 +78,7 @@ def main() -> int:
     print(text)
     if args.out:
         from pathlib import Path
-        Path(args.out).write_text(text, encoding="utf-8")
+        Path(args.out).write_text(text + "\n", encoding="utf-8", newline="\n")
     return 0 if result["errors"] == 0 else 2
 
 

@@ -19,13 +19,15 @@ def _has_table(table: str) -> bool:
     return table in set(inspect(op.get_bind()).get_table_names())
 
 
+def _has_index(table: str, index: str) -> bool:
+    return index in {item["name"] for item in inspect(op.get_bind()).get_indexes(table)}
+
+
 def upgrade() -> None:
     if not _has_column("workflow_instances", "template_id"):
         op.add_column("workflow_instances", sa.Column("template_id", sa.Text(), nullable=False, server_default="career_development_v1"))
-    try:
+    if not _has_index("workflow_instances", "idx_workflow_template"):
         op.create_index("idx_workflow_template", "workflow_instances", ["tenant_id", "template_id", "updated_at"], unique=False)
-    except Exception:
-        pass
 
     if not _has_table("job_requirements"):
         op.create_table(
