@@ -10,8 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.11.9'
           cache: pip
@@ -23,7 +23,7 @@ jobs:
       - run: python scripts/audit_repository_contract.py --json-out docs/CI_REPOSITORY_CONTRACT_AUDIT.json
       - run: python scripts/run_test_matrix.py --timeout 120 --json-out docs/CI_TEST_MATRIX.json
       - run: python -c "import json; report=json.load(open('docs/CI_TEST_MATRIX.json', encoding='utf-8')); assert report['ok'] and report['passed_tests'] == 132, report"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: careeros-ci-reports
