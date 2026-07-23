@@ -16,4 +16,6 @@ RUN groupadd --gid 10001 careeros \
 COPY --chown=careeros:careeros . .
 USER 10001:10001
 EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl --fail --silent http://127.0.0.1:8000/live || exit 1
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
