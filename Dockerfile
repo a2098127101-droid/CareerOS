@@ -10,6 +10,10 @@ COPY requirements.txt requirements.lock ./
 RUN pip install --no-cache-dir --require-hashes --retries 10 --timeout 60 \
     --index-url https://pypi.org/simple \
     -r requirements.lock
-COPY . .
+RUN groupadd --gid 10001 careeros \
+    && useradd --uid 10001 --gid careeros --home-dir /app --no-create-home \
+       --shell /usr/sbin/nologin careeros
+COPY --chown=careeros:careeros . .
+USER 10001:10001
 EXPOSE 8000
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
