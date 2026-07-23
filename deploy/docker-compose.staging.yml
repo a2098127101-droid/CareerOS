@@ -1,0 +1,119 @@
+name: careeros-beta1-staging
+
+x-careeros-env: &careeros-env
+  env_file:
+    - .env.staging
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    <<: *careeros-env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-careeros}
+      POSTGRES_USER: ${POSTGRES_USER:-careeros}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-careeros} -d ${POSTGRES_DB:-careeros}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - careeros_pg:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - careeros_redis:/data
+
+  minio:
+    image: minio/minio:latest
+    <<: *careeros-env
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - careeros_minio:/data
+
+  minio-init:
+    image: minio/mc:latest
+    <<: *careeros-env
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: >-
+      mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" &&
+      mc mb --ignore-existing "local/$${S3_BUCKET}" &&
+      mc anonymous set none "local/$${S3_BUCKET}"
+    restart: "no"
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    <<: *careeros-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    command: ["/bin/sh", "-c", "python scripts/staging_preflight.py --profile infrastructure && alembic upgrade head && python scripts/certify_postgres.py --database-url \"$${DATABASE_URL}\" --out \"$${POSTGRES_CERTIFICATION_FILE}\" && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - careeros_runtime:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/live', timeout=2).read()"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    <<: *careeros-env
+    depends_on:
+      api:
+        condition: service_healthy
+    command: ["python", "scripts/run_worker.py"]
+    volumes:
+      - careeros_runtime:/app/data
+
+  certifier:
+    profiles: ["certify"]
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    <<: *careeros-env
+    depends_on:
+      api:
+        condition: service_healthy
+      worker:
+        condition: service_started
+    command: ["python", "scripts/staging_runtime_gate.py", "--base-url", "http://api:8000", "--storage-roundtrip"]
+    volumes:
+      - careeros_runtime:/app/data
+
+volumes:
+  careeros_pg:
+  careeros_redis:
+  careeros_minio:
+  careeros_runtime:

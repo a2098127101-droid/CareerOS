@@ -1,0 +1,11 @@
+services:
+  careeros:
+    build: ..
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../.env
+    volumes:
+      - ../data:/app/data
+# Local/single-instance evaluation only.
+# v1.0-alpha1 local compatibility repositories still use SQLite; this file is intentionally not presented as a multi-instance production stack.

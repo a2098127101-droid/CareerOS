@@ -1,0 +1,14 @@
+.venv
+__pycache__
+.pytest_cache
+*.pyc
+data/*.db
+data/*.log
+data/uploads
+.git
+.env
+deploy/.env.staging
+data/*certification*.json
+data/staging_gate_report.json
+data/email_outbox.jsonl
+backups

@@ -1,0 +1,63 @@
+{
+  "direct_sqlite_modules": 13,
+  "direct_sqlite_business_modules": 12,
+  "files": [
+    {
+      "file": "app/artifact_store.py",
+      "legacy_expected": true
+    },
+    {
+      "file": "app/auth_store.py",
+      "legacy_expected": true
+    },
+    {
+      "file": "app/collaboration_store.py",
+      "legacy_expected": true
+    },
+    {
+      "file": "app/commercial_store.py",
+      "legacy_expected": true
+    },
+    {
+      "file": "app/evidence_graph.py",
+      "legacy_expected": true
+    },
+    {
+      "file": "app/evidence_store.py",
+      "legacy_expected": true
+    },
+    {
+      "file": "app/job_store.py",
+      "legacy_expected": true
+    },
+    {
+      "file": "app/knowledge.py",
+      "legacy_expected": true
+    },
+    {
+      "file": "app/migrations.py",
+      "legacy_expected": true
+    },
+    {
+      "file": "app/model_store.py",
+      "legacy_expected": true
+    },
+    {
+      "file": "app/storage.py",
+      "legacy_expected": true
+    },
+    {
+      "file": "app/store.py",
+      "legacy_expected": true
+    },
+    {
+      "file": "app/workflow_store.py",
+      "legacy_expected": true
+    }
+  ],
+  "unexpected": [],
+  "store_owned_ddl_violations": [],
+  "schema_ownership": "CENTRALIZED",
+  "status": "TRANSITION",
+  "note": "Direct sqlite CRUD remains intentionally in local compatibility repositories; table DDL is centralized in migrations.py and PostgreSQL Alembic migrations."
+}

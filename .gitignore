@@ -1,0 +1,20 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+.env
+data/*.db
+
+# Desktop build output
+dist/
+build/
+*.spec
+deploy/.env.staging
+data/runtime_certification.json
+data/postgres_certification.json
+data/staging_gate_report.json
+data/email_outbox.jsonl
+backups/
+data/business_certification.json
+data/migration_certification.json
+data/backup_restore_certification.json

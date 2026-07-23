@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: careeros
+      POSTGRES_USER: careeros
+      POSTGRES_PASSWORD: change-me
+    ports: ["5432:5432"]
+    volumes: ["careeros_pg:/var/lib/postgresql/data"]
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["6379:6379"]
+    volumes: ["careeros_redis:/data"]
+volumes:
+  careeros_pg:
+  careeros_redis:

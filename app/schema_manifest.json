@@ -1,0 +1,4020 @@
+{
+  "version": "1.0-beta1",
+  "tables": {
+    "ai_tasks": {
+      "columns": [
+        {
+          "name": "task_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "owner_user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "task_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'todo'",
+          "pk": 0
+        },
+        {
+          "name": "priority",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'normal'",
+          "pk": 0
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'system'",
+          "pk": 0
+        },
+        {
+          "name": "payload_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_tasks_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "status",
+            "updated_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "task_id"
+        ]
+      ]
+    },
+    "analytics_events": {
+      "columns": [
+        {
+          "name": "event_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "event_name",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "properties_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_analytics_tenant_time",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "created_at"
+          ]
+        }
+      ],
+      "unique_constraints": []
+    },
+    "artifact_series": {
+      "columns": [
+        {
+          "name": "artifact_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "owner_user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "kind",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "current_version_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_artifact_series_session",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "session_id",
+            "updated_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "session_id",
+          "kind"
+        ],
+        [
+          "artifact_id"
+        ]
+      ]
+    },
+    "artifact_versions": {
+      "columns": [
+        {
+          "name": "version_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "artifact_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "content",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'unknown'",
+          "pk": 0
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "metadata_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "evidence_links_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'[]'",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from": "artifact_id",
+          "table": "artifact_series",
+          "to": "artifact_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_artifact_versions_series",
+          "unique": false,
+          "columns": [
+            "artifact_id",
+            "version"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "artifact_id",
+          "version"
+        ],
+        [
+          "version_id"
+        ]
+      ]
+    },
+    "auth_sessions": {
+      "columns": [
+        {
+          "name": "auth_session_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "token_hash",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "expires_at",
+          "type": "DATETIME",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "last_seen_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "revoked_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from": "tenant_id",
+          "table": "tenants",
+          "to": "tenant_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
+        },
+        {
+          "from": "user_id",
+          "table": "users",
+          "to": "user_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_auth_sessions_token",
+          "unique": false,
+          "columns": [
+            "token_hash"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "token_hash"
+        ],
+        [
+          "auth_session_id"
+        ]
+      ]
+    },
+    "class_memberships": {
+      "columns": [
+        {
+          "name": "class_membership_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "class_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from": "user_id",
+          "table": "users",
+          "to": "user_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
+        },
+        {
+          "from": "tenant_id",
+          "table": "tenants",
+          "to": "tenant_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
+        },
+        {
+          "from": "class_id",
+          "table": "classes",
+          "to": "class_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_class_memberships_user",
+          "unique": false,
+          "columns": [
+            "user_id",
+            "tenant_id"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "class_id",
+          "user_id",
+          "role"
+        ],
+        [
+          "class_membership_id"
+        ]
+      ]
+    },
+    "classes": {
+      "columns": [
+        {
+          "name": "class_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'active'",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from": "tenant_id",
+          "table": "tenants",
+          "to": "tenant_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
+        }
+      ],
+      "indexes": [],
+      "unique_constraints": [
+        [
+          "tenant_id",
+          "name"
+        ],
+        [
+          "class_id"
+        ]
+      ]
+    },
+    "evidence_claims": {
+      "columns": [
+        {
+          "name": "claim_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "claim_text",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "claim_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'artifact_claim'",
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'unverified'",
+          "pk": 0
+        },
+        {
+          "name": "fingerprint",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "verification_status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'UNVERIFIED'",
+          "pk": 0
+        },
+        {
+          "name": "verification_confidence",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "verified_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "verified_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "risk_level",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'normal'",
+          "pk": 0
+        },
+        {
+          "name": "requires_human_review",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_claims_session",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "session_id",
+            "created_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "claim_id"
+        ]
+      ]
+    },
+    "evidence_graph_edges": {
+      "columns": [
+        {
+          "name": "edge_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "from_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "from_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "relation",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "to_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "to_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "confidence",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "1.0",
+          "pk": 0
+        },
+        {
+          "name": "metadata_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_graph_edges_session",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "session_id",
+            "created_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "tenant_id",
+          "from_type",
+          "from_id",
+          "relation",
+          "to_type",
+          "to_id"
+        ],
+        [
+          "edge_id"
+        ]
+      ]
+    },
+    "evidence_items": {
+      "columns": [
+        {
+          "name": "evidence_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "owner_user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "source_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "source_label",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "content",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "verified",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_evidence_tenant_session",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "session_id",
+            "created_at"
+          ]
+        },
+        {
+          "name": "idx_evidence_session",
+          "unique": false,
+          "columns": [
+            "session_id",
+            "created_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "evidence_id"
+        ]
+      ]
+    },
+    "jobs": {
+      "columns": [
+        {
+          "name": "job_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'global'",
+          "pk": 0
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "company",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "city",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "industry",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "salary_min",
+          "type": "FLOAT",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "salary_max",
+          "type": "FLOAT",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "skills_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'[]'",
+          "pk": 0
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'manual'",
+          "pk": 0
+        },
+        {
+          "name": "source_url",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "active",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_jobs_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "active",
+            "updated_at"
+          ]
+        },
+        {
+          "name": "idx_jobs_title_city",
+          "unique": false,
+          "columns": [
+            "title",
+            "city",
+            "active"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "job_id"
+        ]
+      ]
+    },
+    "knowledge_chunks": {
+      "columns": [
+        {
+          "name": "chunk_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "source_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "chunk_index",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "content",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "content_hash",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "embedding_model",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from": "source_id",
+          "table": "knowledge_sources",
+          "to": "source_id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_knowledge_chunks_source",
+          "unique": false,
+          "columns": [
+            "source_id"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "chunk_id"
+        ]
+      ]
+    },
+    "knowledge_embeddings": {
+      "columns": [
+        {
+          "name": "chunk_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "source_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "embedding_model",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "embedding_version",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'1'",
+          "pk": 0
+        },
+        {
+          "name": "vector_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "content_hash",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'local_hash'",
+          "pk": 0
+        },
+        {
+          "name": "dimensions",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "warning",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_knowledge_embeddings_source",
+          "unique": false,
+          "columns": [
+            "source_id"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "chunk_id"
+        ]
+      ]
+    },
+    "knowledge_sources": {
+      "columns": [
+        {
+          "name": "source_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'global'",
+          "pk": 0
+        },
+        {
+          "name": "title",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "filename",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "mime_type",
+          "type": "TEXT",
+          "notnull": false,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "scope",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'global'",
+          "pk": 0
+        },
+        {
+          "name": "tags",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'[]'",
+          "pk": 0
+        },
+        {
+          "name": "active",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "char_count",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "chunk_count",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "category",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'other'",
+          "pk": 0
+        },
+        {
+          "name": "authority",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'internal'",
+          "pk": 0
+        },
+        {
+          "name": "effective_year",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "priority",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "50",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_knowledge_sources_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "active",
+            "updated_at"
+          ]
+        },
+        {
+          "name": "idx_knowledge_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "updated_at"
+          ]
+        },
+        {
+          "name": "idx_knowledge_sources_scope",
+          "unique": false,
+          "columns": [
+            "scope",
+            "active"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "source_id"
+        ]
+      ]
+    },
+    "llm_providers": {
+      "columns": [
+        {
+          "name": "provider_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "kind",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "base_url",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "api_key_enc",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "default_model",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "enabled",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "timeout_seconds",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "90",
+          "pk": 0
+        },
+        {
+          "name": "extra_headers",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "unique_constraints": [
+        [
+          "provider_id"
+        ]
+      ]
+    },
+    "llm_routes": {
+      "columns": [
+        {
+          "name": "task",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "provider_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "model",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "fallback_provider_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "fallback_model",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "temperature",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "0.2",
+          "pk": 0
+        },
+        {
+          "name": "max_tokens",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "4000",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "unique_constraints": [
+        [
+          "task"
+        ]
+      ]
+    },
+    "llm_usage": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "INTEGER",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'global'",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "task",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "provider_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "model",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "input_tokens",
+          "type": "INTEGER",
+          "notnull": false,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "output_tokens",
+          "type": "INTEGER",
+          "notnull": false,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "total_tokens",
+          "type": "INTEGER",
+          "notnull": false,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "latency_ms",
+          "type": "INTEGER",
+          "notnull": false,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "success",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "error",
+          "type": "TEXT",
+          "notnull": false,
+          "default": "''",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_llm_usage_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "created_at"
+          ]
+        }
+      ],
+      "unique_constraints": []
+    },
+    "password_reset_tokens": {
+      "columns": [
+        {
+          "name": "reset_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "token_hash",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "expires_at",
+          "type": "DATETIME",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "used_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from": "user_id",
+          "table": "users",
+          "to": "user_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
+        }
+      ],
+      "indexes": [],
+      "unique_constraints": [
+        [
+          "token_hash"
+        ],
+        [
+          "reset_id"
+        ]
+      ]
+    },
+    "plans": {
+      "columns": [
+        {
+          "name": "plan_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "entitlements_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "active",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "unique_constraints": [
+        [
+          "plan_id"
+        ]
+      ]
+    },
+    "review_records": {
+      "columns": [
+        {
+          "name": "review_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "artifact_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "version_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "total_score",
+          "type": "INTEGER",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "report_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_review_records_session",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "session_id",
+            "created_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "review_id"
+        ]
+      ]
+    },
+    "schema_migrations": {
+      "columns": [
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "applied_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "unique_constraints": []
+    },
+    "security_audit_log": {
+      "columns": [
+        {
+          "name": "audit_id",
+          "type": "INTEGER",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'global'",
+          "pk": 0
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "action",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "resource_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "resource_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "success",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "details_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "ip_address",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_security_audit_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "created_at"
+          ]
+        }
+      ],
+      "unique_constraints": []
+    },
+    "sessions": {
+      "columns": [
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "payload",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "student_user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "class_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'default'",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_sessions_class",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "class_id",
+            "updated_at"
+          ]
+        },
+        {
+          "name": "idx_sessions_tenant_updated",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "updated_at"
+          ]
+        },
+        {
+          "name": "idx_sessions_owner",
+          "unique": false,
+          "columns": [
+            "student_user_id",
+            "tenant_id"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "session_id"
+        ]
+      ]
+    },
+    "stored_objects": {
+      "columns": [
+        {
+          "name": "object_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "owner_user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "object_key",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "filename",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "content_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "size_bytes",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "sha256",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'active'",
+          "pk": 0
+        },
+        {
+          "name": "scan_status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'unknown'",
+          "pk": 0
+        },
+        {
+          "name": "deleted_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_stored_objects_tenant_owner",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "owner_user_id",
+            "created_at"
+          ]
+        },
+        {
+          "name": "idx_stored_objects_status",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "status",
+            "created_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "object_id"
+        ]
+      ]
+    },
+    "teacher_feedback": {
+      "columns": [
+        {
+          "name": "feedback_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "teacher_user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "teacher_name",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'Advisor'",
+          "pk": 0
+        },
+        {
+          "name": "content",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "priority",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'normal'",
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'open'",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "resolved_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_feedback_session",
+          "unique": false,
+          "columns": [
+            "session_id",
+            "created_at"
+          ]
+        },
+        {
+          "name": "idx_feedback_tenant_session",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "session_id",
+            "created_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "feedback_id"
+        ]
+      ]
+    },
+    "tenant_memberships": {
+      "columns": [
+        {
+          "name": "membership_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'active'",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from": "user_id",
+          "table": "users",
+          "to": "user_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
+        },
+        {
+          "from": "tenant_id",
+          "table": "tenants",
+          "to": "tenant_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_memberships_user",
+          "unique": false,
+          "columns": [
+            "user_id",
+            "tenant_id"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "tenant_id",
+          "user_id",
+          "role"
+        ],
+        [
+          "membership_id"
+        ]
+      ]
+    },
+    "tenant_subscriptions": {
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "plan_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'free'",
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'active'",
+          "pk": 0
+        },
+        {
+          "name": "billing_provider",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'mock'",
+          "pk": 0
+        },
+        {
+          "name": "external_customer_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "external_subscription_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "current_period_end",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "unique_constraints": [
+        [
+          "tenant_id"
+        ]
+      ]
+    },
+    "tenants": {
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'active'",
+          "pk": 0
+        },
+        {
+          "name": "branding_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "tenant_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'organization'",
+          "pk": 0
+        },
+        {
+          "name": "product_preset",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'career_development'",
+          "pk": 0
+        },
+        {
+          "name": "settings_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "unique_constraints": [
+        [
+          "tenant_id"
+        ]
+      ]
+    },
+    "users": {
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "email",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "password_hash",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "display_name",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'active'",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "unique_constraints": [
+        [
+          "email"
+        ],
+        [
+          "user_id"
+        ]
+      ]
+    },
+    "workflow_instances": {
+      "columns": [
+        {
+          "name": "workflow_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "current_step_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'self_exploration'",
+          "pk": 0
+        },
+        {
+          "name": "progress",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "template_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'career_development_v1'",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_workflow_session",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "session_id"
+          ]
+        },
+        {
+          "name": "idx_workflow_template",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "template_id",
+            "updated_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "session_id"
+        ],
+        [
+          "workflow_id"
+        ]
+      ]
+    },
+    "workflow_steps": {
+      "columns": [
+        {
+          "name": "workflow_step_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "workflow_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "step_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "step_index",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "label",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'locked'",
+          "pk": 0
+        },
+        {
+          "name": "started_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "completed_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "completed_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "source_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "source_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "metadata_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [
+        {
+          "from": "workflow_id",
+          "table": "workflow_instances",
+          "to": "workflow_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "idx_workflow_steps_session",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "session_id",
+            "step_index"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "workflow_id",
+          "step_id"
+        ],
+        [
+          "workflow_step_id"
+        ]
+      ]
+    },
+    "rag_eval_cases": {
+      "columns": [
+        {
+          "name": "case_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'global'",
+          "pk": 0
+        },
+        {
+          "name": "query",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "scope",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'global'",
+          "pk": 0
+        },
+        {
+          "name": "effective_year",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "expected_source_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "expected_authority",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "active",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_rag_eval_cases_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "active",
+            "created_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "case_id"
+        ]
+      ]
+    },
+    "rag_eval_runs": {
+      "columns": [
+        {
+          "name": "run_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'global'",
+          "pk": 0
+        },
+        {
+          "name": "metrics_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "cases_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'[]'",
+          "pk": 0
+        },
+        {
+          "name": "embedding_model",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "retrieval_mode",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_rag_eval_runs_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "created_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "run_id"
+        ]
+      ]
+    },
+    "data_subject_requests": {
+      "columns": [
+        {
+          "name": "request_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "request_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'pending'",
+          "pk": 0
+        },
+        {
+          "name": "notes",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "result_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "processed_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_data_subject_requests_user",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "user_id",
+            "created_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "request_id"
+        ]
+      ]
+    },
+    "llm_model_capabilities": {
+      "columns": [
+        {
+          "name": "provider_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "model",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 2
+        },
+        {
+          "name": "supports_streaming",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "supports_json_schema",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "supports_tools",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "supports_vision",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "supports_files",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "context_window",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "max_output",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "reasoning_level",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'none'",
+          "pk": 0
+        },
+        {
+          "name": "latency_class",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'unknown'",
+          "pk": 0
+        },
+        {
+          "name": "input_cost_per_million",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "output_cost_per_million",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "metadata_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_llm_model_capabilities_provider",
+          "unique": false,
+          "columns": [
+            "provider_id",
+            "updated_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "provider_id",
+          "model"
+        ]
+      ]
+    },
+    "model_eval_runs": {
+      "columns": [
+        {
+          "name": "eval_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'global'",
+          "pk": 0
+        },
+        {
+          "name": "task",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'evaluation'",
+          "pk": 0
+        },
+        {
+          "name": "provider_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "model",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "metrics_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "cases_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'[]'",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_model_eval_runs_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "created_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "eval_id"
+        ]
+      ]
+    },
+    "privacy_consents": {
+      "columns": [
+        {
+          "name": "consent_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "policy_version",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "purpose",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'service'",
+          "pk": 0
+        },
+        {
+          "name": "granted",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "source",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'ui'",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_privacy_consents_user",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "user_id",
+            "created_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "consent_id"
+        ]
+      ]
+    },
+    "user_invitations": {
+      "columns": [
+        {
+          "name": "invitation_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "token_hash",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "email",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "role",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "display_name",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "invited_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "expires_at",
+          "type": "DATETIME",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "accepted_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "revoked_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_user_invitations_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "created_at"
+          ]
+        },
+        {
+          "name": "idx_user_invitations_email",
+          "unique": false,
+          "columns": [
+            "email",
+            "tenant_id"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "token_hash"
+        ],
+        [
+          "invitation_id"
+        ]
+      ]
+    },
+    "billing_events": {
+      "columns": [
+        {
+          "name": "event_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "event_key",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "event_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "payload_hash",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'received'",
+          "pk": 0
+        },
+        {
+          "name": "result_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "received_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "processed_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_billing_events_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "received_at"
+          ]
+        },
+        {
+          "name": "idx_billing_events_provider",
+          "unique": false,
+          "columns": [
+            "provider",
+            "received_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "provider",
+          "event_key"
+        ],
+        [
+          "event_id"
+        ]
+      ]
+    },
+    "billing_orders": {
+      "columns": [
+        {
+          "name": "order_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "plan_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "provider",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'mock'",
+          "pk": 0
+        },
+        {
+          "name": "external_order_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'pending'",
+          "pk": 0
+        },
+        {
+          "name": "amount_minor",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "currency",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'CNY'",
+          "pk": 0
+        },
+        {
+          "name": "metadata_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_billing_orders_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "created_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "order_id"
+        ]
+      ]
+    },
+    "evidence_verification_history": {
+      "columns": [
+        {
+          "name": "verification_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "claim_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "previous_status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'UNVERIFIED'",
+          "pk": 0
+        },
+        {
+          "name": "new_status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "confidence",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "verifier_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'ai'",
+          "pk": 0
+        },
+        {
+          "name": "verified_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "risk_level",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'normal'",
+          "pk": 0
+        },
+        {
+          "name": "requires_human_review",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_verification_history_claim",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "claim_id",
+            "created_at"
+          ]
+        },
+        {
+          "name": "idx_verification_history_session",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "session_id",
+            "created_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "verification_id"
+        ]
+      ]
+    },
+    "job_requirements": {
+      "columns": [
+        {
+          "name": "requirement_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "job_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "category",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'requirement'",
+          "pk": 0
+        },
+        {
+          "name": "requirement_text",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "normalized_key",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "importance",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "3",
+          "pk": 0
+        },
+        {
+          "name": "source_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'derived'",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_job_requirements_job",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "job_id",
+            "importance"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "requirement_id"
+        ]
+      ]
+    },
+    "artifact_template_definitions": {
+      "columns": [
+        {
+          "name": "template_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "kind",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "label",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'draft'",
+          "pk": 0
+        },
+        {
+          "name": "aliases_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'[]'",
+          "pk": 0
+        },
+        {
+          "name": "schema_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "renderer",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'structured_text'",
+          "pk": 0
+        },
+        {
+          "name": "review_rubric",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'general_v1'",
+          "pk": 0
+        },
+        {
+          "name": "presets_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'[]'",
+          "pk": 0
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_artifact_template_defs_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "kind",
+            "status",
+            "version"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "template_id"
+        ]
+      ]
+    },
+    "workflow_template_definitions": {
+      "columns": [
+        {
+          "name": "template_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "preset_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'draft'",
+          "pk": 0
+        },
+        {
+          "name": "definition_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_workflow_template_defs_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "preset_id",
+            "status",
+            "version"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "template_id"
+        ]
+      ]
+    }
+  }
+}

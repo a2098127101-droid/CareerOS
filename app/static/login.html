@@ -1,0 +1,28 @@
+<!doctype html><html lang="zh-CN" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>登录 · CareerOS</title><link rel="stylesheet" href="/static/career-os.css"><style>
+.auth-shell{min-height:100vh;display:grid;grid-template-columns:minmax(320px,1fr) minmax(440px,560px);background:var(--background)}
+.auth-aside{padding:40px;display:flex;flex-direction:column;border-right:1px solid var(--border);background:var(--surface-secondary)}
+.auth-main{display:flex;align-items:center;justify-content:center;padding:40px}.auth-panel{width:min(100%,420px)}
+.auth-panel h1{font-size:30px;line-height:1.15;margin:18px 0 8px}.auth-panel .lede{color:var(--foreground-secondary);line-height:1.7;margin:0 0 28px}
+.auth-form{display:grid;gap:16px}.field{display:grid;gap:7px}.field label{font-size:13px;font-weight:600}.field input,.field select{height:44px;border:1px solid var(--border);border-radius:11px;background:var(--surface);color:var(--foreground);padding:0 13px;font:inherit;outline:none;transition:150ms ease-out}.field input:focus,.field select:focus{border-color:var(--border-strong);box-shadow:0 0 0 3px rgba(0,0,0,.04)}
+.auth-error{display:none;padding:11px 12px;border-radius:10px;background:var(--danger-bg);color:var(--danger-text);font-size:13px}.auth-error.show{display:block}.auth-help{margin-top:24px;padding-top:20px;border-top:1px solid var(--border);font-size:12px;color:var(--foreground-muted);line-height:1.7}.demo-accounts{display:none;margin-top:18px}.demo-accounts.show{display:block}.demo-row{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px}.demo-row code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--foreground-secondary)}
+@media(max-width:860px){.auth-shell{grid-template-columns:1fr}.auth-aside{display:none}.auth-main{padding:24px;align-items:flex-start;padding-top:14vh}}
+</style></head><body>
+<div class="auth-shell">
+  <aside class="auth-aside"><div class="brand"><div class="brand-mark">C</div><div class="brand-copy"><strong>CareerOS</strong><span>AI Career Planning OS</span></div></div><div style="margin-top:auto;max-width:420px"><div class="eyebrow">Secure Workspace</div><h2 style="font-size:28px;margin:12px 0">一个账户，只访问被授权的学生、班级与学校数据。</h2><p class="meta" style="line-height:1.8">生产模式启用服务端认证、RBAC 与 Tenant Isolation。Showcase Edition 仍可独立离线演示。</p></div></aside>
+  <main class="auth-main"><section class="auth-panel"><div class="eyebrow">CareerOS Account</div><h1>登录工作空间</h1><p class="lede">使用学校或平台分配的账户进入你的角色工作台。</p><div id="err" class="auth-error"></div>
+    <form id="form" class="auth-form">
+      <div class="field"><label for="email">邮箱</label><input id="email" name="email" type="email" autocomplete="username" placeholder="name@school.edu.cn" required></div>
+      <div class="field"><label for="password">密码</label><input id="password" name="password" type="password" autocomplete="current-password" required></div>
+      <div class="field"><label for="role">身份（可选）</label><select id="role"><option value="">自动识别</option><option value="student">学生</option><option value="teacher">教师</option><option value="school_admin">学校管理员</option><option value="super_admin">平台管理员</option></select></div>
+      <button id="submit" class="btn primary" type="submit" style="width:100%;height:44px">登录</button>
+    </form>
+    <div id="demo" class="demo-accounts"><div class="eyebrow">Local Demo Accounts</div><div class="demo-row"><span>学生</span><code>student@demo.local</code></div><div class="demo-row"><span>教师</span><code>teacher@demo.local</code></div><div class="demo-row"><span>学校管理员</span><code>admin@demo.local</code></div><div class="demo-row"><span>平台管理员</span><code>super@demo.local</code></div><p class="meta" style="margin-top:10px">本地开发默认密码：<code>CareerOS-Demo-123!</code>。生产环境不会自动创建这些账户。</p></div>
+    <div class="auth-help">无法登录时请联系学校管理员。密码重置 API 已预留；正式上线前应接入邮件或学校身份系统完成验证码/通知流程。</div>
+  </section></main>
+</div>
+<script src="/static/vendor/lucide.min.js"></script><script src="/static/ui.js"></script><script>
+const form=document.getElementById('form'),err=document.getElementById('err'),btn=document.getElementById('submit');
+const params=new URLSearchParams(location.search),next=params.get('next')||'';
+async function init(){try{const h=await fetch('/api/health').then(r=>r.json());if(h.auth?.environment!=='production')document.getElementById('demo').classList.add('show')}catch{}}
+form.addEventListener('submit',async e=>{e.preventDefault();err.classList.remove('show');btn.disabled=true;btn.textContent='登录中…';try{const body={email:email.value.trim(),password:password.value,role:role.value||null};const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw new Error(d.detail||'登录失败');location.href=next||d.redirect||'/'}catch(ex){err.textContent=ex.message||'登录失败';err.classList.add('show')}finally{btn.disabled=false;btn.textContent='登录'}});init();
+</script></body></html>
