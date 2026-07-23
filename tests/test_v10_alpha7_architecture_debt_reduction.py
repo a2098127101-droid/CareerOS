@@ -127,18 +127,26 @@ def test_privacy_and_commercial_routes_are_modularized_without_duplicates(tmp_pa
     assert '@app.get("/api/privacy/export")' not in main_text
     assert '@app.get("/api/admin/commercial/overview")' not in main_text
     code = r'''
-from collections import Counter
 from app.main import app
-keys=[]
-for r in app.routes:
-    methods=tuple(sorted(getattr(r,'methods',[]) or []))
-    keys.append((getattr(r,'path',''),methods))
-counts=Counter(keys)
-targets=['/api/privacy/export','/api/admin/privacy/requests','/api/admin/commercial/overview','/api/admin/analytics/summary','/api/billing/webhooks/{provider_id}']
-for path in targets:
-    matches=[(k,v) for k,v in counts.items() if k[0]==path]
-    assert matches, path
-    assert all(v==1 for _,v in matches), (path,matches)
+schema=app.openapi()
+targets={
+    '/api/privacy/export':'get',
+    '/api/admin/privacy/requests':'get',
+    '/api/admin/commercial/overview':'get',
+    '/api/admin/analytics/summary':'get',
+    '/api/billing/webhooks/{provider_id}':'post',
+}
+for path,method in targets.items():
+    assert path in schema['paths'], path
+    assert method in schema['paths'][path], (path,method)
+operation_ids=[
+    operation.get('operationId')
+    for path_item in schema['paths'].values()
+    for method,operation in path_item.items()
+    if method in {'get','put','post','delete','options','head','patch','trace'}
+]
+assert all(operation_ids)
+assert len(operation_ids)==len(set(operation_ids)), 'duplicate OpenAPI operation IDs'
 print('ROUTER_MODULARIZATION_OK')
 '''
     env=os.environ.copy(); env.update({

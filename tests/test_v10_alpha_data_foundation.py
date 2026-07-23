@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -96,6 +97,10 @@ def test_snapshot_export_and_postgres_import_dry_run(tmp_path: Path):
     out = tmp_path / "snapshot"
     manifest = export_snapshot(db, out)
     assert manifest["tables"]["sessions"] == 1
+    for table, expected_hash in manifest["sha256"].items():
+        payload = (out / f"{table}.jsonl").read_bytes()
+        assert b"\r\n" not in payload
+        assert hashlib.sha256(payload).hexdigest() == expected_hash
     dry = import_snapshot(out, "", dry_run=True)
     assert dry["ok"] is True and dry["dry_run"] is True
     assert "sessions" in dry["order"]
@@ -133,5 +138,4 @@ def test_sqlalchemy_session_repository_parity_on_baseline_schema(tmp_path: Path)
     repo.save(loaded)
     rows = repo.list(tenant_id="org-a", class_id="group-a")
     assert rows and rows[0][0].stage == "draft"
-
 
