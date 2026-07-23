@@ -1,4 +1,4 @@
-name: CareerOS CI
+name: CareerOS CI (locked 132-test matrix)
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
 jobs:
   sqlite-regression:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
