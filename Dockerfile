@@ -9,7 +9,9 @@ RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.l
 COPY requirements.txt requirements.lock ./
 RUN pip install --no-cache-dir --require-hashes --retries 10 --timeout 60 \
     --index-url https://pypi.org/simple \
-    -r requirements.lock
+    -r requirements.lock \
+    && pip check \
+    && pip uninstall --yes setuptools wheel
 RUN groupadd --gid 10001 careeros \
     && useradd --uid 10001 --gid careeros --home-dir /app --no-create-home \
        --shell /usr/sbin/nologin careeros
