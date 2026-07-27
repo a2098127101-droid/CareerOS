@@ -58,7 +58,7 @@ def certify(database_url: str, out_path: Path) -> dict:
         future=True,
         pool_pre_ping=True,
         connect_args={"options": f"-csearch_path={schema},public"},
-    )
+    ).execution_options(schema_translate_map={None: schema})
     try:
         # Disposable schema makes the probe non-destructive while exercising PostgreSQL SQL semantics.
         BASELINE_METADATA.create_all(cert_engine)
@@ -80,17 +80,19 @@ def certify(database_url: str, out_path: Path) -> dict:
             session_ttl_hours=1,
             embedding_gateway=EmbeddingGateway(EmbeddingConfig()),
         )
-        tenant = "cert-org"
+        run_suffix = secrets.token_hex(4)
+        tenant = f"cert-org-{run_suffix}"
+        email = f"cert-user-{run_suffix}@example.invalid"
         repos["identity"].ensure_tenant(tenant, "Certification Organization")
         user = repos["identity"].create_user(
-            email="cert-user@example.invalid",
+            email=email,
             password="Certification-Password-12345",
             display_name="Certification User",
             tenant_id=tenant,
             role="participant",
         )
         principal, token = repos["identity"].authenticate(
-            "cert-user@example.invalid", "Certification-Password-12345", tenant_id=tenant
+            email, "Certification-Password-12345", tenant_id=tenant
         )
         assert repos["identity"].resolve_session(token).user_id == principal.user_id
         checks.append("identity_auth")
@@ -154,7 +156,7 @@ def certify(database_url: str, out_path: Path) -> dict:
         repos["commercial"].ensure_subscription(tenant, "professional")
         repos["commercial"].track(tenant_id=tenant, user_id=user["user_id"], event_name="certification_probe")
         stored = StoredObject(
-            object_id="OBJ-CERT", provider="local", key=f"{tenant}/{user['user_id']}/cert.txt",
+            object_id=f"OBJ-CERT-{run_suffix}", provider="local", key=f"{tenant}/{user['user_id']}/cert.txt",
             filename="cert.txt", size_bytes=1, sha256="0" * 64, content_type="text/plain",
         )
         repos["storage_registry"].record(stored=stored, tenant_id=tenant, owner_user_id=user["user_id"])

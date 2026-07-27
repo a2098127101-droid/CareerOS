@@ -1,0 +1,3 @@
+{"query":"2026就业赛道材料需要围绕哪些内容？","expected_source_title":"示例：2026职规赛就业赛道官方规则","expected_authority":"official","expected_year":"2026","required_terms":["目标岗位","个人经历证据","人岗匹配"],"scope":"global","notes":"Demo retrieval evaluation case; not an official rule claim."}
+{"query":"用户研究员需要哪些能力？","expected_source_title":"示例：用户研究员岗位要求","expected_authority":"public","expected_year":"2026","required_terms":["用户访谈","需求分析","数据分析"],"scope":"global","notes":"Demo structured-role evidence case."}
+{"query":"学校有哪些模拟答辩和简历辅导资源？","expected_source_title":"示例：学校生涯辅导资源","expected_authority":"school","expected_year":"2026","required_terms":["简历门诊","模拟答辩"],"scope":"global","notes":"Demo school-resource case."}

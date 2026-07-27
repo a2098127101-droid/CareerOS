@@ -58,11 +58,16 @@ GET   /api/domain/v1/audit
 
 ## Validation
 
-- Test files: 36
-- Automated tests: **153/153 passed**
-- SQLite migration: **21/21**
-- Alembic head: `0009_domain_intelligence_v15`
-- H5 copies synchronized and inline JavaScript syntax-checked.
+- Automated tests: **161/161 passed**
+- SQLite migration: **22/22**
+- Alembic head: `0010_immutable_runtime_tenant_hardening`
+- Immutable published-migration guard and upgrade-from-original-0007 test.
+- Canonical `/api/v1` compatibility surface with OpenAPI cookie authentication.
+- Deterministic Demo retrieval evaluation and disposable staging infrastructure probe.
+- Chrome multi-role browser E2E.
+
+Real generation-model, semantic Embedding and remote Reranker calls remain
+environment-dependent gates and were not tested without credentials.
 
 ## Important boundaries
 

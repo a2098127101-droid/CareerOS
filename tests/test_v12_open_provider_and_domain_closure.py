@@ -76,8 +76,19 @@ import pytest
 from app.model_store import ProviderRecord
 
 
+@pytest.fixture
+def public_test_dns(monkeypatch):
+    """Keep mocked provider tests independent from enterprise DNS interception."""
+    monkeypatch.setattr(
+        "app.network_security.socket.getaddrinfo",
+        lambda *args, **kwargs: [
+            (2, 1, 6, "", ("93.184.216.34", 443)),
+        ],
+    )
+
+
 @pytest.mark.asyncio
-async def test_custom_rest_provider_executes_request_and_maps_response(monkeypatch):
+async def test_custom_rest_provider_executes_request_and_maps_response(monkeypatch, public_test_dns):
     captured = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -111,7 +122,7 @@ async def test_custom_rest_provider_executes_request_and_maps_response(monkeypat
     assert 'v=1' in captured['url']
 
 @pytest.mark.asyncio
-async def test_oauth2_client_credentials_custom_rest_flow(monkeypatch):
+async def test_oauth2_client_credentials_custom_rest_flow(monkeypatch, public_test_dns):
     calls = []
 
     def handler(request: httpx.Request) -> httpx.Response:

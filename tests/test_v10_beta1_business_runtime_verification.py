@@ -133,7 +133,7 @@ def test_beta1_gate_requires_business_migration_and_recovery_certifications():
 
 
 def test_production_readiness_requires_business_certificate():
-    text = Path("app/main.py").read_text(encoding="utf-8")
+    text = Path("app/routers/system.py").read_text(encoding="utf-8")
     assert "signed business E2E certification" in text
     assert "business_certification" in text
 

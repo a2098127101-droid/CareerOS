@@ -278,21 +278,21 @@
       "foreign_keys": [],
       "indexes": [
         {
+          "name": "idx_artifact_series_session",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "session_id",
+            "updated_at"
+          ]
+        },
+        {
           "name": "idx_artifact_owner_active",
           "unique": false,
           "columns": [
             "tenant_id",
             "owner_user_id",
             "deleted_at",
-            "updated_at"
-          ]
-        },
-        {
-          "name": "idx_artifact_series_session",
-          "unique": false,
-          "columns": [
-            "tenant_id",
-            "session_id",
             "updated_at"
           ]
         }
@@ -394,6 +394,15 @@
       ],
       "indexes": [
         {
+          "name": "idx_artifact_versions_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "artifact_id",
+            "version"
+          ]
+        },
+        {
           "name": "idx_artifact_versions_series",
           "unique": false,
           "columns": [
@@ -480,21 +489,30 @@
       ],
       "foreign_keys": [
         {
-          "from": "user_id",
-          "table": "users",
-          "to": "user_id",
-          "on_update": "NO ACTION",
-          "on_delete": "NO ACTION"
-        },
-        {
           "from": "tenant_id",
           "table": "tenants",
           "to": "tenant_id",
           "on_update": "NO ACTION",
           "on_delete": "NO ACTION"
+        },
+        {
+          "from": "user_id",
+          "table": "users",
+          "to": "user_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
         }
       ],
       "indexes": [
+        {
+          "name": "idx_auth_sessions_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "user_id",
+            "expires_at"
+          ]
+        },
         {
           "name": "idx_auth_sessions_token",
           "unique": false,
@@ -559,9 +577,9 @@
       ],
       "foreign_keys": [
         {
-          "from": "class_id",
-          "table": "classes",
-          "to": "class_id",
+          "from": "user_id",
+          "table": "users",
+          "to": "user_id",
           "on_update": "NO ACTION",
           "on_delete": "NO ACTION"
         },
@@ -573,9 +591,9 @@
           "on_delete": "NO ACTION"
         },
         {
-          "from": "user_id",
-          "table": "users",
-          "to": "user_id",
+          "from": "class_id",
+          "table": "classes",
+          "to": "class_id",
           "on_update": "NO ACTION",
           "on_delete": "NO ACTION"
         }
@@ -1037,6 +1055,16 @@
       "foreign_keys": [],
       "indexes": [
         {
+          "name": "idx_evidence_owner_active",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "owner_user_id",
+            "deleted_at",
+            "updated_at"
+          ]
+        },
+        {
           "name": "idx_evidence_session",
           "unique": false,
           "columns": [
@@ -1051,16 +1079,6 @@
             "tenant_id",
             "owner_user_id",
             "verification_status",
-            "updated_at"
-          ]
-        },
-        {
-          "name": "idx_evidence_owner_active",
-          "unique": false,
-          "columns": [
-            "tenant_id",
-            "owner_user_id",
-            "deleted_at",
             "updated_at"
           ]
         },
@@ -1484,11 +1502,12 @@
       "foreign_keys": [],
       "indexes": [
         {
-          "name": "idx_knowledge_sources_scope",
+          "name": "idx_knowledge_sources_tenant",
           "unique": false,
           "columns": [
-            "scope",
-            "active"
+            "tenant_id",
+            "active",
+            "updated_at"
           ]
         },
         {
@@ -1500,12 +1519,11 @@
           ]
         },
         {
-          "name": "idx_knowledge_sources_tenant",
+          "name": "idx_knowledge_sources_scope",
           "unique": false,
           "columns": [
-            "tenant_id",
-            "active",
-            "updated_at"
+            "scope",
+            "active"
           ]
         }
       ],
@@ -2133,6 +2151,15 @@
       "foreign_keys": [],
       "indexes": [
         {
+          "name": "idx_sessions_class",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "class_id",
+            "updated_at"
+          ]
+        },
+        {
           "name": "idx_sessions_tenant_updated",
           "unique": false,
           "columns": [
@@ -2146,15 +2173,6 @@
           "columns": [
             "student_user_id",
             "tenant_id"
-          ]
-        },
-        {
-          "name": "idx_sessions_class",
-          "unique": false,
-          "columns": [
-            "tenant_id",
-            "class_id",
-            "updated_at"
           ]
         }
       ],
@@ -2368,18 +2386,18 @@
       "foreign_keys": [],
       "indexes": [
         {
-          "name": "idx_feedback_tenant_session",
+          "name": "idx_feedback_session",
           "unique": false,
           "columns": [
-            "tenant_id",
             "session_id",
             "created_at"
           ]
         },
         {
-          "name": "idx_feedback_session",
+          "name": "idx_feedback_tenant_session",
           "unique": false,
           "columns": [
+            "tenant_id",
             "session_id",
             "created_at"
           ]
@@ -2438,16 +2456,16 @@
       ],
       "foreign_keys": [
         {
-          "from": "tenant_id",
-          "table": "tenants",
-          "to": "tenant_id",
+          "from": "user_id",
+          "table": "users",
+          "to": "user_id",
           "on_update": "NO ACTION",
           "on_delete": "NO ACTION"
         },
         {
-          "from": "user_id",
-          "table": "users",
-          "to": "user_id",
+          "from": "tenant_id",
+          "table": "tenants",
+          "to": "tenant_id",
           "on_update": "NO ACTION",
           "on_delete": "NO ACTION"
         }
@@ -3509,19 +3527,19 @@
       "foreign_keys": [],
       "indexes": [
         {
-          "name": "idx_user_invitations_email",
-          "unique": false,
-          "columns": [
-            "email",
-            "tenant_id"
-          ]
-        },
-        {
           "name": "idx_user_invitations_tenant",
           "unique": false,
           "columns": [
             "tenant_id",
             "created_at"
+          ]
+        },
+        {
+          "name": "idx_user_invitations_email",
+          "unique": false,
+          "columns": [
+            "email",
+            "tenant_id"
           ]
         }
       ],
@@ -3610,18 +3628,18 @@
       "foreign_keys": [],
       "indexes": [
         {
-          "name": "idx_billing_events_provider",
-          "unique": false,
-          "columns": [
-            "provider",
-            "received_at"
-          ]
-        },
-        {
           "name": "idx_billing_events_tenant",
           "unique": false,
           "columns": [
             "tenant_id",
+            "received_at"
+          ]
+        },
+        {
+          "name": "idx_billing_events_provider",
+          "unique": false,
+          "columns": [
+            "provider",
             "received_at"
           ]
         }
@@ -4256,15 +4274,6 @@
           ]
         },
         {
-          "name": "idx_unified_runtime_tenant_type_updated",
-          "unique": false,
-          "columns": [
-            "tenant_id",
-            "entity_type",
-            "updated_at"
-          ]
-        },
-        {
           "name": "idx_unified_runtime_owner",
           "unique": false,
           "columns": [
@@ -4272,6 +4281,15 @@
             "owner_user_id",
             "entity_type",
             "revision"
+          ]
+        },
+        {
+          "name": "idx_unified_runtime_tenant_type_updated",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "entity_type",
+            "updated_at"
           ]
         }
       ],
@@ -4795,7 +4813,17 @@
         }
       ],
       "foreign_keys": [],
-      "indexes": [],
+      "indexes": [
+        {
+          "name": "idx_capability_versions_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "capability_id",
+            "version"
+          ]
+        }
+      ],
       "unique_constraints": [
         [
           "capability_id",
@@ -4866,7 +4894,17 @@
         }
       ],
       "foreign_keys": [],
-      "indexes": [],
+      "indexes": [
+        {
+          "name": "idx_career_gap_versions_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "gap_id",
+            "version"
+          ]
+        }
+      ],
       "unique_constraints": [
         [
           "gap_id",
@@ -5369,21 +5407,21 @@
       "foreign_keys": [],
       "indexes": [
         {
+          "name": "idx_domain_audit_session",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "session_id",
+            "created_at"
+          ]
+        },
+        {
           "name": "idx_domain_audit_entity",
           "unique": false,
           "columns": [
             "tenant_id",
             "entity_type",
             "entity_id",
-            "created_at"
-          ]
-        },
-        {
-          "name": "idx_domain_audit_session",
-          "unique": false,
-          "columns": [
-            "tenant_id",
-            "session_id",
             "created_at"
           ]
         }
@@ -5454,7 +5492,17 @@
         }
       ],
       "foreign_keys": [],
-      "indexes": [],
+      "indexes": [
+        {
+          "name": "idx_domain_claim_versions_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "claim_id",
+            "version"
+          ]
+        }
+      ],
       "unique_constraints": [
         [
           "claim_id",

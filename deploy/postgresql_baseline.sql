@@ -879,8 +879,8 @@ CREATE TABLE auth_sessions (
 	revoked_at TIMESTAMP WITH TIME ZONE, 
 	CONSTRAINT pk_auth_sessions PRIMARY KEY (auth_session_id), 
 	CONSTRAINT uq_auth_sessions_1 UNIQUE (token_hash), 
-	CONSTRAINT fk_auth_sessions_1_user_id FOREIGN KEY(user_id) REFERENCES users (user_id), 
-	CONSTRAINT fk_auth_sessions_2_tenant_id FOREIGN KEY(tenant_id) REFERENCES tenants (tenant_id)
+	CONSTRAINT fk_auth_sessions_1_tenant_id FOREIGN KEY(tenant_id) REFERENCES tenants (tenant_id),
+	CONSTRAINT fk_auth_sessions_2_user_id FOREIGN KEY(user_id) REFERENCES users (user_id)
 );
 
 
@@ -931,8 +931,8 @@ CREATE TABLE tenant_memberships (
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
 	CONSTRAINT pk_tenant_memberships PRIMARY KEY (membership_id), 
 	CONSTRAINT uq_tenant_memberships_1 UNIQUE (tenant_id, user_id, role), 
-	CONSTRAINT fk_tenant_memberships_1_tenant_id FOREIGN KEY(tenant_id) REFERENCES tenants (tenant_id), 
-	CONSTRAINT fk_tenant_memberships_2_user_id FOREIGN KEY(user_id) REFERENCES users (user_id)
+	CONSTRAINT fk_tenant_memberships_1_user_id FOREIGN KEY(user_id) REFERENCES users (user_id),
+	CONSTRAINT fk_tenant_memberships_2_tenant_id FOREIGN KEY(tenant_id) REFERENCES tenants (tenant_id)
 );
 
 
@@ -967,16 +967,16 @@ CREATE TABLE class_memberships (
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
 	CONSTRAINT pk_class_memberships PRIMARY KEY (class_membership_id), 
 	CONSTRAINT uq_class_memberships_1 UNIQUE (class_id, user_id, role), 
-	CONSTRAINT fk_class_memberships_1_class_id FOREIGN KEY(class_id) REFERENCES classes (class_id), 
+	CONSTRAINT fk_class_memberships_1_user_id FOREIGN KEY(user_id) REFERENCES users (user_id),
 	CONSTRAINT fk_class_memberships_2_tenant_id FOREIGN KEY(tenant_id) REFERENCES tenants (tenant_id), 
-	CONSTRAINT fk_class_memberships_3_user_id FOREIGN KEY(user_id) REFERENCES users (user_id)
+	CONSTRAINT fk_class_memberships_3_class_id FOREIGN KEY(class_id) REFERENCES classes (class_id)
 );
 
-CREATE INDEX idx_tasks_owner_active ON ai_tasks (tenant_id, owner_user_id, status, updated_at);
 CREATE INDEX idx_tasks_tenant ON ai_tasks (tenant_id, status, updated_at);
+CREATE INDEX idx_tasks_owner_active ON ai_tasks (tenant_id, owner_user_id, status, updated_at);
 CREATE INDEX idx_analytics_tenant_time ON analytics_events (tenant_id, created_at);
-CREATE INDEX idx_artifact_owner_active ON artifact_series (tenant_id, owner_user_id, deleted_at, updated_at);
 CREATE INDEX idx_artifact_series_session ON artifact_series (tenant_id, session_id, updated_at);
+CREATE INDEX idx_artifact_owner_active ON artifact_series (tenant_id, owner_user_id, deleted_at, updated_at);
 CREATE INDEX idx_artifact_template_defs_tenant ON artifact_template_definitions (tenant_id, kind, status, version);
 CREATE INDEX idx_billing_events_provider ON billing_events (provider, received_at);
 CREATE INDEX idx_billing_events_tenant ON billing_events (tenant_id, received_at);
@@ -984,28 +984,31 @@ CREATE INDEX idx_billing_orders_tenant ON billing_orders (tenant_id, created_at)
 CREATE INDEX idx_capabilities_tenant_category ON capabilities (tenant_id, category, status, name);
 CREATE INDEX idx_assessment_evidence_assessment ON capability_assessment_evidence (tenant_id, assessment_id);
 CREATE INDEX idx_capability_assessments_latest ON capability_assessments (tenant_id, session_id, capability_id, assessment_version);
+CREATE INDEX idx_capability_versions_tenant ON capability_versions (tenant_id, capability_id, version);
+CREATE INDEX idx_career_gap_versions_tenant ON career_gap_versions (tenant_id, gap_id, version);
 CREATE INDEX idx_career_gaps_session_job ON career_gaps (tenant_id, session_id, job_id, status, severity);
 CREATE INDEX idx_claim_capability_capability ON claim_capability_links (tenant_id, capability_id, confidence);
-CREATE INDEX idx_claim_evidence_evidence ON claim_evidence_links (tenant_id, evidence_id, relation);
 CREATE INDEX idx_claim_evidence_claim ON claim_evidence_links (tenant_id, claim_id, relation, confidence);
+CREATE INDEX idx_claim_evidence_evidence ON claim_evidence_links (tenant_id, evidence_id, relation);
 CREATE INDEX idx_data_subject_requests_user ON data_subject_requests (tenant_id, user_id, created_at);
 CREATE INDEX idx_domain_audit_entity ON domain_audit_events (tenant_id, entity_type, entity_id, created_at);
 CREATE INDEX idx_domain_audit_session ON domain_audit_events (tenant_id, session_id, created_at);
+CREATE INDEX idx_domain_claim_versions_tenant ON domain_claim_versions (tenant_id, claim_id, version);
 CREATE INDEX idx_domain_claims_session ON domain_claims (tenant_id, session_id, owner_user_id, status, updated_at);
 CREATE INDEX idx_claims_session ON evidence_claims (tenant_id, session_id, created_at);
 CREATE INDEX idx_graph_edges_session ON evidence_graph_edges (tenant_id, session_id, created_at);
 CREATE INDEX idx_evidence_item_verification_history ON evidence_item_verification_history (tenant_id, evidence_id, created_at);
-CREATE INDEX idx_evidence_tenant_session ON evidence_items (tenant_id, session_id, created_at);
 CREATE INDEX idx_evidence_owner_active ON evidence_items (tenant_id, owner_user_id, deleted_at, updated_at);
-CREATE INDEX idx_evidence_verification ON evidence_items (tenant_id, owner_user_id, verification_status, updated_at);
+CREATE INDEX idx_evidence_tenant_session ON evidence_items (tenant_id, session_id, created_at);
 CREATE INDEX idx_evidence_session ON evidence_items (session_id, created_at);
+CREATE INDEX idx_evidence_verification ON evidence_items (tenant_id, owner_user_id, verification_status, updated_at);
 CREATE INDEX idx_verification_history_session ON evidence_verification_history (tenant_id, session_id, created_at);
 CREATE INDEX idx_verification_history_claim ON evidence_verification_history (tenant_id, claim_id, created_at);
 CREATE INDEX idx_requirement_capability_job ON job_requirement_capability_links (tenant_id, job_id, requirement_id);
 CREATE INDEX idx_job_requirement_versions ON job_requirement_versions (tenant_id, job_id, requirement_id, version);
 CREATE INDEX idx_job_requirements_job ON job_requirements (tenant_id, job_id, importance);
-CREATE INDEX idx_jobs_title_city ON jobs (title, city, active);
 CREATE INDEX idx_jobs_tenant ON jobs (tenant_id, active, updated_at);
+CREATE INDEX idx_jobs_title_city ON jobs (title, city, active);
 CREATE INDEX idx_knowledge_embeddings_source ON knowledge_embeddings (source_id);
 CREATE INDEX idx_knowledge_sources_scope ON knowledge_sources (scope, active);
 CREATE INDEX idx_knowledge_tenant ON knowledge_sources (tenant_id, updated_at);
@@ -1018,23 +1021,25 @@ CREATE INDEX idx_rag_eval_cases_tenant ON rag_eval_cases (tenant_id, active, cre
 CREATE INDEX idx_rag_eval_runs_tenant ON rag_eval_runs (tenant_id, created_at);
 CREATE INDEX idx_review_records_session ON review_records (tenant_id, session_id, created_at);
 CREATE INDEX idx_security_audit_tenant ON security_audit_log (tenant_id, created_at);
-CREATE INDEX idx_sessions_owner ON sessions (student_user_id, tenant_id);
-CREATE INDEX idx_sessions_tenant_updated ON sessions (tenant_id, updated_at);
 CREATE INDEX idx_sessions_class ON sessions (tenant_id, class_id, updated_at);
+CREATE INDEX idx_sessions_tenant_updated ON sessions (tenant_id, updated_at);
+CREATE INDEX idx_sessions_owner ON sessions (student_user_id, tenant_id);
 CREATE INDEX idx_stored_objects_tenant_owner ON stored_objects (tenant_id, owner_user_id, created_at);
 CREATE INDEX idx_stored_objects_status ON stored_objects (tenant_id, status, created_at);
-CREATE INDEX idx_feedback_tenant_session ON teacher_feedback (tenant_id, session_id, created_at);
 CREATE INDEX idx_feedback_session ON teacher_feedback (session_id, created_at);
+CREATE INDEX idx_feedback_tenant_session ON teacher_feedback (tenant_id, session_id, created_at);
 CREATE INDEX idx_unified_runtime_tenant_type_revision ON unified_runtime_entities (tenant_id, entity_type, revision);
-CREATE INDEX idx_unified_runtime_tenant_type_updated ON unified_runtime_entities (tenant_id, entity_type, updated_at);
 CREATE INDEX idx_unified_runtime_owner ON unified_runtime_entities (tenant_id, owner_user_id, entity_type, revision);
+CREATE INDEX idx_unified_runtime_tenant_type_updated ON unified_runtime_entities (tenant_id, entity_type, updated_at);
 CREATE INDEX idx_user_invitations_email ON user_invitations (email, tenant_id);
 CREATE INDEX idx_user_invitations_tenant ON user_invitations (tenant_id, created_at);
 CREATE INDEX idx_workflow_session ON workflow_instances (tenant_id, session_id);
 CREATE INDEX idx_workflow_template ON workflow_instances (tenant_id, template_id, updated_at);
 CREATE INDEX idx_workflow_template_defs_tenant ON workflow_template_definitions (tenant_id, preset_id, status, version);
+CREATE INDEX idx_artifact_versions_tenant ON artifact_versions (tenant_id, artifact_id, version);
 CREATE INDEX idx_artifact_versions_series ON artifact_versions (artifact_id, version);
 CREATE INDEX idx_auth_sessions_token ON auth_sessions (token_hash);
+CREATE INDEX idx_auth_sessions_tenant ON auth_sessions (tenant_id, user_id, expires_at);
 CREATE INDEX idx_knowledge_chunks_source ON knowledge_chunks (source_id);
 CREATE INDEX idx_memberships_user ON tenant_memberships (user_id, tenant_id);
 CREATE INDEX idx_workflow_steps_session ON workflow_steps (tenant_id, session_id, step_index);

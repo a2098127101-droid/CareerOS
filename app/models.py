@@ -429,8 +429,10 @@ class KnowledgeTextIngest(BaseModel):
 class RAGEvalCaseInput(BaseModel):
     query: str = Field(min_length=1, max_length=2000)
     expected_source_id: str = Field(default="", max_length=200)
+    expected_source_title: str = Field(default="", max_length=300)
     expected_authority: str = Field(default="", max_length=80)
     expected_year: str = Field(default="", max_length=16)
+    required_terms: list[str] = Field(default_factory=list, max_length=50)
     scope: str = Field(default="global", max_length=80)
     notes: str = Field(default="", max_length=1000)
 

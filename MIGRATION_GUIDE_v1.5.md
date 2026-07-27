@@ -2,7 +2,7 @@
 
 ## SQLite
 
-Startup applies migrations through version 21. Back up the database before first startup.
+Startup applies migrations through version 22. Back up the database before first startup.
 
 ```bash
 cp data/careeros.db data/careeros.pre-v15.db
@@ -16,7 +16,7 @@ from app.migrations import migration_status
 print(migration_status("data/careeros.db"))
 ```
 
-Expected current/latest: `21`.
+Expected current/latest: `22`.
 
 ## PostgreSQL
 
@@ -27,8 +27,18 @@ alembic -c alembic.ini upgrade head
 Expected Alembic head:
 
 ```text
-0009_domain_intelligence_v15
+0010_immutable_runtime_tenant_hardening
 ```
+
+`0010` is forward-only. It restores the published `0007` migration to its
+original immutable content, creates missing Unified Runtime tables for
+deployments that had already applied that release, adds tenant-first indexes,
+and enables/forces PostgreSQL tenant RLS policies. Do not rewrite or re-run
+`0007`.
+
+Production PostgreSQL must use a dedicated non-owner, non-superuser,
+`NOBYPASSRLS` application role. The migration/owner role is for schema changes,
+not normal application traffic.
 
 ## Created domain tables
 

@@ -26,7 +26,7 @@ def test_v15_schema_and_seed(tmp_path: Path):
     from app.migrations import run_migrations, migration_status
     db = str(tmp_path / "schema.db")
     run_migrations(db)
-    assert migration_status(db)["current"] == 21
+    assert migration_status(db)["current"] == 22
     with sqlite3.connect(db) as conn:
         tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         required = {

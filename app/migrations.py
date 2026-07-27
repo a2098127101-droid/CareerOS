@@ -1226,6 +1226,19 @@ def _migration_21_domain_intelligence_seed(conn: sqlite3.Connection) -> None:
             (capability_id,"global",taxonomy_id,key,name,category,"CareerOS core capability",json.dumps(aliases,ensure_ascii=False),json.dumps({"min":0,"max":100},ensure_ascii=False)))
 
 
+def _migration_22_tenant_index_hardening(conn: sqlite3.Connection) -> None:
+    """Keep tenant-first access paths efficient in the SQLite compatibility runtime."""
+    statements = [
+        "CREATE INDEX IF NOT EXISTS idx_artifact_versions_tenant ON artifact_versions(tenant_id,artifact_id,version)",
+        "CREATE INDEX IF NOT EXISTS idx_auth_sessions_tenant ON auth_sessions(tenant_id,user_id,expires_at)",
+        "CREATE INDEX IF NOT EXISTS idx_capability_versions_tenant ON capability_versions(tenant_id,capability_id,version)",
+        "CREATE INDEX IF NOT EXISTS idx_career_gap_versions_tenant ON career_gap_versions(tenant_id,gap_id,version)",
+        "CREATE INDEX IF NOT EXISTS idx_domain_claim_versions_tenant ON domain_claim_versions(tenant_id,claim_id,version)",
+    ]
+    for statement in statements:
+        conn.execute(statement)
+
+
 
 MIGRATIONS: list[Migration] = [
     (1, "identity_and_tenant_foundation", _migration_1_identity_and_tenant),
@@ -1249,6 +1262,7 @@ MIGRATIONS: list[Migration] = [
     (19, "artifact_workspace_multi_series", _migration_19_artifact_workspace_multi_series),
     (20, "security_trust_and_domain_intelligence", _migration_20_security_trust_and_domain_intelligence),
     (21, "domain_intelligence_seed", _migration_21_domain_intelligence_seed),
+    (22, "tenant_index_hardening", _migration_22_tenant_index_hardening),
 ]
 
 

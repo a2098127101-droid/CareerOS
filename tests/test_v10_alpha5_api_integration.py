@@ -8,7 +8,14 @@ def test_alpha5_identity_privacy_and_model_governance_api(tmp_path: Path):
     code = r'''
 from fastapi.testclient import TestClient
 from app.main import app
+from app import network_security
 import hashlib,hmac,json
+
+# The provider record is never called in this test. Pin DNS to a public documentation
+# address so enterprise DNS interception cannot make the SSRF validator environment-dependent.
+network_security.socket.getaddrinfo=lambda *args,**kwargs:[
+    (network_security.socket.AF_INET,network_security.socket.SOCK_STREAM,6,"",("93.184.216.34",443))
+]
 
 admin=TestClient(app)
 r=admin.post('/api/auth/login',json={'email':'admin@demo.local','password':'CareerOS-Demo-123!','role':'school_admin'})

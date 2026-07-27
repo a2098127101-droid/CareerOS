@@ -13,6 +13,7 @@ from ...embedding_gateway import EmbeddingGateway, local_hash_embedding
 from ...knowledge import SearchHit
 from ...models import KnowledgeRef
 from ...pgvector_backend import pgvector_capabilities, search_pgvector, upsert_pgvector
+from ...retrieval import RerankerGateway, bm25_scores
 from ..sqlalchemy_common import SQLAlchemyRepo
 
 
@@ -30,9 +31,15 @@ def _cosine(a: list[float], b: list[float]) -> float:
 
 
 class PostgresKnowledgeRepository(SQLAlchemyRepo):
-    def __init__(self, engine: Engine, embedding_gateway: EmbeddingGateway):
+    def __init__(
+        self,
+        engine: Engine,
+        embedding_gateway: EmbeddingGateway,
+        reranker_gateway: RerankerGateway | None = None,
+    ):
         super().__init__(engine)
         self.embedding_gateway = embedding_gateway
+        self.reranker_gateway = reranker_gateway or RerankerGateway()
 
     @staticmethod
     def chunk_text(text_value: str, chunk_size: int = 1800, overlap: int = 180) -> list[str]:
@@ -281,6 +288,10 @@ class PostgresKnowledgeRepository(SQLAlchemyRepo):
         if not rows:
             return {"hits": [], "breakdown": [], "retrieval": {"mode": "hybrid", "effective_year": year, "warning": ""}}
         query_lower = query.lower()
+        portable_bm25 = {
+            row["chunk_id"]: score
+            for row, score in zip(rows, bm25_scores(query, [row["content"] for row in rows]))
+        }
         raw = []
         for row in rows:
             txt = row["content"].lower()
@@ -293,7 +304,11 @@ class PostgresKnowledgeRepository(SQLAlchemyRepo):
                     matched += (1 + math.log1p(count)) * min(len(term), 8)
             if query_lower and query_lower in txt:
                 matched += 20
-            lexical = min(1.0, (matched * (1 + unique / max(len(terms), 1)) / max(math.sqrt(len(txt) / 500), .8)) / 35.0) if matched else 0.0
+            legacy_lexical = min(
+                1.0,
+                (matched * (1 + unique / max(len(terms), 1)) / max(math.sqrt(len(txt) / 500), .8)) / 35.0,
+            ) if matched else 0.0
+            lexical = max(portable_bm25.get(row["chunk_id"], 0.0), legacy_lexical)
             if row["chunk_id"] in vector_by_chunk:
                 vector_score = vector_by_chunk[row["chunk_id"]]
             else:
@@ -313,7 +328,19 @@ class PostgresKnowledgeRepository(SQLAlchemyRepo):
                 continue
             raw.append({"row": row, "score": final, "lexical": lexical, "vector": vector_score, "metadata": metadata, "coverage": coverage})
         raw.sort(key=lambda x: x["score"], reverse=True)
-        selected = raw[:top_k]
+        rerank_pool = raw[:max(50, top_k * 10)]
+        reranked = self.reranker_gateway.rerank(
+            query,
+            [item["row"]["content"] for item in rerank_pool],
+            top_n=max(top_k, min(len(rerank_pool), top_k * 4)),
+        )
+        for index, item in enumerate(rerank_pool):
+            reranker_score = reranked.scores[index] if index < len(reranked.scores) else 0.0
+            item["reranker"] = reranker_score
+            if reranked.active:
+                item["score"] = item["score"] * 0.75 + reranker_score * 0.25
+        rerank_pool.sort(key=lambda x: x["score"], reverse=True)
+        selected = rerank_pool[:top_k]
         hits = [SearchHit(
             source_id=x["row"]["source_id"], source_title=x["row"]["source_title"],
             chunk_id=x["row"]["chunk_id"], content=x["row"]["content"], score=round(x["score"], 4),
@@ -329,17 +356,24 @@ class PostgresKnowledgeRepository(SQLAlchemyRepo):
             "breakdown": [{
                 "chunk_id": x["row"]["chunk_id"], "source_id": x["row"]["source_id"],
                 "score": round(x["score"], 4), "lexical": round(x["lexical"], 4), "vector": round(x["vector"], 4),
-                "metadata": round(x["metadata"], 4), "effective_year": x["row"]["effective_year"], "authority": x["row"]["authority"],
+                "metadata": round(x["metadata"], 4), "reranker": round(x.get("reranker", 0.0), 4),
+                "effective_year": x["row"]["effective_year"], "authority": x["row"]["authority"],
+                "source_title": x["row"]["source_title"],
                 "embedding_provider": x["row"].get("provider", "") if hasattr(x["row"], "get") else "",
             } for x in selected],
             "retrieval": {
                 "mode": mode,
-                "bm25": False,
+                "bm25": True,
+                "bm25_backend": "portable_okapi",
                 "vector_backend": "pgvector" if pgvector["ready"] else self.embedding_gateway.model_name,
                 "pgvector": pgvector,
                 "semantic_embedding": qemb.provider != "local_hash" and self.embedding_gateway.semantic_enabled,
                 "embedding_provider": qemb.provider,
                 "embedding_model": qemb.model,
+                "reranker_active": reranked.active,
+                "reranker_provider": reranked.provider,
+                "reranker_model": reranked.model,
+                "reranker_warning": reranked.warning,
                 "effective_year": year,
                 "warning": warning,
                 "note": (

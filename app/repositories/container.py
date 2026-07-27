@@ -17,6 +17,7 @@ from ..workflow_store import WorkflowStore
 from ..unified_runtime_store import UnifiedRuntimeStore
 from ..template_registry import TemplateRegistry
 from ..embedding_gateway import EmbeddingGateway
+from ..retrieval import RerankerGateway
 from ..domain_intelligence import DomainIntelligenceStore
 from ..core.database import DatabaseCapabilityReport, database_capabilities, create_database_engine, BASELINE_METADATA, schema_health
 from .parity import CORE_PARITY
@@ -57,6 +58,7 @@ class RepositoryContainer:
         app_secret_key: str,
         session_ttl_hours: int,
         embedding_gateway: EmbeddingGateway,
+        reranker_gateway: RerankerGateway | None = None,
         database_url: str = "",
         app_env: str = "development",
     ) -> "RepositoryContainer":
@@ -77,7 +79,11 @@ class RepositoryContainer:
             evidence_graph=EvidenceGraphStore(db_path),
             workflows=WorkflowStore(db_path, template_registry=template_registry),
             collaboration=CollaborationStore(db_path),
-            knowledge=KnowledgeStore(db_path, embedding_gateway=embedding_gateway),
+            knowledge=KnowledgeStore(
+                db_path,
+                embedding_gateway=embedding_gateway,
+                reranker_gateway=reranker_gateway,
+            ),
             jobs=JobStore(db_path),
             models=ModelConfigStore(db_path, app_secret_key),
             commercial=CommercialStore(db_path),
@@ -97,6 +103,7 @@ class RepositoryContainer:
         app_secret_key: str,
         session_ttl_hours: int,
         embedding_gateway: EmbeddingGateway,
+        reranker_gateway: RerankerGateway | None = None,
         app_env: str = "development",
     ) -> "RepositoryContainer":
         if not CORE_PARITY.code_parity_complete:
@@ -131,7 +138,11 @@ class RepositoryContainer:
             evidence_graph=PostgresEvidenceGraphRepository(engine),
             workflows=PostgresWorkflowRepository(engine, template_registry=template_registry),
             collaboration=PostgresCollaborationRepository(engine),
-            knowledge=PostgresKnowledgeRepository(engine, embedding_gateway=embedding_gateway),
+            knowledge=PostgresKnowledgeRepository(
+                engine,
+                embedding_gateway=embedding_gateway,
+                reranker_gateway=reranker_gateway,
+            ),
             jobs=PostgresJobRepository(engine),
             models=PostgresModelConfigRepository(engine, app_secret_key),
             commercial=PostgresCommercialRepository(engine),
@@ -144,7 +155,8 @@ class RepositoryContainer:
 
     @classmethod
     def build_sqlalchemy_core_for_testing(
-        cls, *, engine, db_path: str, app_secret_key: str, session_ttl_hours: int, embedding_gateway: EmbeddingGateway
+        cls, *, engine, db_path: str, app_secret_key: str, session_ttl_hours: int,
+        embedding_gateway: EmbeddingGateway, reranker_gateway: RerankerGateway | None = None,
     ) -> dict[str, object]:
         """Build only repositories with SQLAlchemy parity.
 
@@ -165,7 +177,11 @@ class RepositoryContainer:
             "evidence_graph": PostgresEvidenceGraphRepository(engine),
             "workflows": PostgresWorkflowRepository(engine),
             "collaboration": PostgresCollaborationRepository(engine),
-            "knowledge": PostgresKnowledgeRepository(engine, embedding_gateway=embedding_gateway),
+            "knowledge": PostgresKnowledgeRepository(
+                engine,
+                embedding_gateway=embedding_gateway,
+                reranker_gateway=reranker_gateway,
+            ),
             "jobs": PostgresJobRepository(engine),
             "models": PostgresModelConfigRepository(engine, app_secret_key),
             "commercial": PostgresCommercialRepository(engine),

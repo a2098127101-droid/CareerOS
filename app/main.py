@@ -12,6 +12,7 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse, JSONResponse
+from fastapi.security import APIKeyCookie
 from fastapi.staticfiles import StaticFiles
 
 from .agent_service import CareerAgentService
@@ -23,6 +24,7 @@ from .config import Settings
 from .domain_profile import get_domain_profile
 from .domain_intelligence import DomainIntelligenceService
 from .embedding_gateway import EmbeddingConfig, EmbeddingGateway
+from .retrieval import RerankerConfig, RerankerGateway
 from .evidence_verification import EvidenceVerificationService
 from .rag_evaluation import RAGEvalCase, evaluate_rag
 from .pgvector_backend import pgvector_capabilities
@@ -32,7 +34,6 @@ from .runtime_state import build_rate_limiter, redis_capabilities
 from .background_jobs import build_job_manager
 from .job_handlers import register_background_handlers
 from .observability import RuntimeMetrics, configure_observability
-from .model_evaluation import run_model_evaluation
 from .billing import build_billing_provider
 from .emailing import EmailDeliveryError, build_email_provider, invitation_email, password_reset_email
 from .runtime_certification import RuntimeCertification, load_runtime_certification, write_certification
@@ -42,7 +43,6 @@ from .evidence_lock import audit_evidence
 from .file_parser import parse_uploaded_file
 from .migrations import migration_status, run_migrations
 from .llm_gateway import LLMGatewayError
-from .network_security import OutboundURLSecurityError, validate_nonsecret_metadata, validate_outbound_url
 from .models import (
     ChatMessage,
     AITaskCreateRequest,
@@ -54,11 +54,8 @@ from .models import (
     KnowledgeSourceUpdate,
     RAGEvaluationRequest, EvidenceVerificationRequest, ManualClaimVerificationRequest, JobMatchRequest,
     ProfileExtractRequest,
-    ProviderTestRequest, ProviderPlaygroundRequest, ProviderModelsRequest,
-    ProviderUpsert, ModelCapabilityUpsert, ModelRecommendationRequest, ModelEvaluationRequest,
     ReviewRequest,
     ReviseRequest,
-    RouteUpsert,
     SessionState,
     TeacherFeedbackRequest,
     TeacherNoteRequest,
@@ -84,6 +81,10 @@ from .routers.templates import build_template_admin_router
 from .routers.unified_runtime import build_unified_runtime_router
 from .routers.workspace import build_workspace_router
 from .routers.domain_intelligence import build_domain_intelligence_router
+from .routers.system import build_system_router
+from .routers.model_admin import build_model_admin_router
+from .api_versioning import register_v1_compatibility_aliases
+from .tenant_context import clear_tenant_context, set_tenant_context
 
 settings = Settings()
 _runtime_errors = settings.validate_runtime()
@@ -100,6 +101,15 @@ embedding_gateway = EmbeddingGateway(EmbeddingConfig(
     max_batch_size=settings.embedding_max_batch_size, max_retries=settings.embedding_max_retries,
     retry_backoff_seconds=settings.embedding_retry_backoff_seconds,
 ))
+reranker_gateway = RerankerGateway(RerankerConfig(
+    provider=settings.reranker_provider,
+    base_url=settings.reranker_base_url,
+    api_key=settings.reranker_api_key,
+    model=settings.reranker_model,
+    timeout_seconds=settings.reranker_timeout_seconds,
+    max_retries=settings.reranker_max_retries,
+    retry_backoff_seconds=settings.reranker_retry_backoff_seconds,
+))
 # Repository container centralizes persistence wiring. v1.0-beta1 keeps SQLite local compatibility
 # while the full SQLAlchemy repository surface can be wired to PostgreSQL after Alembic provisioning.
 if settings.repository_backend == "postgresql":
@@ -109,6 +119,7 @@ if settings.repository_backend == "postgresql":
         app_secret_key=settings.app_secret_key,
         session_ttl_hours=settings.session_ttl_hours,
         embedding_gateway=embedding_gateway,
+        reranker_gateway=reranker_gateway,
         app_env=settings.app_env,
     )
 else:
@@ -118,6 +129,7 @@ else:
         app_secret_key=settings.app_secret_key,
         session_ttl_hours=settings.session_ttl_hours,
         embedding_gateway=embedding_gateway,
+        reranker_gateway=reranker_gateway,
         app_env=settings.app_env,
     )
 store = repositories.sessions
@@ -210,7 +222,21 @@ elif settings.bootstrap_superadmin_email and settings.bootstrap_superadmin_passw
         display_name="CareerOS Super Admin", tenant_id=settings.bootstrap_tenant_id, role="super_admin"
     )
 
-app = FastAPI(title=f"{settings.product_name} · AI Career Development Platform", version="1.5.0-domain-intelligence")
+app = FastAPI(
+    title=f"{settings.product_name} · AI Career Development Platform",
+    version="1.5.1-release-hardening",
+    description=(
+        "CareerOS Production API. Canonical new integrations should use `/api/v1`; "
+        "unversioned `/api/*` endpoints remain compatibility aliases during migration."
+    ),
+    openapi_tags=[
+        {"name": "Authentication", "description": "Server-side session authentication."},
+        {"name": "Student workspace", "description": "Participant-owned workflow and artifacts."},
+        {"name": "Advisor operations", "description": "Authorized cohort operations."},
+        {"name": "AI administration", "description": "Model, retrieval, and job intelligence administration."},
+        {"name": "System", "description": "Health and operational readiness."},
+    ],
+)
 origins = list(settings.allowed_origins) if settings.allowed_origins else (["*"] if not settings.is_production else [])
 app.add_middleware(
     CORSMiddleware,
@@ -226,6 +252,7 @@ def _rate_allowed(key: tuple[str, str], limit: int, window_seconds: int = 60) ->
 
 @app.middleware("http")
 async def security_observability_and_rate_limit(request: Request, call_next):
+    clear_tenant_context()
     path = request.url.path
     request_id = request.headers.get("X-Request-ID") or f"REQ-{uuid4().hex[:20]}"
     started = time.perf_counter()
@@ -257,6 +284,7 @@ async def security_observability_and_rate_limit(request: Request, call_next):
         latency_ms = (time.perf_counter() - started) * 1000
         runtime_metrics.observe(method=request.method, path=path, status_code=status_code, latency_ms=latency_ms)
         logger.exception("request failed", extra={"request_id": request_id, "path": path, "method": request.method, "status_code": status_code, "latency_ms": round(latency_ms, 2)})
+        clear_tenant_context()
         raise
     latency_ms = (time.perf_counter() - started) * 1000
     runtime_metrics.observe(method=request.method, path=path, status_code=status_code, latency_ms=latency_ms)
@@ -265,6 +293,7 @@ async def security_observability_and_rate_limit(request: Request, call_next):
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
     response.headers.setdefault("Permissions-Policy", "camera=(), geolocation=(), payment=()")
+    clear_tenant_context()
     return response
 
 STAGE_ORDER = {"profile": 1, "track": 2, "draft": 3, "review": 4, "revised": 5}
@@ -272,6 +301,12 @@ STAGE_LABELS = {"profile": "建立画像", "track": "目标确认", "draft": "�
 
 
 AUTH_COOKIE = "careeros_session"
+session_cookie = APIKeyCookie(
+    name=AUTH_COOKIE,
+    scheme_name="CareerOSSession",
+    description="HttpOnly CareerOS session cookie returned by `/api/auth/login`.",
+    auto_error=False,
+)
 
 
 def _demo_principal() -> Principal:
@@ -285,13 +320,18 @@ def _demo_principal() -> Principal:
     )
 
 
-def current_principal(request: Request) -> Principal:
-    token = request.cookies.get(AUTH_COOKIE)
+def current_principal(
+    request: Request,
+    token: str | None = Depends(session_cookie),
+) -> Principal:
     principal = auth_store.resolve_session(token)
     if principal:
+        set_tenant_context(principal.tenant_id, platform_admin=principal.is_super_admin)
         return principal
     if not settings.auth_required:
-        return _demo_principal()
+        principal = _demo_principal()
+        set_tenant_context(principal.tenant_id, platform_admin=principal.is_super_admin)
+        return principal
     raise HTTPException(status_code=401, detail="authentication required")
 
 
@@ -673,77 +713,18 @@ def admin_add_class_member(class_id: str, req: ClassMemberRequest, principal: Pr
     return {"ok": True}
 
 
-@app.get("/api/health")
-def health():
-    tasks = agents.task_status()
-    enabled_count = sum(1 for x in tasks.values() if x["enabled"])
-    mode = "demo" if settings.demo_mode or enabled_count == 0 else ("llm" if enabled_count == len(tasks) else "hybrid")
-    sources = knowledge_store.list_sources()
-    return {
-        "ok": True,
-        "version": "1.5.0-domain-intelligence",
-        "mode": mode,
-        "product": {
-            "name": settings.product_name,
-            "preset": product_profile.profile_id,
-            "subtitle": product_profile.product_subtitle,
-            "competition_template_enabled": product_profile.enable_competition_template,
-        },
-        "tasks": tasks,
-        "knowledge": {
-            "sources": len(sources),
-            "chunks": sum(int(s["chunk_count"]) for s in sources if s["active"]),
-        },
-        "jobs": job_store.stats(),
-        "retrieval": {"embedding_model": embedding_gateway.model_name, "semantic_embedding": embedding_gateway.semantic_enabled},
-        "storage": {"provider": settings.storage_provider},
-        "runtime_state": rate_limiter.capabilities(),
-        "background_jobs": background_jobs.capabilities(),
-        "observability": observability_state,
-        "repository": {"runtime": repositories.backend, "requested": settings.repository_backend, "database_url_configured": bool(settings.database_url)},
-        "migrations": migration_status(settings.db_path),
-        "auth": {"required": settings.auth_required, "environment": settings.app_env},
-        "security": {
-            "admin_token_configured": bool(settings.admin_token),
-            "custom_secret_configured": settings.app_secret_key != "change-me-in-production",
-        },
-    }
-
-
-@app.get("/live")
-@app.get("/api/live")
-def live_probe():
-    return {"ok": True, "service": settings.otel_service_name, "version": "1.5.0-domain-intelligence"}
-
-
-@app.get("/ready")
-@app.get("/api/ready")
-def ready_probe():
-    redis_caps = redis_capabilities(settings.redis_url)
-    blockers = []
-    runtime_cert = load_runtime_certification(settings.runtime_certification_file, settings=settings)
-    business_cert = load_business_certification(settings.business_certification_file, settings=settings)
-    if settings.is_production and not settings.demo_mode:
-        if settings.runtime_state_backend != "redis" or not redis_caps.get("ready"):
-            blockers.append("distributed Redis runtime state is not ready")
-        if settings.background_job_backend != "redis":
-            blockers.append("distributed background job backend is not enabled")
-        if settings.storage_provider != "s3":
-            blockers.append("private S3-compatible object storage is not enabled")
-        if not runtime_cert.get("valid"):
-            blockers.append("signed live runtime certification is missing, stale, invalid, or incomplete")
-        if not business_cert.get("valid"):
-            blockers.append("signed business E2E certification is missing, stale, invalid, or incomplete")
-    return JSONResponse(
-        {
-            "ready": not blockers, "blockers": blockers,
-            "runtime_state": rate_limiter.capabilities(), "redis": redis_caps,
-            "background_jobs": background_jobs.capabilities(), "storage_provider": settings.storage_provider,
-            "runtime_certification": {"valid": bool(runtime_cert.get("valid")), "reason": runtime_cert.get("reason", ""), "generated_at": runtime_cert.get("generated_at")},
-            "business_certification": {"valid": bool(business_cert.get("valid")), "reason": business_cert.get("reason", ""), "generated_at": business_cert.get("generated_at")},
-        },
-        status_code=200 if not blockers else 503,
-    )
+app.include_router(build_system_router(
+    settings=settings,
+    agents=agents,
+    knowledge_store=knowledge_store,
+    job_store=job_store,
+    embedding_gateway=embedding_gateway,
+    rate_limiter=rate_limiter,
+    background_jobs=background_jobs,
+    observability_state=observability_state,
+    repositories=repositories,
+    product_profile=product_profile,
+))
 
 
 @app.get("/api/admin/system/metrics")
@@ -1714,128 +1695,6 @@ app.include_router(build_domain_intelligence_router(
     canonical_role=canonical_role,
 ))
 
-
-# ---------------- Model center / multi-provider APIs ----------------
-@app.get("/api/admin/models/overview")
-def model_overview(x_admin_token: str | None = Header(default=None), principal: Principal = Depends(require_roles("super_admin"))):
-    _require_admin_legacy(x_admin_token, principal)
-    return {
-        "demo_mode": settings.demo_mode,
-        "providers": model_store.list_providers(),
-        "routes": model_store.list_routes(),
-        "capabilities": model_store.list_model_capabilities(),
-        "tasks": agents.task_status(),
-        "usage": model_store.usage_summary(limit=25),
-        "warning": "生产环境必须设置 APP_SECRET_KEY 与 ADMIN_TOKEN。" if (settings.app_secret_key == "change-me-in-production" or not settings.admin_token) else None,
-    }
-
-
-@app.post("/api/admin/providers")
-def upsert_provider(req: ProviderUpsert, x_admin_token: str | None = Header(default=None), principal: Principal = Depends(require_roles("super_admin"))):
-    _require_admin_legacy(x_admin_token, principal)
-    try:
-        validate_outbound_url(req.base_url, allow_private_network=req.allow_private_network)
-        if req.oauth_token_url:
-            validate_outbound_url(req.oauth_token_url, allow_private_network=req.allow_private_network)
-        validate_nonsecret_metadata(req.extra_headers, req.query_params)
-    except OutboundURLSecurityError as exc:
-        raise HTTPException(status_code=400, detail={"code": "unsafe_provider_configuration", "message": str(exc)})
-    model_store.upsert_provider(req)
-    return {"ok": True, "providers": model_store.list_providers()}
-
-
-@app.delete("/api/admin/providers/{provider_id}")
-def delete_provider(provider_id: str, x_admin_token: str | None = Header(default=None), principal: Principal = Depends(require_roles("super_admin"))):
-    _require_admin_legacy(x_admin_token, principal)
-    model_store.delete_provider(provider_id)
-    return {"ok": True}
-
-
-@app.post("/api/admin/providers/test")
-async def test_provider(req: ProviderTestRequest, x_admin_token: str | None = Header(default=None), principal: Principal = Depends(require_roles("super_admin"))):
-    _require_admin_legacy(x_admin_token, principal)
-    try:
-        return await agents.gateway.test_provider(req.provider_id, req.model)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-
-@app.get("/api/admin/providers/{provider_id}/models")
-async def discover_provider_models(provider_id: str, x_admin_token: str | None = Header(default=None), principal: Principal = Depends(require_roles("super_admin"))):
-    _require_admin_legacy(x_admin_token, principal)
-    try:
-        return await agents.gateway.discover_models(provider_id)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-
-@app.post("/api/admin/providers/playground")
-async def provider_playground(req: ProviderPlaygroundRequest, x_admin_token: str | None = Header(default=None), principal: Principal = Depends(require_roles("super_admin"))):
-    _require_admin_legacy(x_admin_token, principal)
-    try:
-        return await agents.gateway.invoke_provider(
-            req.provider_id, model=req.model, system=req.system, user=req.user,
-            temperature=req.temperature, max_tokens=req.max_tokens,
-            tenant_id=(principal.tenant_id if principal.authenticated else settings.bootstrap_tenant_id),
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-
-@app.put("/api/admin/routes/{task}")
-def upsert_route(task: str, req: RouteUpsert, x_admin_token: str | None = Header(default=None), principal: Principal = Depends(require_roles("super_admin"))):
-    _require_admin_legacy(x_admin_token, principal)
-    if task != req.task:
-        raise HTTPException(status_code=400, detail="URL task 与请求体 task 不一致")
-    if req.provider_id != "auto" and not model_store.get_provider(req.provider_id):
-        raise HTTPException(status_code=400, detail="主 Provider 不存在")
-    if req.fallback_provider_id and not model_store.get_provider(req.fallback_provider_id):
-        raise HTTPException(status_code=400, detail="Fallback Provider 不存在")
-    model_store.upsert_route(req)
-    return {"ok": True, "routes": model_store.list_routes(), "tasks": agents.task_status()}
-
-
-@app.put("/api/admin/models/capabilities")
-def upsert_model_capability(req: ModelCapabilityUpsert, principal: Principal = Depends(require_roles("super_admin"))):
-    if not model_store.get_provider(req.provider_id):
-        raise HTTPException(status_code=400, detail="provider not found")
-    return {"ok":True,"capability":model_store.upsert_model_capability(req)}
-
-
-@app.get("/api/admin/models/capabilities")
-def list_model_capabilities(provider_id: str = Query(default=""), principal: Principal = Depends(require_roles("super_admin"))):
-    return {"models":model_store.list_model_capabilities(provider_id or None)}
-
-
-@app.post("/api/admin/models/recommend")
-def recommend_models(req: ModelRecommendationRequest, principal: Principal = Depends(require_roles("super_admin"))):
-    required=req.required_capabilities
-    if req.task and not required:
-        defaults=agents.gateway.recommend_models_for_task(req.task)
-        return {"candidates":defaults,"mode":"task-default"}
-    return {"candidates":model_store.recommend_models(required_capabilities=required,min_context_window=req.min_context_window,max_input_cost_per_million=req.max_input_cost_per_million,max_output_cost_per_million=req.max_output_cost_per_million,prefer_latency=req.prefer_latency),"mode":"explicit"}
-
-
-@app.post("/api/admin/models/evaluate")
-async def evaluate_model(req: ModelEvaluationRequest, principal: Principal = Depends(require_roles("super_admin"))):
-    try:
-        result=await run_model_evaluation(gateway=agents.gateway,store=model_store,tenant_id=principal.tenant_id,provider_id=req.provider_id,model=req.model,task=req.task,cases=[x.model_dump() for x in req.cases])
-        return {"eval_id":result.eval_id,"metrics":result.metrics,"cases":result.cases,"live_api_test":True}
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-
-@app.get("/api/admin/models/evaluations")
-def list_model_evaluations(limit: int = Query(default=50,ge=1,le=500), principal: Principal = Depends(require_roles("super_admin"))):
-    return {"evaluations":model_store.list_model_evals(principal.tenant_id,limit=limit)}
-
-
-@app.get("/api/admin/models/usage")
-def model_usage(limit: int = Query(default=100, ge=1, le=1000), x_admin_token: str | None = Header(default=None), principal: Principal = Depends(require_roles("super_admin"))):
-    _require_admin_legacy(x_admin_token, principal)
-    return model_store.usage_summary(limit=limit)
-
-
 # ---------------- Knowledge base / data ingestion APIs ----------------
 @app.post("/api/admin/knowledge/ingest")
 async def ingest_knowledge(
@@ -2236,6 +2095,11 @@ def index():
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return Response(status_code=204)
+
+
 @app.get("/login")
 def login_page():
     return FileResponse(STATIC_DIR / "login.html")
@@ -2264,3 +2128,17 @@ def admin_page(request: Request):
 @app.get("/showcase")
 def showcase_page():
     return FileResponse(STATIC_DIR / "showcase.html")
+
+
+# Model administration is registered after all legacy route declarations so
+# the final canonical API alias pass observes the complete route surface.
+app.include_router(build_model_admin_router(
+    settings=settings,
+    model_store=model_store,
+    agents=agents,
+    require_roles=require_roles,
+    require_admin_legacy=_require_admin_legacy,
+))
+
+# Register canonical aliases only after the complete compatibility surface is known.
+register_v1_compatibility_aliases(app)
