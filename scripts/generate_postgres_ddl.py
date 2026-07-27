@@ -16,7 +16,7 @@ from app.core.database import BASELINE_METADATA
 
 def generate() -> str:
     dialect = postgresql.dialect()
-    parts = ["-- CareerOS v1.0-beta1 PostgreSQL baseline generated from schema_manifest.json", ""]
+    parts = ["-- CareerOS v1.5 Domain Intelligence PostgreSQL baseline generated from schema_manifest.json", ""]
     for table in BASELINE_METADATA.sorted_tables:
         parts.append(str(CreateTable(table).compile(dialect=dialect)).rstrip() + ";")
         parts.append("")

@@ -10,10 +10,13 @@ from .jobs import PostgresJobRepository
 from .commercial import PostgresCommercialRepository
 from .model import PostgresModelConfigRepository
 from .storage_registry import PostgresStorageRegistry
+from .unified_runtime import PostgresUnifiedRuntimeRepository
 
 __all__ = [
     "PostgresSessionRepository", "PostgresIdentityRepository", "PostgresArtifactRepository",
     "PostgresEvidenceRepository", "PostgresEvidenceGraphRepository", "PostgresWorkflowRepository",
     "PostgresCollaborationRepository", "PostgresKnowledgeRepository", "PostgresJobRepository",
-    "PostgresCommercialRepository", "PostgresModelConfigRepository", "PostgresStorageRegistry",
+    "PostgresCommercialRepository", "PostgresModelConfigRepository", "PostgresStorageRegistry", "PostgresUnifiedRuntimeRepository",
 ]
+
+from .domain_intelligence import PostgresDomainIntelligenceRepository

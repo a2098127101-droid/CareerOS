@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import argparse
 from pathlib import Path as _BootstrapPath
 _ROOT = _BootstrapPath(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
@@ -15,7 +16,7 @@ from pathlib import Path
 LEGACY_SQLITE_MODULES = {
     "store.py", "auth_store.py", "artifact_store.py", "evidence_store.py", "evidence_graph.py",
     "workflow_store.py", "collaboration_store.py", "knowledge.py", "job_store.py", "model_store.py",
-    "commercial_store.py", "storage.py", "migrations.py",
+    "commercial_store.py", "storage.py", "migrations.py", "domain_intelligence.py", "unified_runtime_store.py",
 }
 
 # DDL is allowed only in the centralized SQLite migration layer. PostgreSQL DDL is owned by Alembic.
@@ -52,7 +53,15 @@ def audit(root: Path) -> dict:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Audit direct SQLite access and centralized schema ownership.")
+    parser.add_argument("--json-out", default="", help="Optional output path for the JSON report.")
+    args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     result = audit(root)
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    payload = json.dumps(result, indent=2, ensure_ascii=False)
+    print(payload)
+    if args.json_out:
+        output = Path(args.json_out)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(payload + "\n", encoding="utf-8")
     raise SystemExit(1 if result["unexpected"] or result["store_owned_ddl_violations"] else 0)

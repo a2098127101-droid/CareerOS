@@ -118,8 +118,9 @@ class CollaborationStore:
         payload: dict | None = None,
         *,
         owner_user_id: str = "",
+        task_id: str | None = None,
     ) -> dict:
-        task_id = f"TASK-{uuid4().hex[:10].upper()}"
+        task_id = task_id or f"TASK-{uuid4().hex[:10].upper()}"
         with self._lock, self._connect() as conn:
             conn.execute(
                 """INSERT INTO ai_tasks(task_id,session_id,tenant_id,owner_user_id,title,task_type,priority,source,payload_json)
@@ -167,18 +168,32 @@ class CollaborationStore:
             rows = conn.execute(sql, tuple(params)).fetchall()
         return [self._task_row(r) for r in rows]
 
-    def update_task(self, task_id: str, status: str | None = None, priority: str | None = None, *, tenant_id: str | None = None) -> dict:
+    def update_task(
+        self, task_id: str, status: str | None = None, priority: str | None = None, *,
+        tenant_id: str | None = None, expected_version: int | None = None, title: str | None = None,
+        task_type: str | None = None, source: str | None = None, payload: dict | None = None,
+    ) -> dict:
         fields: list[str] = []
         params: list[object] = []
-        if status is not None:
-            fields.append("status=?")
-            params.append(status)
-        if priority is not None:
-            fields.append("priority=?")
-            params.append(priority)
+        current = self.get_task(task_id, tenant_id=tenant_id)
+        actual = int(current.get("version") or 1)
+        if expected_version is not None and expected_version != actual:
+            from .unified_runtime_store import RuntimeVersionConflict
+            raise RuntimeVersionConflict(task_id, expected_version, actual)
+        for column, value in (("status", status), ("priority", priority), ("title", title), ("task_type", task_type), ("source", source)):
+            if value is not None:
+                fields.append(f"{column}=?")
+                params.append(value)
+        if payload is not None:
+            fields.append("payload_json=?")
+            params.append(json.dumps(payload, ensure_ascii=False))
         if not fields:
-            return self.get_task(task_id, tenant_id=tenant_id)
-        fields.append("updated_at=CURRENT_TIMESTAMP")
+            return current
+        if status in {"done", "completed"}:
+            fields.append("completed_at=CURRENT_TIMESTAMP")
+        elif status is not None:
+            fields.append("completed_at=NULL")
+        fields.extend(["version=version+1", "updated_at=CURRENT_TIMESTAMP"])
         sql = f"UPDATE ai_tasks SET {', '.join(fields)} WHERE task_id=?"
         params.append(task_id)
         if tenant_id is not None:

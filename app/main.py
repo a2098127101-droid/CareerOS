@@ -21,6 +21,7 @@ from .lifecycle import workflow_snapshot
 from .bootstrap import bootstrap_model_config
 from .config import Settings
 from .domain_profile import get_domain_profile
+from .domain_intelligence import DomainIntelligenceService
 from .embedding_gateway import EmbeddingConfig, EmbeddingGateway
 from .evidence_verification import EvidenceVerificationService
 from .rag_evaluation import RAGEvalCase, evaluate_rag
@@ -41,6 +42,7 @@ from .evidence_lock import audit_evidence
 from .file_parser import parse_uploaded_file
 from .migrations import migration_status, run_migrations
 from .llm_gateway import LLMGatewayError
+from .network_security import OutboundURLSecurityError, validate_nonsecret_metadata, validate_outbound_url
 from .models import (
     ChatMessage,
     AITaskCreateRequest,
@@ -52,7 +54,7 @@ from .models import (
     KnowledgeSourceUpdate,
     RAGEvaluationRequest, EvidenceVerificationRequest, ManualClaimVerificationRequest, JobMatchRequest,
     ProfileExtractRequest,
-    ProviderTestRequest,
+    ProviderTestRequest, ProviderPlaygroundRequest, ProviderModelsRequest,
     ProviderUpsert, ModelCapabilityUpsert, ModelRecommendationRequest, ModelEvaluationRequest,
     ReviewRequest,
     ReviseRequest,
@@ -79,6 +81,9 @@ from .job_intelligence import JobIntelligenceService
 from .routers.privacy import build_privacy_router
 from .routers.commercial import build_commercial_router
 from .routers.templates import build_template_admin_router
+from .routers.unified_runtime import build_unified_runtime_router
+from .routers.workspace import build_workspace_router
+from .routers.domain_intelligence import build_domain_intelligence_router
 
 settings = Settings()
 _runtime_errors = settings.validate_runtime()
@@ -129,6 +134,9 @@ collaboration_store = repositories.collaboration
 auth_store = repositories.identity
 commercial_store = repositories.commercial
 template_registry = repositories.templates
+unified_runtime_store = repositories.runtime_entities
+domain_intelligence_store = repositories.domain_intelligence
+domain_intelligence_service = DomainIntelligenceService(domain_intelligence_store, evidence_verifier, job_intelligence)
 billing_runtime = build_billing_provider(settings.billing_provider, webhook_secret=settings.billing_webhook_secret)
 email_runtime = build_email_provider(
     settings.email_provider,
@@ -202,14 +210,14 @@ elif settings.bootstrap_superadmin_email and settings.bootstrap_superadmin_passw
         display_name="CareerOS Super Admin", tenant_id=settings.bootstrap_tenant_id, role="super_admin"
     )
 
-app = FastAPI(title=f"{settings.product_name} · AI Career Development Platform", version="1.0.0-beta1-business-runtime-verification")
+app = FastAPI(title=f"{settings.product_name} · AI Career Development Platform", version="1.5.0-domain-intelligence")
 origins = list(settings.allowed_origins) if settings.allowed_origins else (["*"] if not settings.is_production else [])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=bool(settings.auth_required),
     allow_methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
-    allow_headers=["Content-Type","Authorization","X-Admin-Token","X-Request-ID","X-CSRF-Token","X-CareerOS-Billing-Signature"],
+    allow_headers=["Content-Type","Authorization","X-Admin-Token","X-Request-ID","X-CSRF-Token","X-CareerOS-Billing-Signature","Idempotency-Key"],
 )
 
 def _rate_allowed(key: tuple[str, str], limit: int, window_seconds: int = 60) -> bool:
@@ -232,8 +240,15 @@ async def security_observability_and_rate_limit(request: Request, call_next):
         host = request.client.host if request.client else "unknown"
         if path == "/api/auth/login" and not _rate_allowed((host, "login"), 10, 60):
             return JSONResponse({"detail": "too many login attempts"}, status_code=429, headers={"X-Request-ID": request_id})
-        if path in {"/api/chat", "/api/chat/stream", "/api/draft/generate", "/api/draft/generate/stream", "/api/review", "/api/review/stream", "/api/revise"} and not _rate_allowed((host, "ai"), 60, 60):
-            return JSONResponse({"detail": "rate limit exceeded"}, status_code=429, headers={"X-Request-ID": request_id})
+        legacy_ai = {"/api/chat", "/api/chat/stream", "/api/draft/generate", "/api/draft/generate/stream", "/api/review", "/api/review/stream", "/api/revise"}
+        workspace_ai_limits = {
+            "/api/workspace/v1/ai/coach": 30,
+            "/api/workspace/v1/ai/interview/evaluate": 10,
+            "/api/workspace/v1/ai/ppt/review": 5,
+        }
+        ai_limit = 60 if path in legacy_ai else workspace_ai_limits.get(path)
+        if ai_limit is not None and not _rate_allowed((host, "ai:" + path), ai_limit, 60):
+            return JSONResponse({"detail": {"code": "ai_rate_limit_exceeded", "limit": ai_limit, "window_seconds": 60}}, status_code=429, headers={"X-Request-ID": request_id})
     try:
         response = await call_next(request)
         status_code = response.status_code
@@ -666,7 +681,7 @@ def health():
     sources = knowledge_store.list_sources()
     return {
         "ok": True,
-        "version": "1.0.0-beta1-business-runtime-verification",
+        "version": "1.5.0-domain-intelligence",
         "mode": mode,
         "product": {
             "name": settings.product_name,
@@ -698,7 +713,7 @@ def health():
 @app.get("/live")
 @app.get("/api/live")
 def live_probe():
-    return {"ok": True, "service": settings.otel_service_name, "version": "1.0.0-beta1"}
+    return {"ok": True, "service": settings.otel_service_name, "version": "1.5.0-domain-intelligence"}
 
 
 @app.get("/ready")
@@ -1661,6 +1676,44 @@ app.include_router(build_commercial_router(
     settings=settings,
 ))
 
+# ---------------- Unified H5 runtime ----------------
+# API mode now treats FastAPI persistence as authoritative for all Showcase workspace entities.
+app.include_router(build_unified_runtime_router(
+    repository=unified_runtime_store,
+    current_principal=current_principal,
+    canonical_role=canonical_role,
+    auth_store=auth_store,
+))
+
+# ---------------- Canonical workspace BFF ----------------
+# The complete H5 consumes these domain-backed APIs for business entities.
+# Generic Unified Runtime is reserved for transient/UI state and compatibility.
+app.include_router(build_workspace_router(
+    sessions=store,
+    identity=auth_store,
+    evidence=evidence_store,
+    evidence_graph=evidence_graph,
+    artifacts=artifact_store,
+    collaboration=collaboration_store,
+    knowledge=knowledge_store,
+    jobs=job_store,
+    agents=agents,
+    current_principal=current_principal,
+    canonical_role=canonical_role,
+))
+
+app.include_router(build_domain_intelligence_router(
+    sessions=store,
+    identity=auth_store,
+    evidence=evidence_store,
+    artifacts=artifact_store,
+    jobs=job_store,
+    domain_service=domain_intelligence_service,
+    domain_store=domain_intelligence_store,
+    current_principal=current_principal,
+    canonical_role=canonical_role,
+))
+
 
 # ---------------- Model center / multi-provider APIs ----------------
 @app.get("/api/admin/models/overview")
@@ -1680,6 +1733,13 @@ def model_overview(x_admin_token: str | None = Header(default=None), principal: 
 @app.post("/api/admin/providers")
 def upsert_provider(req: ProviderUpsert, x_admin_token: str | None = Header(default=None), principal: Principal = Depends(require_roles("super_admin"))):
     _require_admin_legacy(x_admin_token, principal)
+    try:
+        validate_outbound_url(req.base_url, allow_private_network=req.allow_private_network)
+        if req.oauth_token_url:
+            validate_outbound_url(req.oauth_token_url, allow_private_network=req.allow_private_network)
+        validate_nonsecret_metadata(req.extra_headers, req.query_params)
+    except OutboundURLSecurityError as exc:
+        raise HTTPException(status_code=400, detail={"code": "unsafe_provider_configuration", "message": str(exc)})
     model_store.upsert_provider(req)
     return {"ok": True, "providers": model_store.list_providers()}
 
@@ -1696,6 +1756,28 @@ async def test_provider(req: ProviderTestRequest, x_admin_token: str | None = He
     _require_admin_legacy(x_admin_token, principal)
     try:
         return await agents.gateway.test_provider(req.provider_id, req.model)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.get("/api/admin/providers/{provider_id}/models")
+async def discover_provider_models(provider_id: str, x_admin_token: str | None = Header(default=None), principal: Principal = Depends(require_roles("super_admin"))):
+    _require_admin_legacy(x_admin_token, principal)
+    try:
+        return await agents.gateway.discover_models(provider_id)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/admin/providers/playground")
+async def provider_playground(req: ProviderPlaygroundRequest, x_admin_token: str | None = Header(default=None), principal: Principal = Depends(require_roles("super_admin"))):
+    _require_admin_legacy(x_admin_token, principal)
+    try:
+        return await agents.gateway.invoke_provider(
+            req.provider_id, model=req.model, system=req.system, user=req.user,
+            temperature=req.temperature, max_tokens=req.max_tokens,
+            tenant_id=(principal.tenant_id if principal.authenticated else settings.bootstrap_tenant_id),
+        )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
@@ -1935,6 +2017,17 @@ async def ingest_jobs_csv(file: UploadFile = File(...), x_admin_token: str | Non
     content = await file.read()
     _validate_upload_security(file, content)
     return {"ok": True, **job_store.ingest_csv(content, source=file.filename or "csv", tenant_id=("global" if principal.is_super_admin else principal.tenant_id))}
+
+
+@app.delete("/api/admin/jobs/{job_id}")
+def delete_job(job_id: str, principal: Principal = Depends(require_roles("organization_admin"))):
+    tenant_id = "global" if principal.is_super_admin else principal.tenant_id
+    if tenant_id == "global" and not principal.is_super_admin:
+        raise HTTPException(status_code=403, detail="global job deletion requires super admin")
+    deleted = job_store.delete_job(job_id, tenant_id=tenant_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="job not found or not tenant-owned")
+    return {"ok": True, "deleted": True, "job_id": job_id}
 
 
 @app.get("/api/admin/jobs/{job_id}/requirements")

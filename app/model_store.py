@@ -25,7 +25,50 @@ class ProviderRecord:
     enabled: bool
     timeout_seconds: int
     extra_headers: dict[str, str]
+    config: dict[str, Any]
 
+
+
+_PROVIDER_CONFIG_KEY = "__careeros_provider_config__"
+
+def _provider_payload_metadata(payload: ProviderUpsert) -> tuple[dict[str, str], dict[str, Any]]:
+    headers = dict(payload.extra_headers or {})
+    config = {
+        "auth_type": payload.auth_type,
+        "auth_header_name": payload.auth_header_name,
+        "auth_prefix": payload.auth_prefix,
+        "api_key_query_name": payload.api_key_query_name,
+        "oauth_token_url": payload.oauth_token_url,
+        "oauth_client_id": payload.oauth_client_id,
+        "oauth_scope": payload.oauth_scope,
+        "oauth_audience": payload.oauth_audience,
+        "chat_path": payload.chat_path,
+        "http_method": payload.http_method,
+        "models_path": payload.models_path,
+        "request_template": payload.request_template,
+        "response_path": payload.response_path,
+        "models_response_path": payload.models_response_path,
+        "query_params": payload.query_params,
+        "allow_private_network": payload.allow_private_network,
+    }
+    headers[_PROVIDER_CONFIG_KEY] = json.dumps(config, ensure_ascii=False)
+    return headers, config
+
+def _split_provider_metadata(raw: dict[str, Any] | None) -> tuple[dict[str, str], dict[str, Any]]:
+    raw = dict(raw or {})
+    encoded = raw.pop(_PROVIDER_CONFIG_KEY, "")
+    try:
+        config = json.loads(encoded) if encoded else {}
+    except Exception:
+        config = {}
+    return {str(k): str(v) for k, v in raw.items()}, config
+
+def _mask_provider_headers(headers: dict[str, str]) -> dict[str, str]:
+    sensitive = ("authorization", "api-key", "apikey", "token", "secret", "cookie")
+    out: dict[str, str] = {}
+    for key, value in (headers or {}).items():
+        out[key] = "••••" if any(marker in key.lower() for marker in sensitive) and value else value
+    return out
 
 @dataclass
 class RouteRecord:
@@ -79,6 +122,7 @@ class ModelConfigStore:
             api_key_enc = self._encrypt(existing.api_key)
         else:
             api_key_enc = self._encrypt(payload.api_key or "")
+        packed_headers, _config = _provider_payload_metadata(payload)
         with self._lock, self._connect() as conn:
             conn.execute(
                 """
@@ -99,7 +143,7 @@ class ModelConfigStore:
                     payload.default_model,
                     1 if payload.enabled else 0,
                     payload.timeout_seconds,
-                    json.dumps(payload.extra_headers, ensure_ascii=False),
+                    json.dumps(packed_headers, ensure_ascii=False),
                 ),
             )
             conn.commit()
@@ -109,6 +153,7 @@ class ModelConfigStore:
             row = conn.execute("SELECT * FROM llm_providers WHERE provider_id=?", (provider_id,)).fetchone()
         if not row:
             return None
+        extra_headers, config = _split_provider_metadata(json.loads(row["extra_headers"] or "{}"))
         return ProviderRecord(
             provider_id=row["provider_id"],
             name=row["name"],
@@ -118,7 +163,8 @@ class ModelConfigStore:
             default_model=row["default_model"],
             enabled=bool(row["enabled"]),
             timeout_seconds=int(row["timeout_seconds"]),
-            extra_headers=json.loads(row["extra_headers"] or "{}"),
+            extra_headers=extra_headers,
+            config=config,
         )
 
     def list_providers(self, reveal_secret: bool = False) -> list[dict[str, Any]]:
@@ -138,7 +184,8 @@ class ModelConfigStore:
                 "default_model": row["default_model"],
                 "enabled": bool(row["enabled"]),
                 "timeout_seconds": int(row["timeout_seconds"]),
-                "extra_headers": json.loads(row["extra_headers"] or "{}"),
+                "extra_headers": _mask_provider_headers(_split_provider_metadata(json.loads(row["extra_headers"] or "{}"))[0]),
+                "config": _split_provider_metadata(json.loads(row["extra_headers"] or "{}"))[1],
                 "updated_at": row["updated_at"],
             })
         return result

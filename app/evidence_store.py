@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 import threading
@@ -15,6 +16,11 @@ FACT_MARKERS = (
     "我是", "我的", "我在", "我曾", "我参与", "我负责", "我获得", "我擅长", "我会", "我想从事", "目标岗位",
     "学校", "专业", "年级", "实习", "项目", "经历", "奖项", "证书", "技能", "负责", "参与", "完成", "访谈", "调研",
 )
+
+EVIDENCE_TRUST_STATES = {
+    "SELF_REPORTED", "SOURCE_ATTACHED", "EXTRACTED", "AI_ASSESSED", "UNDER_REVIEW",
+    "PARTIALLY_VERIFIED", "VERIFIED", "REJECTED", "CONTRADICTED",
+}
 
 
 def is_evidence_candidate(text: str) -> bool:
@@ -80,12 +86,148 @@ class EvidenceStore:
         evidence_id = f"EVID-{uuid4().hex[:10].upper()}"
         with self._lock, self._connect() as conn:
             conn.execute(
-                """INSERT INTO evidence_items(evidence_id,session_id,tenant_id,owner_user_id,source_type,source_label,content,verified)
-                VALUES(?,?,?,?,?,?,?,?)""",
-                (evidence_id, session_id, tenant_id, owner_user_id, source_type, source_label[:160], text[:120000], int(verified)),
+                """INSERT INTO evidence_items(evidence_id,session_id,tenant_id,owner_user_id,source_type,source_label,content,verified,metadata_json,version,updated_at,deleted_at,verification_status,verification_confidence)
+                VALUES(?,?,?,?,?,?,?,?,?,1,CURRENT_TIMESTAMP,NULL,?,?)""",
+                (evidence_id, session_id, tenant_id, owner_user_id, source_type, source_label[:160], text[:120000], int(verified), "{}", "VERIFIED" if verified else ("EXTRACTED" if source_type in {"file", "attachment", "parser"} else "SELF_REPORTED"), 1.0 if verified else 0.0),
             )
             conn.commit()
         return self.get(evidence_id, tenant_id=tenant_id)
+
+
+    def add_structured(
+        self,
+        session_id: str,
+        *,
+        title: str,
+        action: str,
+        proof: str = "",
+        capabilities: list[str] | None = None,
+        verified: bool = False,
+        tenant_id: str = "demo-org",
+        owner_user_id: str = "",
+        evidence_id: str | None = None,
+    ) -> dict:
+        evidence_id = evidence_id or f"EVID-{uuid4().hex[:10].upper()}"
+        title = (title or "Evidence").strip()[:160]
+        action = (action or "").strip()
+        if len(action) < 2:
+            raise ValueError("evidence action/content is required")
+        metadata = {"action": action, "proof": proof or "", "capabilities": list(capabilities or [])}
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                """INSERT INTO evidence_items(evidence_id,session_id,tenant_id,owner_user_id,source_type,source_label,content,verified,metadata_json,version,updated_at,deleted_at,verification_status,verification_confidence)
+                VALUES(?,?,?,?,?,?,?,?,?,1,CURRENT_TIMESTAMP,NULL,?,?)""",
+                (evidence_id, session_id, tenant_id, owner_user_id, "structured", title, action[:120000], int(verified), json.dumps(metadata, ensure_ascii=False), "VERIFIED" if verified else "SELF_REPORTED", 1.0 if verified else 0.0),
+            )
+            conn.commit()
+        return self.get(evidence_id, tenant_id=tenant_id)
+
+    def update_structured(
+        self,
+        evidence_id: str,
+        *,
+        tenant_id: str,
+        owner_user_id: str,
+        title: str | None = None,
+        action: str | None = None,
+        proof: str | None = None,
+        capabilities: list[str] | None = None,
+        verified: bool | None = None,
+        expected_version: int | None = None,
+    ) -> dict:
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM evidence_items WHERE evidence_id=? AND tenant_id=? AND owner_user_id=? AND deleted_at IS NULL",
+                (evidence_id, tenant_id, owner_user_id),
+            ).fetchone()
+            if not row:
+                raise KeyError(evidence_id)
+            current = dict(row)
+            actual = int(current.get("version") or 1)
+            if expected_version is not None and expected_version != actual:
+                from .unified_runtime_store import RuntimeVersionConflict
+                raise RuntimeVersionConflict(evidence_id, expected_version, actual)
+            try:
+                metadata = json.loads(current.get("metadata_json") or "{}")
+            except Exception:
+                metadata = {}
+            next_title = (title if title is not None else current.get("source_label") or "Evidence").strip()[:160]
+            next_action = (action if action is not None else metadata.get("action") or current.get("content") or "").strip()
+            if len(next_action) < 2:
+                raise ValueError("evidence action/content is required")
+            metadata["action"] = next_action
+            if proof is not None:
+                metadata["proof"] = proof
+            if capabilities is not None:
+                metadata["capabilities"] = list(capabilities)
+            material_changed = (next_title != (current.get("source_label") or "")) or (next_action != (current.get("content") or ""))
+            old_meta = json.loads(current.get("metadata_json") or "{}") if current.get("metadata_json") else {}
+            material_changed = material_changed or (metadata.get("proof", "") != old_meta.get("proof", "")) or (list(metadata.get("capabilities") or []) != list(old_meta.get("capabilities") or []))
+            current_status = str(current.get("verification_status") or ("VERIFIED" if current.get("verified") else "SELF_REPORTED"))
+            next_status = current_status
+            next_verified = int(current_status == "VERIFIED")
+            invalidated = material_changed and current_status in {"VERIFIED", "PARTIALLY_VERIFIED", "REJECTED", "CONTRADICTED"}
+            if invalidated:
+                next_status = "EXTRACTED" if str(current.get("source_type") or "") in {"file", "attachment", "parser"} else "SELF_REPORTED"
+                next_verified = 0
+            conn.execute(
+                """UPDATE evidence_items SET source_label=?,content=?,verified=?,metadata_json=?,verification_status=?,verification_confidence=?,verified_by=?,verified_at=?,version=version+1,updated_at=CURRENT_TIMESTAMP
+                WHERE evidence_id=? AND tenant_id=? AND owner_user_id=?""",
+                (next_title, next_action[:120000], next_verified, json.dumps(metadata, ensure_ascii=False), next_status, 0.0 if invalidated else float(current.get("verification_confidence") or 0), "" if invalidated else str(current.get("verified_by") or ""), None if invalidated else current.get("verified_at"), evidence_id, tenant_id, owner_user_id),
+            )
+            if invalidated:
+                conn.execute(
+                    """INSERT INTO evidence_item_verification_history
+                    (history_id,tenant_id,session_id,evidence_id,previous_status,new_status,decision,confidence,method,reason,actor_user_id)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+                    (f"EVH-{uuid4().hex[:18].upper()}", tenant_id, current.get("session_id") or "", evidence_id, current_status, next_status, "invalidated", 0.0, "material_edit", "Material edit invalidated previous verification", owner_user_id),
+                )
+            conn.commit()
+        return self.get(evidence_id, tenant_id=tenant_id)
+
+    def delete_item(
+        self, evidence_id: str, *, tenant_id: str, owner_user_id: str, expected_version: int | None = None
+    ) -> bool:
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT version FROM evidence_items WHERE evidence_id=? AND tenant_id=? AND owner_user_id=? AND deleted_at IS NULL",
+                (evidence_id, tenant_id, owner_user_id),
+            ).fetchone()
+            if not row:
+                return False
+            actual = int(row["version"] or 1)
+            if expected_version is not None and expected_version != actual:
+                from .unified_runtime_store import RuntimeVersionConflict
+                raise RuntimeVersionConflict(evidence_id, expected_version, actual)
+            conn.execute(
+                """UPDATE evidence_items SET deleted_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP,version=version+1
+                WHERE evidence_id=? AND tenant_id=? AND owner_user_id=?""",
+                (evidence_id, tenant_id, owner_user_id),
+            )
+            conn.commit()
+        return True
+
+    @staticmethod
+    def to_workspace_item(row: dict) -> dict:
+        try:
+            meta = json.loads(row.get("metadata_json") or "{}")
+        except Exception:
+            meta = {}
+        return {
+            "id": row.get("evidence_id", ""),
+            "title": row.get("source_label", "Evidence"),
+            "action": meta.get("action") or row.get("content", ""),
+            "proof": meta.get("proof", ""),
+            "capabilities": list(meta.get("capabilities") or []),
+            "verified": str(row.get("verification_status") or "") == "VERIFIED",
+            "verificationStatus": str(row.get("verification_status") or ("VERIFIED" if row.get("verified") else "SELF_REPORTED")),
+            "verificationConfidence": float(row.get("verification_confidence") or 0),
+            "verifiedBy": str(row.get("verified_by") or ""),
+            "verifiedAt": str(row.get("verified_at") or ""),
+            "createdAt": str(row.get("created_at") or ""),
+            "updatedAt": str(row.get("updated_at") or row.get("created_at") or ""),
+            "_version": int(row.get("version") or 1),
+        }
 
     def add_chat_candidate(
         self,
@@ -109,7 +251,7 @@ class EvidenceStore:
         )
 
     def get(self, evidence_id: str, *, tenant_id: str | None = None) -> dict:
-        sql = "SELECT * FROM evidence_items WHERE evidence_id=?"
+        sql = "SELECT * FROM evidence_items WHERE evidence_id=? AND deleted_at IS NULL"
         params: list[str] = [evidence_id]
         if tenant_id is not None:
             sql += " AND tenant_id=?"
@@ -121,7 +263,7 @@ class EvidenceStore:
         return dict(row)
 
     def list_session(self, session_id: str, limit: int = 100, *, tenant_id: str | None = None) -> list[dict]:
-        sql = "SELECT * FROM evidence_items WHERE session_id=?"
+        sql = "SELECT * FROM evidence_items WHERE session_id=? AND deleted_at IS NULL"
         params: list[object] = [session_id]
         if tenant_id is not None:
             sql += " AND tenant_id=?"
@@ -179,6 +321,49 @@ class EvidenceStore:
             if len(links) >= max_links:
                 break
         return links
+
+
+    def verify_item(
+        self, evidence_id: str, *, tenant_id: str, owner_user_id: str, decision: str,
+        actor_user_id: str, reason: str = "", confidence: float = 1.0, method: str = "human_review"
+    ) -> dict:
+        mapping = {
+            "submit_review": "UNDER_REVIEW", "verified": "VERIFIED", "partial": "PARTIALLY_VERIFIED",
+            "rejected": "REJECTED", "contradicted": "CONTRADICTED",
+        }
+        if decision not in mapping:
+            raise ValueError("invalid evidence verification decision")
+        new_status = mapping[decision]
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM evidence_items WHERE evidence_id=? AND tenant_id=? AND owner_user_id=? AND deleted_at IS NULL",
+                (evidence_id, tenant_id, owner_user_id),
+            ).fetchone()
+            if not row:
+                raise KeyError(evidence_id)
+            current = dict(row)
+            previous = str(current.get("verification_status") or ("VERIFIED" if current.get("verified") else "SELF_REPORTED"))
+            verified = int(new_status == "VERIFIED")
+            conn.execute(
+                """UPDATE evidence_items SET verification_status=?,verification_method=?,verification_confidence=?,verified=?,verified_by=?,verified_at=CURRENT_TIMESTAMP,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE evidence_id=?""",
+                (new_status, method, max(0.0, min(float(confidence), 1.0)), verified, actor_user_id, evidence_id),
+            )
+            conn.execute(
+                """INSERT INTO evidence_item_verification_history
+                (history_id,tenant_id,session_id,evidence_id,previous_status,new_status,decision,confidence,method,reason,actor_user_id)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+                (f"EVH-{uuid4().hex[:18].upper()}", tenant_id, current.get("session_id") or "", evidence_id, previous, new_status, decision, max(0.0, min(float(confidence), 1.0)), method, reason[:12000], actor_user_id),
+            )
+            conn.commit()
+        return self.get(evidence_id, tenant_id=tenant_id)
+
+    def verification_history(self, evidence_id: str, *, tenant_id: str) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM evidence_item_verification_history WHERE tenant_id=? AND evidence_id=? ORDER BY created_at DESC",
+                (tenant_id, evidence_id),
+            ).fetchall()
+        return [dict(x) for x in rows]
 
     def delete_session(self, session_id: str, *, tenant_id: str) -> int:
         with self._lock, self._connect() as conn:

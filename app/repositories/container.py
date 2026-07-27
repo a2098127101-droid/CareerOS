@@ -14,8 +14,10 @@ from ..model_store import ModelConfigStore
 from ..storage import StorageRegistry
 from ..store import SessionStore
 from ..workflow_store import WorkflowStore
+from ..unified_runtime_store import UnifiedRuntimeStore
 from ..template_registry import TemplateRegistry
 from ..embedding_gateway import EmbeddingGateway
+from ..domain_intelligence import DomainIntelligenceStore
 from ..core.database import DatabaseCapabilityReport, database_capabilities, create_database_engine, BASELINE_METADATA, schema_health
 from .parity import CORE_PARITY
 
@@ -43,6 +45,8 @@ class RepositoryContainer:
     commercial: CommercialStore
     storage_registry: StorageRegistry
     templates: TemplateRegistry
+    runtime_entities: object
+    domain_intelligence: object
     capabilities: DatabaseCapabilityReport
 
     @classmethod
@@ -79,6 +83,8 @@ class RepositoryContainer:
             commercial=CommercialStore(db_path),
             storage_registry=StorageRegistry(db_path),
             templates=template_registry,
+            runtime_entities=UnifiedRuntimeStore(db_path),
+            domain_intelligence=DomainIntelligenceStore(db_path),
             capabilities=caps,
         )
 
@@ -114,7 +120,7 @@ class RepositoryContainer:
             PostgresArtifactRepository, PostgresCollaborationRepository, PostgresCommercialRepository,
             PostgresEvidenceGraphRepository, PostgresEvidenceRepository, PostgresIdentityRepository,
             PostgresJobRepository, PostgresKnowledgeRepository, PostgresModelConfigRepository,
-            PostgresSessionRepository, PostgresStorageRegistry, PostgresWorkflowRepository,
+            PostgresSessionRepository, PostgresStorageRegistry, PostgresWorkflowRepository, PostgresUnifiedRuntimeRepository, PostgresDomainIntelligenceRepository,
         )
         return cls(
             backend="postgresql",
@@ -131,6 +137,8 @@ class RepositoryContainer:
             commercial=PostgresCommercialRepository(engine),
             storage_registry=PostgresStorageRegistry(engine),
             templates=template_registry,
+            runtime_entities=PostgresUnifiedRuntimeRepository(engine),
+            domain_intelligence=PostgresDomainIntelligenceRepository(engine),
             capabilities=caps,
         )
 
@@ -147,7 +155,7 @@ class RepositoryContainer:
             PostgresArtifactRepository, PostgresCollaborationRepository, PostgresCommercialRepository,
             PostgresEvidenceGraphRepository, PostgresEvidenceRepository, PostgresIdentityRepository,
             PostgresJobRepository, PostgresKnowledgeRepository, PostgresModelConfigRepository,
-            PostgresSessionRepository, PostgresStorageRegistry, PostgresWorkflowRepository,
+            PostgresSessionRepository, PostgresStorageRegistry, PostgresWorkflowRepository, PostgresUnifiedRuntimeRepository, PostgresDomainIntelligenceRepository,
         )
         return {
             "sessions": PostgresSessionRepository(engine, BASELINE_METADATA),
@@ -162,4 +170,6 @@ class RepositoryContainer:
             "models": PostgresModelConfigRepository(engine, app_secret_key),
             "commercial": PostgresCommercialRepository(engine),
             "storage_registry": PostgresStorageRegistry(engine),
+            "runtime_entities": PostgresUnifiedRuntimeRepository(engine),
+            "domain_intelligence": PostgresDomainIntelligenceRepository(engine),
         }

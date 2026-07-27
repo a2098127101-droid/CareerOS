@@ -18,3 +18,16 @@ backups/
 data/business_certification.json
 data/migration_certification.json
 data/backup_restore_certification.json
+
+# Local databases, runtime state and generated files
+*.db
+*.sqlite
+*.sqlite3
+data/uploads/
+data/*.jsonl
+logs/
+*.log
+.coverage
+htmlcov/
+docs/CI_*.json
+.DS_Store

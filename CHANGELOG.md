@@ -1,4 +1,30 @@
+# CareerOS Changelog
+
+## 1.5.0-domain-intelligence
+
+See `CHANGELOG_v1.5.md`. Claim → Capability → Requirement → Gap is now a persistent, versioned, explainable and auditable server-side domain.
+
+# CareerOS v1.4
+
+See `CHANGELOG_v1.4.md` for the canonical runtime release changes.
+
 # Changelog
+
+## v1.2-beta · Domain Closure & Open API Gateway Candidate
+
+- Added H5 State Schema v2 and state-driven Evidence → Capability → Job Requirement → Match/Gap → Task derivation.
+- Normalized locally generated tasks with stable IDs and origin metadata; removed legacy incomplete task creation path.
+- Added LocalDemoAdapter / ApiAdapter foundation and runtime mode switching in H5 settings.
+- Extended provider kinds with `custom_rest` and vendor-neutral connection metadata without a database-table migration.
+- Added generic auth modes including OAuth2 Client Credentials, configurable chat/models paths, request templates, response mapping, query parameters, and model discovery.
+- Added real backend Provider Playground endpoint and UI for direct provider invocation with latency/usage output.
+- Added real Provider connection tests; offline Showcase no longer reports fake connectivity.
+- Added RFC4180-style CSV parsing, backup restore with schema envelope, default-workspace activation, and dependency-aware Evidence deletion warnings.
+- Replaced active fixed Showcase KPI/score values with state-derived dashboards and explicit `Not reviewed`/unverified states.
+- Replaced fabricated local retrieval probability-like scores with transparent matched-term output.
+- Added v1.2 regression tests for Custom REST persistence, secret masking, template rendering, response mapping and actual mock HTTP execution.
+- Production status remains **NOT VERIFIED** until real PostgreSQL/pgvector, Redis, object storage, semantic embedding, external model providers and certification gates pass in the target environment.
+
 
 ## v1.0-beta1 · Business Runtime Verification Candidate
 
@@ -29,3 +55,13 @@
 - Decoupled worker startup from FastAPI `app.main`.
 - Runtime certification reads model configuration through the selected RepositoryContainer backend.
 - Added staging preflight, staging runtime gate and CI regression workflow.
+
+## 2026-07-23 · H5 Showcase v1.1 interaction closure
+
+- Added 10-language global UI selector with persisted locale and Arabic RTL support.
+- Converted H5 showcase controls from toast-only responses into persistent local CRUD/action loops.
+- Added artifact versioning/restore/duplicate/delete/export flows.
+- Added Evidence, task, user, PPT, interview, knowledge, job-data, provider, notification, analytics, usage, and settings closure flows.
+- Corrected offline Provider status from misleading `Connected` labels to `Demo / Unverified`.
+- Added browser-level regression coverage and route-language smoke verification.
+- Kept production capability boundaries explicit: no fake external AI/database/object-storage connectivity.

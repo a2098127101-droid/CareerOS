@@ -120,7 +120,7 @@ def test_alembic_baseline_upgrade_on_fresh_sqlite(tmp_path: Path):
     with sqlite3.connect(target) as conn:
         version = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
         count = conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='sessions'").fetchone()[0]
-    assert version == "0007_tenant_templates_evidence_risk"
+    assert version == "0009_domain_intelligence_v15"
     assert count == 1
 
 

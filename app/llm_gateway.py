@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from .model_store import ModelConfigStore, ProviderRecord
 from .commercial_store import CommercialStore
 from .privacy import minimize_for_model
+from .network_security import validate_outbound_url
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -90,9 +91,107 @@ class LLMGateway:
                     return True
                 continue
             provider = self.store.get_provider(route["provider_id"])
-            if provider and provider.enabled and provider.api_key:
+            if provider and provider.enabled and self._provider_credentials_ready(provider):
                 return True
         return False
+
+    @staticmethod
+    def _provider_credentials_ready(provider: ProviderRecord) -> bool:
+        auth_type = str((provider.config or {}).get("auth_type") or "bearer")
+        return auth_type in {"none", "custom_headers"} or bool(provider.api_key)
+
+    @staticmethod
+    def _safe_url(provider: ProviderRecord, url: str) -> str:
+        return validate_outbound_url(
+            url, allow_private_network=bool((provider.config or {}).get("allow_private_network", False))
+        )
+
+    @staticmethod
+    def _deep_get(data: Any, path: str) -> Any:
+        if not path:
+            return data
+        current = data
+        normalized = path.strip().lstrip("$").lstrip(".")
+        for part in [p for p in normalized.split(".") if p]:
+            if isinstance(current, list):
+                try:
+                    current = current[int(part)]
+                except Exception as exc:
+                    raise LLMGatewayError(f"response path not found: {path}") from exc
+            elif isinstance(current, dict) and part in current:
+                current = current[part]
+            else:
+                raise LLMGatewayError(f"response path not found: {path}")
+        return current
+
+    @classmethod
+    def _render_template(cls, value: Any, context: dict[str, Any]) -> Any:
+        if isinstance(value, dict):
+            return {k: cls._render_template(v, context) for k, v in value.items()}
+        if isinstance(value, list):
+            return [cls._render_template(v, context) for v in value]
+        if not isinstance(value, str):
+            return value
+        exact = re.fullmatch(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}", value)
+        if exact and exact.group(1) in context:
+            return context[exact.group(1)]
+        out = value
+        for key, val in context.items():
+            replacement = json.dumps(val, ensure_ascii=False) if isinstance(val, (dict, list)) else str(val)
+            out = re.sub(r"\{\{\s*" + re.escape(key) + r"\s*\}\}", replacement, out)
+        return out
+
+    @staticmethod
+    def _apply_auth(provider: ProviderRecord, headers: dict[str, str], params: dict[str, str]) -> None:
+        cfg = provider.config or {}
+        auth_type = str(cfg.get("auth_type") or "bearer")
+        if auth_type == "none" or auth_type == "custom_headers":
+            return
+        if auth_type == "bearer":
+            header = str(cfg.get("auth_header_name") or "Authorization")
+            prefix = str(cfg.get("auth_prefix") or "Bearer").strip()
+            headers[header] = f"{prefix} {provider.api_key}".strip()
+        elif auth_type == "api_key_header":
+            headers[str(cfg.get("auth_header_name") or "X-API-Key")] = provider.api_key
+        elif auth_type == "api_key_query":
+            params[str(cfg.get("api_key_query_name") or "key")] = provider.api_key
+        elif auth_type == "basic":
+            import base64
+            token = base64.b64encode(provider.api_key.encode("utf-8")).decode("ascii")
+            headers["Authorization"] = f"Basic {token}"
+        elif auth_type == "oauth2_client_credentials":
+            raise LLMGatewayError("oauth2_client_credentials requires async token acquisition")
+        else:
+            raise LLMGatewayError(f"unsupported auth_type: {auth_type}")
+
+    async def _apply_auth_async(self, provider: ProviderRecord, headers: dict[str, str], params: dict[str, str], client: httpx.AsyncClient) -> None:
+        cfg = provider.config or {}
+        auth_type = str(cfg.get("auth_type") or "bearer")
+        if auth_type != "oauth2_client_credentials":
+            self._apply_auth(provider, headers, params)
+            return
+        token_url = str(cfg.get("oauth_token_url") or "").strip()
+        if token_url:
+            token_url = self._safe_url(provider, token_url)
+        client_id = str(cfg.get("oauth_client_id") or "").strip()
+        if not token_url or not client_id or not provider.api_key:
+            raise LLMGatewayError("OAuth2 client credentials require token URL, client ID and client secret")
+        form = {"grant_type": "client_credentials", "client_id": client_id, "client_secret": provider.api_key}
+        if cfg.get("oauth_scope"):
+            form["scope"] = str(cfg.get("oauth_scope"))
+        if cfg.get("oauth_audience"):
+            form["audience"] = str(cfg.get("oauth_audience"))
+        token_response = await client.post(token_url, data=form)
+        self._raise_for_status(token_response)
+        try:
+            token_data = token_response.json()
+        except Exception as exc:
+            raise LLMGatewayError("OAuth2 token endpoint did not return JSON") from exc
+        access_token = str(token_data.get("access_token") or "")
+        if not access_token:
+            raise LLMGatewayError("OAuth2 token endpoint response missing access_token")
+        token_type = str(token_data.get("token_type") or "Bearer")
+        headers[str(cfg.get("auth_header_name") or "Authorization")] = f"{token_type} {access_token}".strip()
 
     def recommend_models_for_task(self, task: str, *, required_capabilities: list[str] | None = None) -> list[dict[str, Any]]:
         defaults = TASK_CAPABILITY_REQUIREMENTS.get(task, {})
@@ -130,8 +229,8 @@ class LLMGateway:
             if not provider or not provider.enabled:
                 last_error = f"provider {provider_id} 不存在或已禁用"
                 continue
-            if not provider.api_key:
-                last_error = f"provider {provider_id} 未配置 API Key"
+            if not self._provider_credentials_ready(provider):
+                last_error = f"provider {provider_id} 缺少所需认证凭据"
                 continue
             if self._circuit_open(provider_id):
                 last_error = f"provider {provider_id} circuit open; fallback activated"
@@ -188,16 +287,19 @@ class LLMGateway:
         provider_id, model = attempts[0]
         provider = self.store.get_provider(provider_id)
         capability = self.store.get_model_capability(provider_id, model) or {}
-        if provider and provider.enabled and provider.api_key and provider.kind == "openai_compatible" and capability.get("supports_streaming"):
+        if provider and provider.enabled and self._provider_credentials_ready(provider) and provider.kind == "openai_compatible" and capability.get("supports_streaming"):
             started = time.perf_counter()
             chunks: list[str] = []
             try:
                 timeout = httpx.Timeout(provider.timeout_seconds)
                 headers = dict(provider.extra_headers)
-                headers.update({"Authorization": f"Bearer {provider.api_key}", "Content-Type": "application/json"})
+                params: dict[str, str] = dict((provider.config or {}).get("query_params") or {})
+                headers.setdefault("Content-Type", "application/json")
                 body = {"model": model, "messages": [{"role": "system", "content": system},{"role": "user", "content": user}], "temperature": route.temperature, "max_tokens": route.max_tokens, "stream": True}
                 async with httpx.AsyncClient(timeout=timeout) as client:
-                    async with client.stream("POST", provider.base_url.rstrip("/") + "/chat/completions", headers=headers, json=body) as response:
+                    await self._apply_auth_async(provider, headers, params, client)
+                    chat_path = str((provider.config or {}).get("chat_path") or "/chat/completions")
+                    async with client.stream("POST", self._safe_url(provider, provider.base_url.rstrip("/") + "/" + chat_path.lstrip("/")), headers=headers, params=params, json=body) as response:
                         if not response.is_success:
                             raw = (await response.aread()).decode("utf-8", errors="ignore")[:3000]
                             raise LLMGatewayError(f"HTTP {response.status_code}: {raw}")
@@ -257,6 +359,76 @@ class LLMGateway:
             "usage": usage,
         }
 
+    async def invoke_provider(
+        self, provider_id: str, *, model: str | None = None, system: str = "", user: str,
+        temperature: float = 0.2, max_tokens: int = 1000, tenant_id: str = "global", task: str = "playground",
+    ) -> dict[str, Any]:
+        provider = self.store.get_provider(provider_id)
+        if not provider:
+            raise LLMGatewayError("provider not found")
+        if not provider.enabled:
+            raise LLMGatewayError("provider disabled")
+        if not self._provider_credentials_ready(provider):
+            raise LLMGatewayError("provider credentials missing")
+        started = time.perf_counter()
+        selected_model = model or provider.default_model
+        try:
+            text, usage = await self._call_provider(
+                provider, model=selected_model, system=system, user=user,
+                temperature=temperature, max_tokens=max_tokens,
+            )
+            latency = int((time.perf_counter() - started) * 1000)
+            if self.store is not None:
+                self.store.record_usage(
+                    task=task, provider_id=provider_id, model=selected_model,
+                    input_tokens=usage.get("input_tokens", 0), output_tokens=usage.get("output_tokens", 0),
+                    total_tokens=usage.get("total_tokens", 0), latency_ms=latency, success=True, tenant_id=tenant_id,
+                )
+            return {
+                "ok": True, "provider_id": provider_id, "model": selected_model, "text": text,
+                "latency_ms": latency, "usage": usage,
+            }
+        except Exception as exc:
+            latency = int((time.perf_counter() - started) * 1000)
+            if self.store is not None:
+                self.store.record_usage(task=task, provider_id=provider_id, model=selected_model, latency_ms=latency, success=False, error=str(exc), tenant_id=tenant_id)
+            raise
+
+    async def discover_models(self, provider_id: str) -> dict[str, Any]:
+        provider = self.store.get_provider(provider_id)
+        if not provider:
+            raise LLMGatewayError("provider not found")
+        if not self._provider_credentials_ready(provider):
+            raise LLMGatewayError("provider credentials missing")
+        cfg = provider.config or {}
+        if provider.kind in {"openai_compatible", "openai_responses"}:
+            path = str(cfg.get("models_path") or "/models")
+        elif provider.kind == "custom_rest":
+            path = str(cfg.get("models_path") or "")
+            if not path:
+                return {"ok": True, "provider_id": provider_id, "models": [], "manual": True}
+        else:
+            return {"ok": True, "provider_id": provider_id, "models": [provider.default_model] if provider.default_model else [], "manual": True}
+        headers = dict(provider.extra_headers)
+        params: dict[str, str] = {str(k): str(v) for k, v in (cfg.get("query_params") or {}).items()}
+        url = self._safe_url(provider, provider.base_url.rstrip("/") + "/" + path.lstrip("/"))
+        async with httpx.AsyncClient(timeout=httpx.Timeout(provider.timeout_seconds)) as client:
+            await self._apply_auth_async(provider, headers, params, client)
+            r = await client.get(url, headers=headers, params=params)
+            self._raise_for_status(r)
+            data = r.json()
+        response_path = str(cfg.get("models_response_path") or "").strip()
+        items = self._deep_get(data, response_path) if response_path else (data.get("data") if isinstance(data, dict) else data)
+        models: list[str] = []
+        for item in items or []:
+            if isinstance(item, str):
+                models.append(item)
+            elif isinstance(item, dict):
+                value = item.get("id") or item.get("name") or item.get("model")
+                if value:
+                    models.append(str(value))
+        return {"ok": True, "provider_id": provider_id, "models": sorted(set(models)), "manual": False}
+
     async def _call_provider(
         self,
         provider: ProviderRecord,
@@ -271,8 +443,11 @@ class LLMGateway:
         headers = dict(provider.extra_headers)
         async with httpx.AsyncClient(timeout=timeout) as client:
             if provider.kind == "openai_compatible":
-                url = provider.base_url.rstrip("/") + "/chat/completions"
-                headers.update({"Authorization": f"Bearer {provider.api_key}", "Content-Type": "application/json"})
+                chat_path = str((provider.config or {}).get("chat_path") or "/chat/completions")
+                url = self._safe_url(provider, provider.base_url.rstrip("/") + "/" + chat_path.lstrip("/"))
+                params: dict[str, str] = dict((provider.config or {}).get("query_params") or {})
+                await self._apply_auth_async(provider, headers, params, client)
+                headers.setdefault("Content-Type", "application/json")
                 body = {
                     "model": model,
                     "messages": [
@@ -282,7 +457,7 @@ class LLMGateway:
                     "temperature": temperature,
                     "max_tokens": max_tokens,
                 }
-                r = await client.post(url, headers=headers, json=body)
+                r = await client.post(url, headers=headers, params=params, json=body)
                 self._raise_for_status(r)
                 data = r.json()
                 text = data["choices"][0]["message"].get("content") or ""
@@ -294,15 +469,18 @@ class LLMGateway:
                 }
 
             if provider.kind == "openai_responses":
-                url = provider.base_url.rstrip("/") + "/responses"
-                headers.update({"Authorization": f"Bearer {provider.api_key}", "Content-Type": "application/json"})
+                chat_path = str((provider.config or {}).get("chat_path") or "/responses")
+                url = self._safe_url(provider, provider.base_url.rstrip("/") + "/" + chat_path.lstrip("/"))
+                params: dict[str, str] = dict((provider.config or {}).get("query_params") or {})
+                await self._apply_auth_async(provider, headers, params, client)
+                headers.setdefault("Content-Type", "application/json")
                 body = {
                     "model": model,
                     "instructions": system,
                     "input": user,
                     "max_output_tokens": max_tokens,
                 }
-                r = await client.post(url, headers=headers, json=body)
+                r = await client.post(url, headers=headers, params=params, json=body)
                 self._raise_for_status(r)
                 data = r.json()
                 text = data.get("output_text") or self._extract_openai_response_text(data)
@@ -314,7 +492,7 @@ class LLMGateway:
                 }
 
             if provider.kind == "anthropic":
-                url = provider.base_url.rstrip("/") + "/v1/messages"
+                url = self._safe_url(provider, provider.base_url.rstrip("/") + "/v1/messages")
                 headers.update({
                     "x-api-key": provider.api_key,
                     "anthropic-version": "2023-06-01",
@@ -338,7 +516,7 @@ class LLMGateway:
 
             if provider.kind == "gemini":
                 # Gemini Interactions API (current primary text-generation API).
-                url = provider.base_url.rstrip("/") + "/interactions"
+                url = self._safe_url(provider, provider.base_url.rstrip("/") + "/interactions")
                 headers.update({"Content-Type": "application/json", "x-goog-api-key": provider.api_key})
                 body = {
                     "model": model,
@@ -366,6 +544,59 @@ class LLMGateway:
                 inp = int(u.get("input_tokens") or u.get("promptTokenCount") or 0)
                 out = int(u.get("output_tokens") or u.get("candidatesTokenCount") or 0)
                 total = int(u.get("total_tokens") or u.get("totalTokenCount") or (inp + out))
+                return text, {"input_tokens": inp, "output_tokens": out, "total_tokens": total}
+
+            if provider.kind == "custom_rest":
+                cfg = provider.config or {}
+                path = str(cfg.get("chat_path") or "").strip()
+                url = self._safe_url(provider, provider.base_url.rstrip("/") + (("/" + path.lstrip("/")) if path else ""))
+                params: dict[str, str] = {str(k): str(v) for k, v in (cfg.get("query_params") or {}).items()}
+                await self._apply_auth_async(provider, headers, params, client)
+                headers.setdefault("Content-Type", "application/json")
+                context = {
+                    "model": model, "system": system, "user": user,
+                    "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+                    "temperature": temperature, "max_tokens": max_tokens,
+                }
+                template = cfg.get("request_template") or {"model": "{{model}}", "messages": "{{messages}}", "temperature": "{{temperature}}", "max_tokens": "{{max_tokens}}"}
+                body = self._render_template(template, context)
+                method = str(cfg.get("http_method") or "POST").upper()
+                if method not in {"GET", "POST", "PUT", "PATCH"}:
+                    raise LLMGatewayError(f"unsupported custom REST method: {method}")
+                if method == "GET":
+                    request_params = {
+                        str(k): json.dumps(v, ensure_ascii=False) if isinstance(v, (dict, list)) else str(v)
+                        for k, v in (body or {}).items()
+                    }
+                    r = await client.request(method, url, headers=headers, params={**params, **request_params})
+                else:
+                    r = await client.request(method, url, headers=headers, params=params, json=body)
+                self._raise_for_status(r)
+                try:
+                    data = r.json()
+                except Exception as exc:
+                    raise LLMGatewayError("custom REST provider did not return JSON") from exc
+                response_path = str(cfg.get("response_path") or "").strip()
+                if response_path:
+                    extracted = self._deep_get(data, response_path)
+                else:
+                    extracted = data.get("output_text") if isinstance(data, dict) else None
+                    if extracted is None and isinstance(data, dict):
+                        try:
+                            extracted = data["choices"][0]["message"]["content"]
+                        except Exception:
+                            extracted = None
+                if isinstance(extracted, (dict, list)):
+                    text = json.dumps(extracted, ensure_ascii=False)
+                else:
+                    text = str(extracted or "")
+                if not text:
+                    raise LLMGatewayError("custom REST response mapping produced empty text")
+                usage_obj = data.get("usage") if isinstance(data, dict) else {}
+                usage_obj = usage_obj if isinstance(usage_obj, dict) else {}
+                inp = int(usage_obj.get("input_tokens") or usage_obj.get("prompt_tokens") or 0)
+                out = int(usage_obj.get("output_tokens") or usage_obj.get("completion_tokens") or 0)
+                total = int(usage_obj.get("total_tokens") or (inp + out))
                 return text, {"input_tokens": inp, "output_tokens": out, "total_tokens": total}
 
         raise LLMGatewayError(f"不支持的 provider kind: {provider.kind}")

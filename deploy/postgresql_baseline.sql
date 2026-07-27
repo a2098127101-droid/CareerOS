@@ -1,4 +1,4 @@
--- CareerOS v1.0-beta1 PostgreSQL baseline generated from schema_manifest.json
+-- CareerOS v1.5 Domain Intelligence PostgreSQL baseline generated from schema_manifest.json
 
 
 CREATE TABLE ai_tasks (
@@ -14,6 +14,8 @@ CREATE TABLE ai_tasks (
 	payload_json TEXT DEFAULT '{}' NOT NULL, 
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	version INTEGER DEFAULT 1 NOT NULL, 
+	completed_at TIMESTAMP WITH TIME ZONE, 
 	CONSTRAINT pk_ai_tasks PRIMARY KEY (task_id)
 );
 
@@ -40,8 +42,9 @@ CREATE TABLE artifact_series (
 	current_version_id TEXT, 
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
-	CONSTRAINT pk_artifact_series PRIMARY KEY (artifact_id), 
-	CONSTRAINT uq_artifact_series_1 UNIQUE (session_id, kind)
+	version INTEGER DEFAULT 1 NOT NULL, 
+	deleted_at TIMESTAMP WITH TIME ZONE, 
+	CONSTRAINT pk_artifact_series PRIMARY KEY (artifact_id)
 );
 
 
@@ -96,6 +99,165 @@ CREATE TABLE billing_orders (
 );
 
 
+CREATE TABLE capabilities (
+	capability_id TEXT, 
+	tenant_id TEXT NOT NULL, 
+	taxonomy_id TEXT NOT NULL, 
+	capability_key TEXT NOT NULL, 
+	name TEXT NOT NULL, 
+	category TEXT DEFAULT 'general' NOT NULL, 
+	description TEXT DEFAULT '' NOT NULL, 
+	aliases_json TEXT DEFAULT '[]' NOT NULL, 
+	level_scale_json TEXT DEFAULT '{}' NOT NULL, 
+	version INTEGER DEFAULT 1 NOT NULL, 
+	status TEXT DEFAULT 'active' NOT NULL, 
+	created_by TEXT DEFAULT '' NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	CONSTRAINT pk_capabilities PRIMARY KEY (capability_id), 
+	CONSTRAINT uq_capabilities_1 UNIQUE (tenant_id, taxonomy_id, capability_key)
+);
+
+
+CREATE TABLE capability_assessment_evidence (
+	link_id TEXT, 
+	tenant_id TEXT NOT NULL, 
+	assessment_id TEXT NOT NULL, 
+	capability_id TEXT NOT NULL, 
+	claim_id TEXT DEFAULT '' NOT NULL, 
+	evidence_id TEXT DEFAULT '' NOT NULL, 
+	contribution_type TEXT NOT NULL, 
+	potential_weight FLOAT DEFAULT 0 NOT NULL, 
+	verified_weight FLOAT DEFAULT 0 NOT NULL, 
+	explanation TEXT DEFAULT '' NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	CONSTRAINT pk_capability_assessment_evidence PRIMARY KEY (link_id)
+);
+
+
+CREATE TABLE capability_assessments (
+	assessment_id TEXT, 
+	tenant_id TEXT NOT NULL, 
+	session_id TEXT NOT NULL, 
+	owner_user_id TEXT NOT NULL, 
+	capability_id TEXT NOT NULL, 
+	assessment_version INTEGER NOT NULL, 
+	potential_score FLOAT DEFAULT 0 NOT NULL, 
+	verified_score FLOAT DEFAULT 0 NOT NULL, 
+	confidence FLOAT DEFAULT 0 NOT NULL, 
+	methodology_version TEXT NOT NULL, 
+	explanation_json TEXT DEFAULT '{}' NOT NULL, 
+	created_by TEXT DEFAULT '' NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	CONSTRAINT pk_capability_assessments PRIMARY KEY (assessment_id), 
+	CONSTRAINT uq_capability_assessments_1 UNIQUE (tenant_id, session_id, capability_id, assessment_version)
+);
+
+
+CREATE TABLE capability_taxonomies (
+	taxonomy_id TEXT, 
+	tenant_id TEXT NOT NULL, 
+	name TEXT NOT NULL, 
+	description TEXT DEFAULT '' NOT NULL, 
+	version INTEGER DEFAULT 1 NOT NULL, 
+	status TEXT DEFAULT 'active' NOT NULL, 
+	created_by TEXT DEFAULT '' NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	CONSTRAINT pk_capability_taxonomies PRIMARY KEY (taxonomy_id), 
+	CONSTRAINT uq_capability_taxonomies_1 UNIQUE (tenant_id, name)
+);
+
+
+CREATE TABLE capability_versions (
+	capability_version_id TEXT, 
+	tenant_id TEXT NOT NULL, 
+	capability_id TEXT NOT NULL, 
+	version INTEGER NOT NULL, 
+	snapshot_json TEXT NOT NULL, 
+	changed_by TEXT DEFAULT '' NOT NULL, 
+	change_reason TEXT DEFAULT '' NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	CONSTRAINT pk_capability_versions PRIMARY KEY (capability_version_id), 
+	CONSTRAINT uq_capability_versions_1 UNIQUE (capability_id, version)
+);
+
+
+CREATE TABLE career_gap_versions (
+	gap_version_id TEXT, 
+	tenant_id TEXT NOT NULL, 
+	gap_id TEXT NOT NULL, 
+	version INTEGER NOT NULL, 
+	snapshot_json TEXT NOT NULL, 
+	changed_by TEXT DEFAULT '' NOT NULL, 
+	change_reason TEXT DEFAULT '' NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	CONSTRAINT pk_career_gap_versions PRIMARY KEY (gap_version_id), 
+	CONSTRAINT uq_career_gap_versions_1 UNIQUE (gap_id, version)
+);
+
+
+CREATE TABLE career_gaps (
+	gap_id TEXT, 
+	tenant_id TEXT NOT NULL, 
+	session_id TEXT NOT NULL, 
+	owner_user_id TEXT NOT NULL, 
+	job_id TEXT NOT NULL, 
+	requirement_id TEXT NOT NULL, 
+	capability_id TEXT DEFAULT '' NOT NULL, 
+	gap_type TEXT NOT NULL, 
+	severity FLOAT DEFAULT 0 NOT NULL, 
+	status TEXT DEFAULT 'open' NOT NULL, 
+	version INTEGER DEFAULT 1 NOT NULL, 
+	potential_score FLOAT DEFAULT 0 NOT NULL, 
+	verified_score FLOAT DEFAULT 0 NOT NULL, 
+	required_score FLOAT DEFAULT 60 NOT NULL, 
+	explanation_json TEXT DEFAULT '{}' NOT NULL, 
+	created_by TEXT DEFAULT '' NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	deleted_at TIMESTAMP WITH TIME ZONE, 
+	CONSTRAINT pk_career_gaps PRIMARY KEY (gap_id), 
+	CONSTRAINT uq_career_gaps_1 UNIQUE (tenant_id, session_id, job_id, requirement_id, capability_id)
+);
+
+
+CREATE TABLE claim_capability_links (
+	link_id TEXT, 
+	tenant_id TEXT NOT NULL, 
+	claim_id TEXT NOT NULL, 
+	capability_id TEXT NOT NULL, 
+	relation TEXT DEFAULT 'indicates' NOT NULL, 
+	confidence FLOAT DEFAULT 0 NOT NULL, 
+	explanation TEXT DEFAULT '' NOT NULL, 
+	version INTEGER DEFAULT 1 NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	CONSTRAINT pk_claim_capability_links PRIMARY KEY (link_id), 
+	CONSTRAINT uq_claim_capability_links_1 UNIQUE (tenant_id, claim_id, capability_id, relation)
+);
+
+
+CREATE TABLE claim_evidence_links (
+	link_id TEXT, 
+	tenant_id TEXT NOT NULL, 
+	session_id TEXT NOT NULL, 
+	claim_id TEXT NOT NULL, 
+	evidence_id TEXT NOT NULL, 
+	relation TEXT DEFAULT 'candidate_support' NOT NULL, 
+	confidence FLOAT DEFAULT 0 NOT NULL, 
+	verification_status TEXT DEFAULT 'UNVERIFIED' NOT NULL, 
+	explanation TEXT DEFAULT '' NOT NULL, 
+	verifier_type TEXT DEFAULT 'deterministic' NOT NULL, 
+	verified_by TEXT DEFAULT '' NOT NULL, 
+	version INTEGER DEFAULT 1 NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	CONSTRAINT pk_claim_evidence_links PRIMARY KEY (link_id), 
+	CONSTRAINT uq_claim_evidence_links_1 UNIQUE (tenant_id, claim_id, evidence_id, relation)
+);
+
+
 CREATE TABLE data_subject_requests (
 	request_id TEXT, 
 	tenant_id TEXT NOT NULL, 
@@ -107,6 +269,61 @@ CREATE TABLE data_subject_requests (
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
 	processed_at TIMESTAMP WITH TIME ZONE, 
 	CONSTRAINT pk_data_subject_requests PRIMARY KEY (request_id)
+);
+
+
+CREATE TABLE domain_audit_events (
+	event_id TEXT, 
+	tenant_id TEXT NOT NULL, 
+	session_id TEXT DEFAULT '' NOT NULL, 
+	actor_user_id TEXT DEFAULT '' NOT NULL, 
+	subject_user_id TEXT DEFAULT '' NOT NULL, 
+	entity_type TEXT NOT NULL, 
+	entity_id TEXT NOT NULL, 
+	action TEXT NOT NULL, 
+	before_json TEXT DEFAULT '{}' NOT NULL, 
+	after_json TEXT DEFAULT '{}' NOT NULL, 
+	reason TEXT DEFAULT '' NOT NULL, 
+	correlation_id TEXT DEFAULT '' NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	CONSTRAINT pk_domain_audit_events PRIMARY KEY (event_id)
+);
+
+
+CREATE TABLE domain_claim_versions (
+	claim_version_id TEXT, 
+	tenant_id TEXT NOT NULL, 
+	claim_id TEXT NOT NULL, 
+	version INTEGER NOT NULL, 
+	snapshot_json TEXT NOT NULL, 
+	changed_by TEXT DEFAULT '' NOT NULL, 
+	change_reason TEXT DEFAULT '' NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	CONSTRAINT pk_domain_claim_versions PRIMARY KEY (claim_version_id), 
+	CONSTRAINT uq_domain_claim_versions_1 UNIQUE (claim_id, version)
+);
+
+
+CREATE TABLE domain_claims (
+	claim_id TEXT, 
+	tenant_id TEXT NOT NULL, 
+	session_id TEXT NOT NULL, 
+	owner_user_id TEXT NOT NULL, 
+	source_type TEXT NOT NULL, 
+	source_id TEXT NOT NULL, 
+	source_locator TEXT DEFAULT '' NOT NULL, 
+	claim_text TEXT NOT NULL, 
+	normalized_text TEXT DEFAULT '' NOT NULL, 
+	claim_type TEXT DEFAULT 'experience' NOT NULL, 
+	status TEXT DEFAULT 'active' NOT NULL, 
+	version INTEGER DEFAULT 1 NOT NULL, 
+	supersedes_claim_id TEXT DEFAULT '' NOT NULL, 
+	created_by TEXT DEFAULT '' NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	deleted_at TIMESTAMP WITH TIME ZONE, 
+	CONSTRAINT pk_domain_claims PRIMARY KEY (claim_id), 
+	CONSTRAINT uq_domain_claims_1 UNIQUE (tenant_id, session_id, source_type, source_id, source_locator)
 );
 
 
@@ -147,6 +364,23 @@ CREATE TABLE evidence_graph_edges (
 );
 
 
+CREATE TABLE evidence_item_verification_history (
+	history_id TEXT, 
+	tenant_id TEXT NOT NULL, 
+	session_id TEXT NOT NULL, 
+	evidence_id TEXT NOT NULL, 
+	previous_status TEXT NOT NULL, 
+	new_status TEXT NOT NULL, 
+	decision TEXT DEFAULT '' NOT NULL, 
+	confidence FLOAT DEFAULT 0 NOT NULL, 
+	method TEXT DEFAULT '' NOT NULL, 
+	reason TEXT DEFAULT '' NOT NULL, 
+	actor_user_id TEXT DEFAULT '' NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	CONSTRAINT pk_evidence_item_verification_history PRIMARY KEY (history_id)
+);
+
+
 CREATE TABLE evidence_items (
 	evidence_id TEXT, 
 	session_id TEXT NOT NULL, 
@@ -157,6 +391,16 @@ CREATE TABLE evidence_items (
 	content TEXT NOT NULL, 
 	verified INTEGER DEFAULT 0 NOT NULL, 
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	metadata_json TEXT DEFAULT '{}' NOT NULL, 
+	version INTEGER DEFAULT 1 NOT NULL, 
+	updated_at TIMESTAMP WITH TIME ZONE, 
+	deleted_at TIMESTAMP WITH TIME ZONE, 
+	verification_status TEXT DEFAULT 'SELF_REPORTED' NOT NULL, 
+	verification_method TEXT DEFAULT '' NOT NULL, 
+	verification_confidence FLOAT DEFAULT 0 NOT NULL, 
+	verified_by TEXT DEFAULT '' NOT NULL, 
+	verified_at TIMESTAMP WITH TIME ZONE, 
+	source_hash TEXT DEFAULT '' NOT NULL, 
 	CONSTRAINT pk_evidence_items PRIMARY KEY (evidence_id)
 );
 
@@ -179,6 +423,39 @@ CREATE TABLE evidence_verification_history (
 );
 
 
+CREATE TABLE job_requirement_capability_links (
+	link_id TEXT, 
+	tenant_id TEXT NOT NULL, 
+	job_id TEXT NOT NULL, 
+	requirement_id TEXT NOT NULL, 
+	capability_id TEXT NOT NULL, 
+	weight FLOAT DEFAULT 1 NOT NULL, 
+	minimum_score FLOAT DEFAULT 60 NOT NULL, 
+	mapping_status TEXT DEFAULT 'derived' NOT NULL, 
+	explanation TEXT DEFAULT '' NOT NULL, 
+	version INTEGER DEFAULT 1 NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	CONSTRAINT pk_job_requirement_capability_links PRIMARY KEY (link_id), 
+	CONSTRAINT uq_job_requirement_capability_links_1 UNIQUE (tenant_id, requirement_id, capability_id)
+);
+
+
+CREATE TABLE job_requirement_versions (
+	requirement_version_id TEXT, 
+	tenant_id TEXT NOT NULL, 
+	job_id TEXT NOT NULL, 
+	requirement_id TEXT NOT NULL, 
+	version INTEGER NOT NULL, 
+	snapshot_json TEXT NOT NULL, 
+	changed_by TEXT DEFAULT '' NOT NULL, 
+	change_reason TEXT DEFAULT '' NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	CONSTRAINT pk_job_requirement_versions PRIMARY KEY (requirement_version_id), 
+	CONSTRAINT uq_job_requirement_versions_1 UNIQUE (requirement_id, version)
+);
+
+
 CREATE TABLE job_requirements (
 	requirement_id TEXT, 
 	tenant_id TEXT NOT NULL, 
@@ -189,6 +466,8 @@ CREATE TABLE job_requirements (
 	importance INTEGER DEFAULT 3 NOT NULL, 
 	source_type TEXT DEFAULT 'derived' NOT NULL, 
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	version INTEGER DEFAULT 1 NOT NULL, 
+	updated_at TIMESTAMP WITH TIME ZONE, 
 	CONSTRAINT pk_job_requirements PRIMARY KEY (requirement_id)
 );
 
@@ -487,6 +766,30 @@ CREATE TABLE tenants (
 );
 
 
+CREATE TABLE unified_runtime_entities (
+	tenant_id TEXT NOT NULL, 
+	owner_user_id TEXT DEFAULT '' NOT NULL, 
+	entity_type TEXT NOT NULL, 
+	entity_id TEXT NOT NULL, 
+	payload_json TEXT DEFAULT '{}' NOT NULL, 
+	version INTEGER DEFAULT 1 NOT NULL, 
+	revision INTEGER DEFAULT 0 NOT NULL, 
+	updated_by TEXT DEFAULT '' NOT NULL, 
+	deleted_at TIMESTAMP WITH TIME ZONE, 
+	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	CONSTRAINT pk_unified_runtime_entities PRIMARY KEY (tenant_id, owner_user_id, entity_type, entity_id)
+);
+
+
+CREATE TABLE unified_runtime_revisions (
+	tenant_id TEXT, 
+	revision INTEGER DEFAULT 0 NOT NULL, 
+	updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
+	CONSTRAINT pk_unified_runtime_revisions PRIMARY KEY (tenant_id)
+);
+
+
 CREATE TABLE user_invitations (
 	invitation_id TEXT, 
 	token_hash TEXT NOT NULL, 
@@ -576,8 +879,8 @@ CREATE TABLE auth_sessions (
 	revoked_at TIMESTAMP WITH TIME ZONE, 
 	CONSTRAINT pk_auth_sessions PRIMARY KEY (auth_session_id), 
 	CONSTRAINT uq_auth_sessions_1 UNIQUE (token_hash), 
-	CONSTRAINT fk_auth_sessions_1_tenant_id FOREIGN KEY(tenant_id) REFERENCES tenants (tenant_id), 
-	CONSTRAINT fk_auth_sessions_2_user_id FOREIGN KEY(user_id) REFERENCES users (user_id)
+	CONSTRAINT fk_auth_sessions_1_user_id FOREIGN KEY(user_id) REFERENCES users (user_id), 
+	CONSTRAINT fk_auth_sessions_2_tenant_id FOREIGN KEY(tenant_id) REFERENCES tenants (tenant_id)
 );
 
 
@@ -628,8 +931,8 @@ CREATE TABLE tenant_memberships (
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
 	CONSTRAINT pk_tenant_memberships PRIMARY KEY (membership_id), 
 	CONSTRAINT uq_tenant_memberships_1 UNIQUE (tenant_id, user_id, role), 
-	CONSTRAINT fk_tenant_memberships_1_user_id FOREIGN KEY(user_id) REFERENCES users (user_id), 
-	CONSTRAINT fk_tenant_memberships_2_tenant_id FOREIGN KEY(tenant_id) REFERENCES tenants (tenant_id)
+	CONSTRAINT fk_tenant_memberships_1_tenant_id FOREIGN KEY(tenant_id) REFERENCES tenants (tenant_id), 
+	CONSTRAINT fk_tenant_memberships_2_user_id FOREIGN KEY(user_id) REFERENCES users (user_id)
 );
 
 
@@ -664,32 +967,49 @@ CREATE TABLE class_memberships (
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
 	CONSTRAINT pk_class_memberships PRIMARY KEY (class_membership_id), 
 	CONSTRAINT uq_class_memberships_1 UNIQUE (class_id, user_id, role), 
-	CONSTRAINT fk_class_memberships_1_user_id FOREIGN KEY(user_id) REFERENCES users (user_id), 
+	CONSTRAINT fk_class_memberships_1_class_id FOREIGN KEY(class_id) REFERENCES classes (class_id), 
 	CONSTRAINT fk_class_memberships_2_tenant_id FOREIGN KEY(tenant_id) REFERENCES tenants (tenant_id), 
-	CONSTRAINT fk_class_memberships_3_class_id FOREIGN KEY(class_id) REFERENCES classes (class_id)
+	CONSTRAINT fk_class_memberships_3_user_id FOREIGN KEY(user_id) REFERENCES users (user_id)
 );
 
+CREATE INDEX idx_tasks_owner_active ON ai_tasks (tenant_id, owner_user_id, status, updated_at);
 CREATE INDEX idx_tasks_tenant ON ai_tasks (tenant_id, status, updated_at);
 CREATE INDEX idx_analytics_tenant_time ON analytics_events (tenant_id, created_at);
+CREATE INDEX idx_artifact_owner_active ON artifact_series (tenant_id, owner_user_id, deleted_at, updated_at);
 CREATE INDEX idx_artifact_series_session ON artifact_series (tenant_id, session_id, updated_at);
 CREATE INDEX idx_artifact_template_defs_tenant ON artifact_template_definitions (tenant_id, kind, status, version);
 CREATE INDEX idx_billing_events_provider ON billing_events (provider, received_at);
 CREATE INDEX idx_billing_events_tenant ON billing_events (tenant_id, received_at);
 CREATE INDEX idx_billing_orders_tenant ON billing_orders (tenant_id, created_at);
+CREATE INDEX idx_capabilities_tenant_category ON capabilities (tenant_id, category, status, name);
+CREATE INDEX idx_assessment_evidence_assessment ON capability_assessment_evidence (tenant_id, assessment_id);
+CREATE INDEX idx_capability_assessments_latest ON capability_assessments (tenant_id, session_id, capability_id, assessment_version);
+CREATE INDEX idx_career_gaps_session_job ON career_gaps (tenant_id, session_id, job_id, status, severity);
+CREATE INDEX idx_claim_capability_capability ON claim_capability_links (tenant_id, capability_id, confidence);
+CREATE INDEX idx_claim_evidence_evidence ON claim_evidence_links (tenant_id, evidence_id, relation);
+CREATE INDEX idx_claim_evidence_claim ON claim_evidence_links (tenant_id, claim_id, relation, confidence);
 CREATE INDEX idx_data_subject_requests_user ON data_subject_requests (tenant_id, user_id, created_at);
+CREATE INDEX idx_domain_audit_entity ON domain_audit_events (tenant_id, entity_type, entity_id, created_at);
+CREATE INDEX idx_domain_audit_session ON domain_audit_events (tenant_id, session_id, created_at);
+CREATE INDEX idx_domain_claims_session ON domain_claims (tenant_id, session_id, owner_user_id, status, updated_at);
 CREATE INDEX idx_claims_session ON evidence_claims (tenant_id, session_id, created_at);
 CREATE INDEX idx_graph_edges_session ON evidence_graph_edges (tenant_id, session_id, created_at);
-CREATE INDEX idx_evidence_session ON evidence_items (session_id, created_at);
+CREATE INDEX idx_evidence_item_verification_history ON evidence_item_verification_history (tenant_id, evidence_id, created_at);
 CREATE INDEX idx_evidence_tenant_session ON evidence_items (tenant_id, session_id, created_at);
-CREATE INDEX idx_verification_history_claim ON evidence_verification_history (tenant_id, claim_id, created_at);
+CREATE INDEX idx_evidence_owner_active ON evidence_items (tenant_id, owner_user_id, deleted_at, updated_at);
+CREATE INDEX idx_evidence_verification ON evidence_items (tenant_id, owner_user_id, verification_status, updated_at);
+CREATE INDEX idx_evidence_session ON evidence_items (session_id, created_at);
 CREATE INDEX idx_verification_history_session ON evidence_verification_history (tenant_id, session_id, created_at);
+CREATE INDEX idx_verification_history_claim ON evidence_verification_history (tenant_id, claim_id, created_at);
+CREATE INDEX idx_requirement_capability_job ON job_requirement_capability_links (tenant_id, job_id, requirement_id);
+CREATE INDEX idx_job_requirement_versions ON job_requirement_versions (tenant_id, job_id, requirement_id, version);
 CREATE INDEX idx_job_requirements_job ON job_requirements (tenant_id, job_id, importance);
 CREATE INDEX idx_jobs_title_city ON jobs (title, city, active);
 CREATE INDEX idx_jobs_tenant ON jobs (tenant_id, active, updated_at);
 CREATE INDEX idx_knowledge_embeddings_source ON knowledge_embeddings (source_id);
 CREATE INDEX idx_knowledge_sources_scope ON knowledge_sources (scope, active);
-CREATE INDEX idx_knowledge_sources_tenant ON knowledge_sources (tenant_id, active, updated_at);
 CREATE INDEX idx_knowledge_tenant ON knowledge_sources (tenant_id, updated_at);
+CREATE INDEX idx_knowledge_sources_tenant ON knowledge_sources (tenant_id, active, updated_at);
 CREATE INDEX idx_llm_model_capabilities_provider ON llm_model_capabilities (provider_id, updated_at);
 CREATE INDEX idx_llm_usage_tenant ON llm_usage (tenant_id, created_at);
 CREATE INDEX idx_model_eval_runs_tenant ON model_eval_runs (tenant_id, created_at);
@@ -698,17 +1018,20 @@ CREATE INDEX idx_rag_eval_cases_tenant ON rag_eval_cases (tenant_id, active, cre
 CREATE INDEX idx_rag_eval_runs_tenant ON rag_eval_runs (tenant_id, created_at);
 CREATE INDEX idx_review_records_session ON review_records (tenant_id, session_id, created_at);
 CREATE INDEX idx_security_audit_tenant ON security_audit_log (tenant_id, created_at);
-CREATE INDEX idx_sessions_class ON sessions (tenant_id, class_id, updated_at);
-CREATE INDEX idx_sessions_tenant_updated ON sessions (tenant_id, updated_at);
 CREATE INDEX idx_sessions_owner ON sessions (student_user_id, tenant_id);
+CREATE INDEX idx_sessions_tenant_updated ON sessions (tenant_id, updated_at);
+CREATE INDEX idx_sessions_class ON sessions (tenant_id, class_id, updated_at);
 CREATE INDEX idx_stored_objects_tenant_owner ON stored_objects (tenant_id, owner_user_id, created_at);
 CREATE INDEX idx_stored_objects_status ON stored_objects (tenant_id, status, created_at);
-CREATE INDEX idx_feedback_session ON teacher_feedback (session_id, created_at);
 CREATE INDEX idx_feedback_tenant_session ON teacher_feedback (tenant_id, session_id, created_at);
-CREATE INDEX idx_user_invitations_tenant ON user_invitations (tenant_id, created_at);
+CREATE INDEX idx_feedback_session ON teacher_feedback (session_id, created_at);
+CREATE INDEX idx_unified_runtime_tenant_type_revision ON unified_runtime_entities (tenant_id, entity_type, revision);
+CREATE INDEX idx_unified_runtime_tenant_type_updated ON unified_runtime_entities (tenant_id, entity_type, updated_at);
+CREATE INDEX idx_unified_runtime_owner ON unified_runtime_entities (tenant_id, owner_user_id, entity_type, revision);
 CREATE INDEX idx_user_invitations_email ON user_invitations (email, tenant_id);
-CREATE INDEX idx_workflow_template ON workflow_instances (tenant_id, template_id, updated_at);
+CREATE INDEX idx_user_invitations_tenant ON user_invitations (tenant_id, created_at);
 CREATE INDEX idx_workflow_session ON workflow_instances (tenant_id, session_id);
+CREATE INDEX idx_workflow_template ON workflow_instances (tenant_id, template_id, updated_at);
 CREATE INDEX idx_workflow_template_defs_tenant ON workflow_template_definitions (tenant_id, preset_id, status, version);
 CREATE INDEX idx_artifact_versions_series ON artifact_versions (artifact_id, version);
 CREATE INDEX idx_auth_sessions_token ON auth_sessions (token_hash);

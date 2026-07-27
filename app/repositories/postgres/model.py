@@ -3,7 +3,7 @@ import base64, hashlib, json
 from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy.engine import Engine
 from ...models import ProviderUpsert, RouteUpsert, ModelCapabilityUpsert
-from ...model_store import ProviderRecord, RouteRecord
+from ...model_store import ProviderRecord, RouteRecord, _provider_payload_metadata, _split_provider_metadata, _mask_provider_headers
 from ..sqlalchemy_common import SQLAlchemyRepo
 
 class PostgresModelConfigRepository(SQLAlchemyRepo):
@@ -16,17 +16,17 @@ class PostgresModelConfigRepository(SQLAlchemyRepo):
         except InvalidToken:return ''
     def upsert_provider(self,payload:ProviderUpsert)->None:
         existing=self.get_provider(payload.provider_id);enc=self._encrypt(existing.api_key if payload.api_key is None and existing else (payload.api_key or ''))
-        params={'id':payload.provider_id,'name':payload.name,'kind':payload.kind,'url':payload.base_url.rstrip('/'),'key':enc,'model':payload.default_model,'enabled':1 if payload.enabled else 0,'timeout':payload.timeout_seconds,'headers':json.dumps(payload.extra_headers,ensure_ascii=False)}
+        packed_headers,_config=_provider_payload_metadata(payload);params={'id':payload.provider_id,'name':payload.name,'kind':payload.kind,'url':payload.base_url.rstrip('/'),'key':enc,'model':payload.default_model,'enabled':1 if payload.enabled else 0,'timeout':payload.timeout_seconds,'headers':json.dumps(packed_headers,ensure_ascii=False)}
         if self.one('SELECT 1 FROM llm_providers WHERE provider_id=:id',{'id':payload.provider_id}):self.execute("""UPDATE llm_providers SET name=:name,kind=:kind,base_url=:url,api_key_enc=:key,default_model=:model,enabled=:enabled,timeout_seconds=:timeout,extra_headers=:headers,updated_at=CURRENT_TIMESTAMP WHERE provider_id=:id""",params)
         else:self.execute("""INSERT INTO llm_providers(provider_id,name,kind,base_url,api_key_enc,default_model,enabled,timeout_seconds,extra_headers) VALUES(:id,:name,:kind,:url,:key,:model,:enabled,:timeout,:headers)""",params)
     def get_provider(self,provider_id:str):
         r=self.one('SELECT * FROM llm_providers WHERE provider_id=:id',{'id':provider_id})
         if not r:return None
-        return ProviderRecord(provider_id=r['provider_id'],name=r['name'],kind=r['kind'],base_url=r['base_url'],api_key=self._decrypt(r['api_key_enc']),default_model=r['default_model'],enabled=bool(r['enabled']),timeout_seconds=int(r['timeout_seconds']),extra_headers=json.loads(r['extra_headers'] or '{}'))
+        headers,config=_split_provider_metadata(json.loads(r['extra_headers'] or '{}'));return ProviderRecord(provider_id=r['provider_id'],name=r['name'],kind=r['kind'],base_url=r['base_url'],api_key=self._decrypt(r['api_key_enc']),default_model=r['default_model'],enabled=bool(r['enabled']),timeout_seconds=int(r['timeout_seconds']),extra_headers=headers,config=config)
     def list_providers(self,reveal_secret:bool=False)->list[dict]:
         out=[]
         for r in self.all('SELECT * FROM llm_providers ORDER BY name'):
-            key=self._decrypt(r['api_key_enc']);out.append({'provider_id':r['provider_id'],'name':r['name'],'kind':r['kind'],'base_url':r['base_url'],'api_key':key if reveal_secret else None,'has_api_key':bool(key),'api_key_masked':(key[:4]+'••••'+key[-4:]) if len(key)>=10 else ('••••' if key else ''),'default_model':r['default_model'],'enabled':bool(r['enabled']),'timeout_seconds':int(r['timeout_seconds']),'extra_headers':json.loads(r['extra_headers'] or '{}'),'updated_at':r['updated_at']})
+            key=self._decrypt(r['api_key_enc']);out.append({'provider_id':r['provider_id'],'name':r['name'],'kind':r['kind'],'base_url':r['base_url'],'api_key':key if reveal_secret else None,'has_api_key':bool(key),'api_key_masked':(key[:4]+'••••'+key[-4:]) if len(key)>=10 else ('••••' if key else ''),'default_model':r['default_model'],'enabled':bool(r['enabled']),'timeout_seconds':int(r['timeout_seconds']),'extra_headers':_mask_provider_headers(_split_provider_metadata(json.loads(r['extra_headers'] or '{}'))[0]),'config':_split_provider_metadata(json.loads(r['extra_headers'] or '{}'))[1],'updated_at':r['updated_at']})
         return out
     def delete_provider(self,provider_id:str)->None:
         self.execute('DELETE FROM llm_routes WHERE provider_id=:id OR fallback_provider_id=:id',{'id':provider_id});self.execute('DELETE FROM llm_providers WHERE provider_id=:id',{'id':provider_id})

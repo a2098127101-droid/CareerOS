@@ -6,7 +6,8 @@ from pydantic import BaseModel, Field, ConfigDict
 
 Track = Literal["成长赛道", "就业赛道", "待确认"]
 DocumentType = str
-ProviderKind = Literal["openai_responses", "openai_compatible", "anthropic", "gemini"]
+ProviderKind = Literal["openai_responses", "openai_compatible", "anthropic", "gemini", "custom_rest"]
+ProviderAuthType = Literal["bearer", "api_key_header", "api_key_query", "basic", "oauth2_client_credentials", "custom_headers", "none"]
 AgentTask = Literal["profile", "coach", "writer", "reviewer", "critic", "revision"]
 
 
@@ -185,7 +186,158 @@ class ProviderUpsert(BaseModel):
     enabled: bool = True
     timeout_seconds: int = Field(default=90, ge=5, le=600)
     extra_headers: dict[str, str] = Field(default_factory=dict)
+    # Vendor-neutral connection settings. These are persisted as encrypted-secret-free
+    # provider metadata so new REST/compatible providers do not require schema changes.
+    auth_type: ProviderAuthType = "bearer"
+    auth_header_name: str = Field(default="Authorization", max_length=120)
+    auth_prefix: str = Field(default="Bearer", max_length=80)
+    api_key_query_name: str = Field(default="key", max_length=120)
+    oauth_token_url: str = Field(default="", max_length=2000)
+    oauth_client_id: str = Field(default="", max_length=500)
+    oauth_scope: str = Field(default="", max_length=1000)
+    oauth_audience: str = Field(default="", max_length=1000)
+    chat_path: str = Field(default="", max_length=1000)
+    http_method: Literal["GET", "POST", "PUT", "PATCH"] = "POST"
+    models_path: str = Field(default="", max_length=1000)
+    request_template: dict = Field(default_factory=dict)
+    response_path: str = Field(default="", max_length=500)
+    models_response_path: str = Field(default="", max_length=500)
+    query_params: dict[str, str] = Field(default_factory=dict)
+    allow_private_network: bool = False
 
+
+class UnifiedRuntimeEntityUpsert(BaseModel):
+    id: str = Field(min_length=1, max_length=200)
+    payload: dict = Field(default_factory=dict)
+    expected_version: int | None = Field(default=None, ge=1)
+    idempotency_key: str = Field(default="", max_length=200)
+
+
+class UnifiedRuntimeCollectionReplace(BaseModel):
+    items: list[dict] = Field(default_factory=list)
+
+
+class UnifiedRuntimeStateValue(BaseModel):
+    value: object | None = None
+
+
+class UnifiedRuntimeImportRequest(BaseModel):
+    data: dict = Field(default_factory=dict)
+    mode: Literal["replace", "merge"] = "replace"
+
+
+class WorkspaceEvidenceUpsert(BaseModel):
+    id: str = Field(default="", max_length=200)
+    title: str = Field(min_length=1, max_length=200)
+    action: str = Field(min_length=2, max_length=120000)
+    proof: str = Field(default="", max_length=12000)
+    capabilities: list[str] = Field(default_factory=list, max_length=50)
+    verified: bool = False
+    expected_version: int | None = Field(default=None, ge=1)
+
+
+
+class WorkspaceEvidenceVerificationDecision(BaseModel):
+    decision: Literal["submit_review", "verified", "partial", "rejected", "contradicted"]
+    reason: str = Field(default="", max_length=12000)
+    confidence: float = Field(default=1.0, ge=0, le=1)
+    method: str = Field(default="human_review", max_length=80)
+
+class WorkspaceArtifactUpsert(BaseModel):
+    id: str = Field(default="", max_length=200)
+    title: str = Field(min_length=1, max_length=240)
+    type: str = Field(default="custom", max_length=120)
+    content: str = Field(default="", max_length=500000)
+    evidence_ids: list[str] = Field(default_factory=list, max_length=200)
+    expected_version: int | None = Field(default=None, ge=1)
+
+
+class WorkspaceTaskUpsert(BaseModel):
+    id: str = Field(default="", max_length=200)
+    title: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=6000)
+    type: str = Field(default="custom", max_length=80)
+    status: Literal["todo", "done", "completed", "cancelled"] = "todo"
+    priority: Literal["normal", "medium", "high", "Normal", "High"] = "normal"
+    origin_type: str = Field(default="manual", max_length=80)
+    origin_id: str = Field(default="", max_length=200)
+    expected_version: int | None = Field(default=None, ge=1)
+
+
+class WorkspaceUserCreate(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    display_name: str = Field(min_length=1, max_length=160)
+    role: str = Field(default="student", max_length=80)
+    password: str = Field(default="", max_length=200)
+    invite_only: bool = True
+
+
+class WorkspaceInterviewUpsert(BaseModel):
+    id: str = Field(default="", max_length=200)
+    question: str = Field(default="", max_length=6000)
+    answer: str = Field(default="", max_length=30000)
+    scores: dict = Field(default_factory=dict)
+    feedback: str = Field(default="", max_length=12000)
+    expected_version: int | None = Field(default=None, ge=1)
+
+
+
+
+
+class WorkspaceCoachRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=30000)
+    mode: str = Field(default="coach", max_length=80)
+
+
+class WorkspaceInterviewEvaluateRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=6000)
+    answer: str = Field(min_length=1, max_length=30000)
+    target_job: str = Field(default="", max_length=300)
+
+
+class WorkspacePPTReviewRequest(BaseModel):
+    slides: list[dict] = Field(default_factory=list, max_length=200)
+    target_job: str = Field(default="", max_length=300)
+
+
+class WorkspaceInterviewEvaluation(BaseModel):
+    overall_score: int = Field(ge=0, le=100)
+    structure: int = Field(ge=0, le=100)
+    relevance: int = Field(ge=0, le=100)
+    evidence: int = Field(ge=0, le=100)
+    specificity: int = Field(ge=0, le=100)
+    role_fit: int = Field(ge=0, le=100)
+    feedback: str = Field(max_length=12000)
+    risks: list[str] = Field(default_factory=list, max_length=20)
+
+
+class WorkspacePPTReviewResult(BaseModel):
+    overall_score: int = Field(ge=0, le=100)
+    narrative: int = Field(ge=0, le=100)
+    evidence: int = Field(ge=0, le=100)
+    logic: int = Field(ge=0, le=100)
+    role_fit: int = Field(ge=0, le=100)
+    density: int = Field(ge=0, le=100)
+    issues: list[dict] = Field(default_factory=list, max_length=100)
+    summary: str = Field(max_length=12000)
+
+
+class DomainRecomputeRequest(BaseModel):
+    job_id: str = Field(default="", max_length=200)
+    reason: str = Field(default="manual recompute", max_length=500)
+
+
+class DomainClaimUpsert(BaseModel):
+    claim_text: str = Field(min_length=3, max_length=12000)
+    claim_type: str = Field(default="manual", max_length=80)
+    expected_version: int | None = Field(default=None, ge=1)
+    reason: str = Field(default="manual claim edit", max_length=500)
+
+
+class DomainGapStatusUpdate(BaseModel):
+    status: Literal["open", "planned", "in_progress", "resolved", "accepted", "dismissed"]
+    expected_version: int | None = Field(default=None, ge=1)
+    reason: str = Field(default="gap status update", max_length=500)
 
 class RouteUpsert(BaseModel):
     task: AgentTask
@@ -241,6 +393,19 @@ class ModelEvaluationRequest(BaseModel):
 class ProviderTestRequest(BaseModel):
     provider_id: str
     model: str | None = None
+
+
+class ProviderPlaygroundRequest(BaseModel):
+    provider_id: str
+    model: str | None = None
+    system: str = Field(default="You are a helpful assistant.", max_length=20000)
+    user: str = Field(min_length=1, max_length=100000)
+    temperature: float = Field(default=0.2, ge=0, le=2)
+    max_tokens: int = Field(default=1000, ge=1, le=64000)
+
+
+class ProviderModelsRequest(BaseModel):
+    provider_id: str
 
 
 class KnowledgeSearchRequest(BaseModel):

@@ -66,6 +66,22 @@ def upgrade() -> None:
         )
         op.create_index("idx_artifact_template_defs_tenant", "artifact_template_definitions", ["tenant_id", "kind", "status", "version"])
 
+    if "unified_runtime_entities" not in tables:
+        op.create_table(
+            "unified_runtime_entities",
+            sa.Column("tenant_id", sa.Text(), nullable=False),
+            sa.Column("entity_type", sa.Text(), nullable=False),
+            sa.Column("entity_id", sa.Text(), nullable=False),
+            sa.Column("owner_user_id", sa.Text(), nullable=False, server_default=""),
+            sa.Column("payload_json", sa.Text(), nullable=False, server_default="{}"),
+            sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP")),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP")),
+            sa.PrimaryKeyConstraint("tenant_id", "entity_type", "entity_id", name="pk_unified_runtime_entities"),
+        )
+        op.create_index("idx_unified_runtime_tenant_type_updated", "unified_runtime_entities", ["tenant_id", "entity_type", "updated_at"])
+        op.create_index("idx_unified_runtime_owner", "unified_runtime_entities", ["tenant_id", "owner_user_id", "entity_type"])
+
 
 def downgrade() -> None:
     op.drop_index("idx_artifact_template_defs_tenant", table_name="artifact_template_definitions")
