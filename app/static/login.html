@@ -9,7 +9,7 @@
     :root{--auth-radius:14px}
     *{box-sizing:border-box}
     .auth-shell{min-height:100dvh;display:grid;grid-template-columns:minmax(360px,1fr) minmax(480px,600px);background:var(--background)}
-    .auth-aside{position:relative;overflow:hidden;padding:44px 48px;display:flex;flex-direction:column;border-right:1px solid var(--border);background:var(--surface-secondary)}
+    .auth-aside{position:sticky;top:0;height:100dvh;overflow:hidden;padding:44px 48px;display:flex;flex-direction:column;border-right:1px solid var(--border);background:var(--surface-secondary)}
     .auth-aside:after{content:"";position:absolute;right:-120px;bottom:-140px;width:420px;height:420px;border:1px solid var(--border);border-radius:50%;opacity:.65;pointer-events:none}
     .auth-brand{position:relative;z-index:1;display:flex;align-items:center;gap:12px}
     .auth-brand-mark{width:38px;height:38px;display:grid;place-items:center;border-radius:11px;background:var(--foreground);color:var(--background)}
