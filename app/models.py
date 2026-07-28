@@ -150,6 +150,7 @@ class ReviseRequest(BaseModel):
 class ChatRequest(BaseModel):
     session_id: str
     message: str
+    locale: Literal["zh-CN", "en-US"] = "zh-CN"
 
 
 class TeacherNoteRequest(BaseModel):

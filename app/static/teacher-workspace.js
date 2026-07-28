@@ -8,10 +8,11 @@
   })[char]);
   const detailText = payload => {
     const detail = payload && payload.detail;
-    if (typeof detail === "string") return detail;
-    if (detail && typeof detail.message === "string") return detail.message;
-    if (detail && typeof detail.code === "string") return detail.code;
-    return "请求失败，请稍后重试。";
+    const message = typeof detail === "string" ? detail
+      : detail && typeof detail.message === "string" ? detail.message
+      : detail && typeof detail.code === "string" ? detail.code
+      : "请求失败，请稍后重试。";
+    return window.CareerI18n?.t(message) || message;
   };
   const apiCall = async (url, options = {}) => {
     const response = await fetch(url, {
@@ -113,6 +114,12 @@
         toast(`已定位路径阶段：${button.dataset.stageLabel}`);
       };
     });
+    qs(".career-modal-body", modal.element)?.insertAdjacentHTML("beforeend",
+      `<div class="workspace-actions"><button class="btn primary" id="openPlanRecommendations"><i data-lucide="route"></i>生成个性化方案推荐</button></div>`);
+    qs("#openPlanRecommendations", modal.element).onclick = () => {
+      modal.close();
+      openRecommendations().catch(error => toast(error.message, "triangle-alert"));
+    };
     CareerUI.refreshIcons();
   }
 
@@ -130,17 +137,96 @@
   async function openReviews() {
     const data = await currentDashboard();
     const rows = (data.sessions || []).filter(item => item.stage === "draft" || item.score != null).map(item => `
-      <button class="workspace-row interactive-row" data-open-student="${escapeHtml(item.session_id)}">
+      <div class="workspace-row">
         <div><strong>${escapeHtml(item.name)}</strong><span>${item.score == null ? "成果物待评审" : `最近评分 ${item.score}/100`}</span></div>
-        <span class="badge ${item.score != null && item.score < 70 ? "danger" : ""}">${item.score == null ? "待评审" : "已评审"}</span>
-      </button>`);
-    const modal = openList("智能评审", "评审由真实 Reviewer 路由执行，教师可进入用户 Inspector 查看依据", rows, "当前没有待评审成果");
+        <div class="version-actions">
+          <button class="btn small" data-open-student="${escapeHtml(item.session_id)}">查看</button>
+          <button class="btn small primary" data-run-review="${escapeHtml(item.session_id)}">${item.score == null ? "开始评审" : "重新评审"}</button>
+        </div>
+      </div>`);
+    const modal = openList("智能评审", "评分由真实 Reviewer 路由执行，不使用前端随机分数", rows, "当前没有待评审成果");
     qsa("[data-open-student]", modal.element).forEach(button => {
       button.onclick = () => {
         modal.close();
         qs(`[data-id="${CSS.escape(button.dataset.openStudent)}"]`)?.click();
       };
     });
+    qsa("[data-run-review]", modal.element).forEach(button => {
+      button.onclick = async () => {
+        button.classList.add("button-busy");
+        button.innerHTML = '<i data-lucide="loader-circle"></i>正在评审';
+        CareerUI.refreshIcons();
+        try {
+          const result = await apiCall("/api/review", {
+            method: "POST", body: JSON.stringify({session_id: button.dataset.runReview})
+          });
+          const review = result.review || result.state?.review;
+          toast(`评审完成 · ${review?.total_score ?? "—"}/100`);
+          modal.close();
+          qs(`[data-id="${CSS.escape(button.dataset.runReview)}"]`)?.click();
+          if (typeof load === "function") await load();
+        } catch (error) {
+          toast(error.message, "triangle-alert");
+        } finally {
+          button.classList.remove("button-busy");
+          button.textContent = "重试评审";
+        }
+      };
+    });
+    CareerUI.refreshIcons();
+  }
+
+  async function openRecommendations() {
+    const data = await currentDashboard();
+    const rows = (data.sessions || []).map(item => `
+      <div class="workspace-row">
+        <div><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.target_job || item.track || "目标待明确")} · ${escapeHtml(item.stage_label)}</span></div>
+        <button class="btn small primary" data-generate-recommendation="${escapeHtml(item.session_id)}">生成方案推荐</button>
+      </div>`);
+    const modal = openList("方案推荐", "推荐由 Coach 模型读取该用户已授权画像、Evidence 与成果物后生成", rows, "当前没有可访问用户");
+    qsa("[data-generate-recommendation]", modal.element).forEach(button => {
+      button.onclick = async () => {
+        button.classList.add("button-busy");
+        button.innerHTML = '<i data-lucide="loader-circle"></i>正在分析';
+        CareerUI.refreshIcons();
+        try {
+          const detail = await apiCall(`/api/teacher/sessions/${encodeURIComponent(button.dataset.generateRecommendation)}`);
+          const subjectUserId = detail.state?.student_user_id || detail.state?.student_id || "";
+          if (!subjectUserId) throw new Error("该用户尚未绑定可授权的账户身份，无法跨用户调用 Coach。");
+          const result = await apiCall(`/api/workspace/v1/ai/coach?subject_user_id=${encodeURIComponent(subjectUserId)}`, {
+            method: "POST",
+            body: JSON.stringify({
+              mode: "advisor_recommendation",
+              message: "请基于该用户已核验的画像、Evidence、成果物和当前工作流，生成一份可执行的职业发展方案推荐。逐项区分已有证据、缺口、下一步任务，禁止补造经历。"
+            })
+          });
+          CareerUI.modal({
+            title: "AI 方案推荐",
+            description: `${escapeHtml(result.provider_id || "Model Gateway")} · ${escapeHtml(result.model || "configured model")}`,
+            html: `<div class="preview" data-i18n-ignore>${escapeHtml(result.reply || "")}</div>
+              <div class="workspace-actions"><button class="btn primary" id="useAdvisorRecommendation">写入顾问反馈</button></div>`
+          });
+          qs("#useAdvisorRecommendation").onclick = async event => {
+            event.currentTarget.classList.add("button-busy");
+            try {
+              await apiCall(`/api/teacher/sessions/${encodeURIComponent(button.dataset.generateRecommendation)}/feedback`, {
+                method: "POST",
+                body: JSON.stringify({content: result.reply, teacher_name: "CareerOS Advisor", priority: "medium"})
+              });
+              toast("方案推荐已写入用户 Coach 与任务中心");
+              if (typeof load === "function") await load();
+            } catch (error) { toast(error.message, "triangle-alert"); }
+            finally { event.currentTarget.classList.remove("button-busy"); }
+          };
+        } catch (error) {
+          toast(error.message, "triangle-alert");
+        } finally {
+          button.classList.remove("button-busy");
+          button.textContent = "重新生成";
+        }
+      };
+    });
+    CareerUI.refreshIcons();
   }
 
   async function openTasks() {
@@ -149,22 +235,26 @@
     const rows = items.map(item => `
       <div class="workspace-row">
         <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.source || item.task_type)} · ${escapeHtml(item.priority)}</span></div>
-        <button class="btn small" data-task-complete="${escapeHtml(item.task_id)}" ${["done", "completed"].includes(item.status) ? "disabled" : ""}>${["done", "completed"].includes(item.status) ? "已完成" : "完成"}</button>
+        <button class="btn small" data-task-complete="${escapeHtml(item.task_id)}">${["done", "completed"].includes(item.status) ? "重新打开" : "完成"}</button>
       </div>`);
     const modal = openList("AI 任务", `${items.filter(item => !["done", "completed"].includes(item.status)).length} 项待处理`, rows, "当前没有任务");
     qsa("[data-task-complete]", modal.element).forEach(button => {
       button.onclick = async () => {
-        button.disabled = true;
+        button.classList.add("button-busy");
         try {
+          const current = items.find(item => item.task_id === button.dataset.taskComplete);
+          const nextStatus = ["done", "completed"].includes(current?.status) ? "todo" : "done";
           await apiCall(`/api/tasks/${encodeURIComponent(button.dataset.taskComplete)}`, {
-            method: "PATCH", body: JSON.stringify({status: "done"})
+            method: "PATCH", body: JSON.stringify({status: nextStatus})
           });
-          button.textContent = "已完成";
-          toast("任务状态已更新");
+          if (current) current.status = nextStatus;
+          button.textContent = nextStatus === "done" ? "重新打开" : "完成";
+          toast(nextStatus === "done" ? "任务已完成" : "任务已重新打开");
           if (typeof load === "function") load();
         } catch (error) {
-          button.disabled = false;
           toast(error.message, "triangle-alert");
+        } finally {
+          button.classList.remove("button-busy");
         }
       };
     });
@@ -304,7 +394,7 @@
     item.addEventListener("click", async event => {
       event.preventDefault();
       const handler = handlers[item.dataset.teacherView];
-      if (!handler) return toast("该模块暂不可用", "triangle-alert");
+      if (!handler) return toast("当前模块未绑定操作，请刷新后重试", "triangle-alert");
       item.setAttribute("aria-busy", "true");
       try { await handler(); } catch (error) { toast(error.message, "triangle-alert"); }
       finally { item.removeAttribute("aria-busy"); }
@@ -339,5 +429,16 @@
     }
     const task = event.target.closest("#aiActivity .activity-item");
     if (task) handlers.tasks().catch(error => toast(error.message, "triangle-alert"));
+    const progress = event.target.closest("#funnel .progress-row");
+    if (progress) {
+      const label = progress.querySelector("span")?.textContent || "进度阶段";
+      CareerUI.modal({
+        title: `${label} · 进度钻取`,
+        description: "数据来自当前教师授权范围",
+        html: `<div class="workspace-list"><div class="workspace-row"><span>完成比例</span><strong>${escapeHtml(progress.querySelector(".pct")?.textContent || "—")}</strong></div></div>
+          <div class="workspace-actions"><button class="btn primary" id="viewProgressUsers">查看相关用户</button></div>`
+      });
+      qs("#viewProgressUsers").onclick = () => openUsers(false).catch(error => toast(error.message, "triangle-alert"));
+    }
   });
 })();

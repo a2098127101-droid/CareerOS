@@ -30,6 +30,10 @@ def test_student_visible_navigation_has_handlers_and_real_api_bindings():
         "workspace/v1/evidence", "workspace/v1/tasks", "workspace/v1/artifacts",
         "domain/v1/capabilities", "domain/v1/recompute",
         "workspace/v1/ai/interview/evaluate", "auth/logout",
+        "artifacts/${encodeURIComponent(item.id)}/versions",
+        "/api/artifacts/${encodeURIComponent(item.id)}/diff",
+        "/api/artifacts/${encodeURIComponent(item.id)}/restore/",
+        "careerosRadarGradient", "#2B5BFF", "#00D4AA",
     ):
         assert control in script
     assert 'src="/static/student-workspace.js?' in html
@@ -49,9 +53,29 @@ def test_teacher_visible_navigation_has_handlers_and_real_api_bindings():
         "workspaceSelect", "teacherHelp", "teacherNotifications",
         "teacherAccount", "topAdvisorAvatar", "teacher/dashboard",
         "teacher/sessions", "workspace/v1/modules", "api/tasks", "auth/logout",
+        "workspace/v1/ai/coach", "advisor_recommendation", "/api/review",
     ):
         assert control in html + script
     assert 'src="/static/teacher-workspace.js?' in html
+
+
+def test_global_i18n_and_admin_configuration_contracts():
+    i18n = (STATIC / "i18n.js").read_text(encoding="utf-8")
+    admin_html = (STATIC / "admin.html").read_text(encoding="utf-8")
+    extension = (STATIC / "admin-extension.js").read_text(encoding="utf-8")
+    for page in ("index.html", "login.html", "student.html", "teacher.html", "admin.html"):
+        html = (STATIC / page).read_text(encoding="utf-8")
+        assert "/static/i18n.js" in html, page
+    for token in ("careeros_locale", "globe-2", "MutationObserver", "careeros:localechange", "en-US"):
+        assert token in i18n
+    assert 'data-tab="templates"' in admin_html
+    assert 'data-tab="access"' in admin_html
+    for endpoint in (
+        "/api/admin/templates/workflows", "/api/admin/templates/artifacts",
+        "/api/admin/users", "/role", "/status",
+    ):
+        assert endpoint in extension
+    assert "workspace-select" in extension
 
 
 def test_workspace_module_contract_and_interaction_apis(tmp_path: Path):
@@ -85,6 +109,26 @@ tasks = student.get("/api/workspace/v1/tasks")
 assert tasks.status_code == 200, tasks.text
 artifacts = student.get("/api/workspace/v1/artifacts")
 assert artifacts.status_code == 200, artifacts.text
+created = student.post("/api/workspace/v1/artifacts", json={
+    "id": "UI-PLAN-1", "title": "UI Contract Plan", "type": "career_report",
+    "content": "Evidence-grounded plan V1", "evidence_ids": [],
+})
+assert created.status_code == 200, created.text
+updated = student.patch("/api/workspace/v1/artifacts/UI-PLAN-1", json={
+    "id": "UI-PLAN-1", "title": "UI Contract Plan", "type": "career_report",
+    "content": "Evidence-grounded plan V2", "evidence_ids": [], "expected_version": 1,
+})
+assert updated.status_code == 200, updated.text
+versions = student.get("/api/workspace/v1/artifacts/UI-PLAN-1/versions")
+assert versions.status_code == 200, versions.text
+assert len(versions.json()["versions"]) == 2
+
+english = student.post("/api/chat", json={
+    "session_id": student.get("/api/workspace/v1/context").json()["session_id"],
+    "message": "What should I do next?", "locale": "en-US",
+})
+assert english.status_code == 200, english.text
+assert english.json()["reply"]
 
 teacher = TestClient(app)
 r = teacher.post("/api/auth/login", json={

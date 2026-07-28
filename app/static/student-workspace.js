@@ -8,10 +8,11 @@
   })[char]);
   const detailText = payload => {
     const detail = payload && payload.detail;
-    if (typeof detail === "string") return detail;
-    if (detail && typeof detail.message === "string") return detail.message;
-    if (detail && typeof detail.code === "string") return detail.code;
-    return "请求失败，请稍后重试。";
+    const message = typeof detail === "string" ? detail
+      : detail && typeof detail.message === "string" ? detail.message
+      : detail && typeof detail.code === "string" ? detail.code
+      : "请求失败，请稍后重试。";
+    return window.CareerI18n?.t(message) || message;
   };
   const api = async (url, options = {}) => {
     const response = await fetch(url, {
@@ -158,61 +159,183 @@
     const rows = items.map(item => `
       <div class="workspace-row">
         <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.description || item.originType || "行动任务")}</span></div>
-        <button class="btn small" data-complete-task="${escapeHtml(item.id)}" ${item.status === "done" ? "disabled" : ""}>${item.status === "done" ? "已完成" : "标记完成"}</button>
+        <button class="btn small" data-complete-task="${escapeHtml(item.id)}">${item.status === "done" ? "重新打开" : "标记完成"}</button>
       </div>`);
     const modal = modalList("行动计划", `${items.filter(item => item.status !== "done").length} 项待推进任务`, rows, "当前没有行动任务");
     qsa("[data-complete-task]", modal.element).forEach(button => {
       button.onclick = async () => {
-        button.disabled = true;
+        button.classList.add("button-busy");
         try {
           const item = items.find(candidate => candidate.id === button.dataset.completeTask);
+          const nextStatus = item.status === "done" ? "todo" : "done";
           await api(`/api/workspace/v1/tasks/${encodeURIComponent(item.id)}`, {
             method: "PATCH",
-            body: JSON.stringify({...item, status: "done", expected_version: item._version})
+            body: JSON.stringify({...item, status: nextStatus, expected_version: item._version})
           });
-          button.textContent = "已完成";
-          toast("任务已完成");
+          button.textContent = nextStatus === "done" ? "重新打开" : "标记完成";
+          item.status = nextStatus;
+          item._version = (item._version || 1) + 1;
+          toast(nextStatus === "done" ? "任务已完成" : "任务已重新打开");
         } catch (error) {
-          button.disabled = false;
           toast(error.message, "triangle-alert");
+        } finally {
+          button.classList.remove("button-busy");
         }
       };
     });
+  }
+
+  function artifactTree(items) {
+    const groups = new Map();
+    items.forEach(item => {
+      const type = item.type || "custom";
+      if (!groups.has(type)) groups.set(type, []);
+      groups.get(type).push(item);
+    });
+    return `<div class="project-tree">${[...groups.entries()].map(([type, children]) => `
+      <div class="tree-node open">
+        <button class="tree-row" type="button" data-tree-toggle>
+          <i class="tree-chevron" data-lucide="chevron-right"></i><i data-lucide="folder-open"></i>
+          <strong>${escapeHtml(type)}</strong><span>${children.length}</span>
+        </button>
+        <div class="tree-children"><div>${children.map(item => `
+          <button class="tree-row depth-1" type="button" data-artifact-history="${escapeHtml(item.id)}">
+            <i data-lucide="file-text"></i><strong>${escapeHtml(item.title)}</strong><span>V${item._version || 1}</span>
+          </button>`).join("")}</div></div>
+      </div>`).join("") || `<div class="empty compact-empty"><div><p>尚未生成成果物</p></div></div>`}</div>`;
+  }
+
+  async function openArtifactHistory(item) {
+    const result = await api(`/api/workspace/v1/artifacts/${encodeURIComponent(item.id)}/versions`);
+    const versions = result.versions || [];
+    const currentVersion = Math.max(...versions.map(version => Number(version.version || 0)), 0);
+    CareerUI.modal({
+      title: `${item.title} · 版本历史`,
+      description: `${versions.length} 个不可变版本，恢复只切换 Current Version，不覆盖历史`,
+      html: `<div class="version-timeline">${versions.map((version, index) => `
+        <div class="version-node ${Number(version.version) === currentVersion ? "current" : ""} ${index > 0 ? "branch" : ""}">
+          <strong>V${version.version} · ${Number(version.version) === currentVersion ? "当前版本" : "归档版本"}</strong>
+          <p>${escapeHtml(version.created_at || version.updated_at || "")} · ${escapeHtml(version.source || "workspace")}</p>
+          <div class="version-actions">
+            ${Number(version.version) > 1 ? `<button class="btn small" data-version-diff="${version.version}">查看差异</button>` : ""}
+            <button class="btn small" data-version-export="${escapeHtml(version.version_id)}">导出</button>
+            <button class="btn small ${Number(version.version) === currentVersion ? "" : "primary"}" data-version-restore="${escapeHtml(version.version_id)}">${Number(version.version) === currentVersion ? "刷新当前版本" : "恢复此版本"}</button>
+          </div>
+        </div>`).join("")}</div>`
+    });
+    qsa("[data-version-diff]").forEach(button => {
+      button.onclick = async () => {
+        const toVersion = Number(button.dataset.versionDiff);
+        const diff = await api(`/api/artifacts/${encodeURIComponent(item.id)}/diff?from_version=${toVersion - 1}&to_version=${toVersion}`);
+        CareerUI.modal({title: `V${toVersion - 1} → V${toVersion}`, description: "版本差异来自后端不可变版本记录",
+          html: `<pre class="preview" style="max-height:56vh">${escapeHtml(diff.unified_diff || diff.diff || JSON.stringify(diff, null, 2))}</pre>`});
+      };
+    });
+    qsa("[data-version-export]").forEach(button => {
+      button.onclick = () => {
+        const version = versions.find(row => row.version_id === button.dataset.versionExport);
+        const anchor = document.createElement("a");
+        anchor.href = URL.createObjectURL(new Blob([version?.content || ""], {type: "text/plain;charset=utf-8"}));
+        anchor.download = `${item.title}_V${version?.version || 1}.txt`;
+        anchor.click();
+        URL.revokeObjectURL(anchor.href);
+        toast("成果物已导出");
+      };
+    });
+    qsa("[data-version-restore]").forEach(button => {
+      button.onclick = async () => {
+        button.classList.add("button-busy");
+        try {
+          await api(`/api/artifacts/${encodeURIComponent(item.id)}/restore/${encodeURIComponent(button.dataset.versionRestore)}`, {method: "POST", body: "{}"});
+          toast("当前版本已更新");
+          document.querySelector(".career-modal-backdrop")?.classList.remove("open");
+          await openArtifacts();
+        } catch (error) {
+          toast(error.message, "triangle-alert");
+        } finally {
+          button.classList.remove("button-busy");
+        }
+      };
+    });
+    CareerUI.refreshIcons();
   }
 
   async function openArtifacts() {
     setActiveView("artifacts");
     const data = await api("/api/workspace/v1/artifacts");
     const items = data.items || [];
-    const rows = items.map(item => `
-      <div class="workspace-row">
-        <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.type)} · V${item._version || 1}</span></div>
-        <button class="btn small" data-download-artifact="${escapeHtml(item.id)}">导出</button>
-      </div>`);
-    const modal = modalList("简历 / 报告", `${items.length} 个当前版本成果物`, rows, "尚未生成成果物");
+    const modal = CareerUI.modal({
+      title: "简历 / 报告",
+      description: `${items.length} 个当前版本成果物`,
+      html: `<div class="permission-grid">
+        <section><div class="eyebrow">目录</div><div class="template-tree" style="margin-top:10px">${artifactTree(items)}</div></section>
+        <section><div class="workspace-form">
+          <label>提交方案</label>
+          <input class="input" id="artifactTitle" placeholder="方案标题">
+          <select class="select" id="artifactType"><option value="career_report">生涯发展报告</option><option value="resume">简历</option><option value="action_plan">行动计划</option><option value="ppt">PPT 讲稿</option></select>
+          <textarea class="textarea tall" id="artifactContent" placeholder="方案内容"></textarea>
+          <input class="input" id="artifactEvidence" placeholder="Evidence ID，多个用逗号分隔">
+          <button class="btn primary" id="submitArtifact"><i data-lucide="send"></i>提交并创建版本</button>
+        </div></section>
+      </div>
+      <div class="workspace-actions"><button class="btn" id="generateArtifact"><i data-lucide="file-plus-2"></i>让 Coach 生成成果</button></div>`
+    });
     const body = qs(".career-modal-body", modal.element);
-    body.insertAdjacentHTML("beforeend", `
-      <div class="workspace-actions">
-        <button class="btn primary" id="generateArtifact"><i data-lucide="file-plus-2"></i>让 Coach 生成成果</button>
-      </div>`);
+    qsa("[data-tree-toggle]", body).forEach(button => button.onclick = () => button.closest(".tree-node").classList.toggle("open"));
+    qsa("[data-artifact-history]", body).forEach(button => button.onclick = () => {
+      const item = items.find(candidate => candidate.id === button.dataset.artifactHistory);
+      if (item) openArtifactHistory(item).catch(error => toast(error.message, "triangle-alert"));
+    });
+    qs("#submitArtifact", body).onclick = async event => {
+      const button = event.currentTarget;
+      const title = qs("#artifactTitle", body).value.trim();
+      const content = qs("#artifactContent", body).value.trim();
+      if (!title || !content) return toast("请填写方案标题与内容", "triangle-alert");
+      button.classList.add("button-busy");
+      button.innerHTML = '<i data-lucide="loader-circle"></i>正在提交';
+      CareerUI.refreshIcons();
+      try {
+        await api("/api/workspace/v1/artifacts", {method: "POST", body: JSON.stringify({
+          title, type: qs("#artifactType", body).value, content,
+          evidence_ids: qs("#artifactEvidence", body).value.split(/[,，\\s]+/).filter(Boolean)
+        })});
+        modal.close();
+        toast("成果已提交并创建新版本");
+        await openArtifacts();
+      } catch (error) {
+        toast(error.message, "triangle-alert");
+      } finally {
+        button.classList.remove("button-busy");
+        button.innerHTML = '<i data-lucide="send"></i>提交并创建版本';
+        CareerUI.refreshIcons();
+      }
+    };
     qs("#generateArtifact", body).onclick = () => {
       modal.close();
       qs("#input").value = "请基于我已确认的事实材料生成适合当前阶段的成果物，不要补造经历。";
       qs("#input").focus();
       toast("生成任务已放入输入框");
     };
-    qsa("[data-download-artifact]", body).forEach(button => {
-      button.onclick = () => {
-        const item = items.find(candidate => candidate.id === button.dataset.downloadArtifact);
-        const anchor = document.createElement("a");
-        anchor.href = URL.createObjectURL(new Blob([item.content || ""], {type: "text/plain;charset=utf-8"}));
-        anchor.download = `${item.title || "CareerOS成果"}_V${item._version || 1}.txt`;
-        anchor.click();
-        URL.revokeObjectURL(anchor.href);
-        toast("成果物已导出");
-      };
-    });
     CareerUI.refreshIcons();
+  }
+
+  function radarSvg(dimensions) {
+    const items = (dimensions || []).slice(0, 6);
+    const count = Math.max(items.length, 3);
+    const center = 150, radius = 98;
+    const point = (index, scale = 1) => {
+      const angle = -Math.PI / 2 + index * (Math.PI * 2 / count);
+      return [center + Math.cos(angle) * radius * scale, center + Math.sin(angle) * radius * scale];
+    };
+    const polygon = scale => Array.from({length: count}, (_, index) => point(index, scale).join(",")).join(" ");
+    const data = items.map((item, index) => point(index, Math.max(0, Math.min(1, item.score / 20))).join(",")).join(" ");
+    return `<svg class="score-radar" viewBox="0 0 300 300" role="img" aria-label="评分雷达图">
+      <defs><linearGradient id="careerosRadarGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#2B5BFF"/><stop offset="100%" stop-color="#00D4AA"/></linearGradient></defs>
+      ${[.25,.5,.75,1].map(scale => `<polygon class="radar-grid" points="${polygon(scale)}"/>`).join("")}
+      ${Array.from({length: count}, (_, index) => `<line class="radar-axis" x1="${center}" y1="${center}" x2="${point(index)[0]}" y2="${point(index)[1]}"/>`).join("")}
+      <polygon class="radar-area" points="${data}"/>
+      ${items.map((item, index) => { const [x,y] = point(index,1.18); return `<text x="${x}" y="${y}" text-anchor="middle">${escapeHtml(item.name)}</text>`; }).join("")}
+    </svg>`;
   }
 
   async function openReview() {
@@ -223,10 +346,11 @@
     CareerUI.modal({
       title: "成果评审",
       description: review ? `最近一次严格评审：${review.total_score}/100` : "当前成果尚未完成严格评审",
-      html: review ? `<div class="workspace-list">
-        ${(review.dimensions || []).map(item => `<div class="workspace-row"><span>${escapeHtml(item.name)}</span><strong>${item.score}/20</strong></div>`).join("")}
-        <div class="preview">${escapeHtml(review.overall_comment || "评审已完成")}</div>
-      </div>` : `<div class="empty compact-empty"><div><div class="empty-icon"><i data-lucide="scan-search"></i></div><h3>暂无评审结果</h3><p>先生成成果物，再发起严格评审。</p></div></div>
+      html: review ? `<div class="review-layout"><div>${radarSvg(review.dimensions)}</div><div>
+        <div class="eyebrow">丢分项</div>
+        ${(review.dimensions || []).sort((a,b) => a.score - b.score).map(item => `<div class="score-gap ${item.score < 14 ? "critical" : ""}"><strong>${escapeHtml(item.name)}</strong><b>${item.score}/20</b><span>${escapeHtml((item.problems || [])[0] || "继续保持")}</span></div>`).join("")}
+        <div class="preview" style="margin-top:12px">${escapeHtml(review.overall_comment || "评审已完成")}</div>
+      </div></div>` : `<div class="empty compact-empty"><div><div class="empty-icon"><i data-lucide="scan-search"></i></div><h3>暂无评审结果</h3><p>先生成成果物，再发起严格评审。</p></div></div>
       <div class="workspace-actions"><button class="btn primary" id="startReview">开始严格评审</button></div>`
     });
     const button = qs("#startReview");
@@ -354,7 +478,7 @@
     item.addEventListener("click", async event => {
       event.preventDefault();
       const handler = handlers[item.dataset.studentView];
-      if (!handler) return toast("该模块暂不可用", "triangle-alert");
+      if (!handler) return toast("当前模块未绑定操作，请刷新后重试", "triangle-alert");
       item.setAttribute("aria-busy", "true");
       try { await handler(); } catch (error) { toast(error.message, "triangle-alert"); }
       finally { item.removeAttribute("aria-busy"); }

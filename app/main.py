@@ -959,17 +959,25 @@ def _derive_track_signals(state: SessionState) -> TrackInput:
 
 def _intent(message: str) -> str:
     m = message.strip().lower()
-    if ("成长赛道" in m or "就业赛道" in m) and any(k in m for k in ["选择", "确定", "确认", "我要", "参加"]):
+    if (("成长赛道" in m or "就业赛道" in m) and any(k in m for k in ["选择", "确定", "确认", "我要", "参加"])) or (
+        ("growth track" in m or "employment track" in m) and any(k in m for k in ["choose", "confirm", "select"])
+    ):
         return "confirm_track"
-    if any(k in m for k in ["修订", "按意见改", "修改作品", "优化作品", "重新修改"]):
+    if any(k in m for k in ["修订", "按意见改", "修改作品", "优化作品", "重新修改", "revise", "revision", "improve the artifact"]):
         return "revise"
-    if any(k in m for k in ["评分", "评审", "打分", "作品问题", "看看问题"]):
+    if any(k in m for k in ["评分", "评审", "打分", "作品问题", "看看问题", "review", "score", "evaluate"]):
         return "review"
-    if any(k in m for k in ["生成初稿", "写简历", "写规划书", "生成作品", "开始写", "帮我写"]):
+    if any(k in m for k in ["生成初稿", "写简历", "写规划书", "生成作品", "开始写", "帮我写", "generate draft", "write resume", "create artifact"]):
         return "draft"
-    if ("赛道" in m and any(k in m for k in ["推荐", "选", "适合", "哪个"])) or m in {"推荐赛道", "赛道推荐"}:
+    if ("赛道" in m and any(k in m for k in ["推荐", "选", "适合", "哪个"])) or m in {"推荐赛道", "赛道推荐"} or (
+        "track" in m and any(k in m for k in ["recommend", "choose", "suitable", "which"])
+    ):
         return "track"
     return "chat"
+
+
+def _localized(locale: str, zh: str, en: str) -> str:
+    return en if locale == "en-US" else zh
 
 
 @app.post("/api/chat")
@@ -992,10 +1000,14 @@ async def chat(req: ChatRequest, principal: Principal = Depends(current_principa
     refs = []
 
     if action == "confirm_track":
-        chosen = "就业赛道" if "就业赛道" in message else "成长赛道"
+        chosen = "就业赛道" if ("就业赛道" in message or "employment track" in message.lower()) else "成长赛道"
         state.track = chosen
         state.stage = "track"
-        reply = f"已确认 **{chosen}**。接下来我会按该赛道组织作品结构与评审口径。你可以直接说“帮我生成初稿”。"
+        reply = _localized(
+            req.locale,
+            f"已确认 **{chosen}**。接下来我会按该赛道组织作品结构与评审口径。你可以直接说“帮我生成初稿”。",
+            f"**{chosen}** is confirmed. I will use its artifact structure and review rubric. You can now ask me to generate a draft.",
+        )
         payload["confirmed_track"] = chosen
 
     elif action == "track":
@@ -1005,16 +1017,22 @@ async def chat(req: ChatRequest, principal: Principal = Depends(current_principa
         state.stage = "track"
         reasons = "；".join(rec.reasons[:3])
         if rec.recommended_track == "待确认":
-            reply = f"两条赛道适配度比较接近：成长赛道 {rec.growth_score}%，就业赛道 {rec.employment_score}%。主要依据：{reasons}。请结合当届资格要求确认，并回复“我选择成长赛道”或“我选择就业赛道”。"
+            reply = _localized(req.locale,
+                f"两条赛道适配度比较接近：成长赛道 {rec.growth_score}%，就业赛道 {rec.employment_score}%。主要依据：{reasons}。请结合当届资格要求确认，并回复“我选择成长赛道”或“我选择就业赛道”。",
+                f"The two tracks are close: Growth {rec.growth_score}% and Employment {rec.employment_score}%. Verify the current eligibility rules, then confirm the Growth Track or Employment Track.")
         else:
-            reply = f"基于你当前已确认的画像，我更建议 **{rec.recommended_track}**。成长赛道适配度 {rec.growth_score}%，就业赛道适配度 {rec.employment_score}%。主要依据：{reasons}。如认可，请回复“我选择{rec.recommended_track}”；最终仍需以当届官方资格与学校通知核验。"
+            reply = _localized(req.locale,
+                f"基于你当前已确认的画像，我更建议 **{rec.recommended_track}**。成长赛道适配度 {rec.growth_score}%，就业赛道适配度 {rec.employment_score}%。主要依据：{reasons}。如认可，请回复“我选择{rec.recommended_track}”；最终仍需以当届官方资格与学校通知核验。",
+                f"Based on your confirmed profile, I recommend **{rec.recommended_track}**. Growth fit: {rec.growth_score}%; Employment fit: {rec.employment_score}%. Verify this against current official and school eligibility rules before confirming.")
         payload["recommendation"] = rec.model_dump()
 
     elif action == "draft":
         if domain.enable_competition_template and state.track == "待确认" and "简历" not in message and "规划书" not in message:
             rec = recommend_track(_derive_track_signals(state))
             state.track_recommendation = rec
-            reply = f"在生成作品前先确认赛道。当前成长赛道适配度 {rec.growth_score}%，就业赛道适配度 {rec.employment_score}%。请回复“我选择成长赛道”或“我选择就业赛道”；也可以明确说“生成简历”或“生成职业规划书”。"
+            reply = _localized(req.locale,
+                f"在生成作品前先确认赛道。当前成长赛道适配度 {rec.growth_score}%，就业赛道适配度 {rec.employment_score}%。请回复“我选择成长赛道”或“我选择就业赛道”；也可以明确说“生成简历”或“生成职业规划书”。",
+                f"Confirm a track before generating an artifact. Current fit: Growth {rec.growth_score}%, Employment {rec.employment_score}%. Confirm a track or explicitly request a resume or career report.")
             payload["recommendation"] = rec.model_dump()
             state.messages.append(ChatMessage(role="assistant", content=reply, action="track"))
             store.save(state)
@@ -1036,7 +1054,9 @@ async def chat(req: ChatRequest, principal: Principal = Depends(current_principa
         collaboration_store.complete_matching(state.session_id, "generate_draft", tenant_id=state.tenant_id)
         collaboration_store.ensure_task("完成严格评审", "review_draft", session_id=state.session_id, tenant_id=state.tenant_id, source="workflow")
         display_type = "职业发展报告" if (doc_type in {"职业规划书", "发展报告"} and not domain.enable_competition_template) else doc_type
-        reply = f"已生成一版 **{display_type}初稿**。我只调用你已经提供或已验证的事实；缺失信息会保留“待补充”，不会替你虚构经历。下一步可以直接对我说“给这份成果评分”。"
+        reply = _localized(req.locale,
+            f"已生成一版 **{display_type}初稿**。我只调用你已经提供或已验证的事实；缺失信息会保留“待补充”，不会替你虚构经历。下一步可以直接对我说“给这份成果评分”。",
+            f"A **{display_type} draft** has been created using only supplied or verified facts. Missing information stays explicitly marked and no experience is invented. Next, ask for a rigorous review.")
         retrieval_query = (f"{state.track} {doc_type} 评分标准 作品规范 {state.profile.target_job}" if domain.enable_competition_template
                            else f"{display_type} 评价标准 成果规范 目标岗位 {state.profile.target_job}")
         _, refs = agents.retrieve_context(retrieval_query, state)
@@ -1044,7 +1064,8 @@ async def chat(req: ChatRequest, principal: Principal = Depends(current_principa
 
     elif action == "review":
         if not state.draft.strip():
-            reply = "目前还没有可评审的成果。先告诉我“生成初稿”，或者上传/粘贴已有材料。"
+            reply = _localized(req.locale, "目前还没有可评审的成果。先告诉我“生成初稿”，或者上传/粘贴已有材料。",
+                               "There is no artifact to review. Generate a draft or upload existing material first.")
         else:
             report = await agents.review(state, state.draft, student_evidence=_evidence_context(state.session_id, state))
             state.review = report
@@ -1057,13 +1078,17 @@ async def chat(req: ChatRequest, principal: Principal = Depends(current_principa
             )
             collaboration_store.complete_matching(state.session_id, "review_draft", tenant_id=state.tenant_id)
             collaboration_store.ensure_task("按评审意见完成修订", "revise_draft", session_id=state.session_id, tenant_id=state.tenant_id, priority="high" if report.total_score < 70 else "normal", source="reviewer", payload={"score": report.total_score})
-            reply = f"严格评审已完成：**{report.total_score}/100**。最高优先级不是语言润色，而是先处理：{report.revision_priority[0] if report.revision_priority else '证据链与结构问题'}。你可以继续说“按意见修订”。"
+            priority = report.revision_priority[0] if report.revision_priority else "证据链与结构问题"
+            reply = _localized(req.locale,
+                f"严格评审已完成：**{report.total_score}/100**。最高优先级不是语言润色，而是先处理：{priority}。你可以继续说“按意见修订”。",
+                f"Rigorous review complete: **{report.total_score}/100**. Address the highest-priority evidence and structural issue before language polishing, then request a revision.")
             _, refs = agents.retrieve_context(f"{state.track} 评分标准 评审规则 {state.document_type or ''}", state)
             payload["review"] = report.model_dump()
 
     elif action == "revise":
         if not state.draft.strip():
-            reply = "还没有初稿，无法修订。先生成或导入作品。"
+            reply = _localized(req.locale, "还没有初稿，无法修订。先生成或导入作品。",
+                               "There is no draft to revise. Generate or import an artifact first.")
         else:
             if state.review is None:
                 state.review = await agents.review(state, state.draft, student_evidence=_evidence_context(state.session_id, state))
@@ -1083,16 +1108,19 @@ async def chat(req: ChatRequest, principal: Principal = Depends(current_principa
             _require_artifact_version_quota(state)
             payload["artifact"] = _save_artifact_version(state, revised, revised=True, metadata={"source": "coach_revision", "score_before": state.review.total_score})
             collaboration_store.complete_matching(state.session_id, "revise_draft", tenant_id=state.tenant_id)
-            reply = "Critic 复核与修订已完成。修订版已经生成；仍存在的“待补充”表示缺少真实材料，不能由 AI 代填。"
+            reply = _localized(req.locale,
+                "Critic 复核与修订已完成。修订版已经生成；仍存在的“待补充”表示缺少真实材料，不能由 AI 代填。",
+                "Critic verification and revision are complete. Remaining missing-information markers require real evidence and cannot be filled by AI.")
             _, refs = agents.retrieve_context(f"{state.track} 评分标准 作品规范 {state.profile.target_job}", state)
             payload.update({"revised_draft": revised, "critic": critic, "evidence_audit": audit.model_dump()})
 
     else:
-        reply, refs = await agents.coach(state, message)
+        reply, refs = await agents.coach(state, message, locale=req.locale)
         open_feedback = collaboration_store.list_feedback(state.session_id, status="open", tenant_id=state.tenant_id)
         if open_feedback:
             latest = open_feedback[0]
-            reply = f"Advisor 最新反馈：{latest['content']}\n\n{reply}"
+            reply = _localized(req.locale, f"Advisor 最新反馈：{latest['content']}\n\n{reply}",
+                               f"Latest advisor feedback: {latest['content']}\n\n{reply}")
             payload["teacher_feedback"] = latest
 
     state.messages.append(ChatMessage(role="assistant", content=reply, action=action, knowledge_refs=refs))
@@ -1110,8 +1138,8 @@ def _sse_event(event: str, data) -> str:
 @app.post("/api/chat/stream")
 async def chat_stream(req: ChatRequest, principal: Principal = Depends(current_principal)):
     async def events():
-        yield _sse_event("status", {"stage": "accepted", "message": "Request accepted"})
-        yield _sse_event("status", {"stage": "analyzing", "message": "Analyzing context and evidence"})
+        yield _sse_event("status", {"stage": "accepted", "message": _localized(req.locale, "请求已接收", "Request accepted")})
+        yield _sse_event("status", {"stage": "analyzing", "message": _localized(req.locale, "正在分析上下文与证据", "Analyzing context and evidence")})
         await asyncio.sleep(0)
         try:
             result = await chat(req, principal)

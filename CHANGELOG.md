@@ -1,5 +1,14 @@
 # CareerOS Changelog
 
+## v1.6-ui-i18n
+
+- Added global zh-CN / en-US hot switching with persisted browser preference and localized Coach replies.
+- Completed user plan submission, artifact directory/version timeline, diff/restore/export actions, score radar, and retryable task states.
+- Added advisor-side real review execution, evidence-grounded recommendation routing, progress drill-down, and feedback persistence.
+- Added tenant workflow/artifact template configuration and server-authoritative RBAC assignment UI.
+- Removed the Showcase catch-all “页面建设中” placeholder and retained an explicit Demo Scenario boundary.
+- Regression baseline: 167 tests passed; external model and production certification remain separate gates.
+
 ## 1.5.0-domain-intelligence
 
 See `CHANGELOG_v1.5.md`. Claim → Capability → Requirement → Gap is now a persistent, versioned, explainable and auditable server-side domain.
