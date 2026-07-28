@@ -145,6 +145,42 @@ def build_workspace_router(
             "evidence_graph": evidence_graph.session_graph(state.session_id, tenant_id=state.tenant_id),
         }
 
+    @router.get("/modules")
+    def modules(subject_user_id: str = Query(default=""), principal=Depends(current_principal)):
+        """Return the server-authoritative workspace capability contract.
+
+        The frontend uses this endpoint to explain role and data availability instead of
+        presenting navigation items as unconditional static links.
+        """
+        state = ensure_session(principal, subject_user_id)
+        evidence_items = evidence.list_session(state.session_id, limit=1000, tenant_id=state.tenant_id)
+        artifact_items = artifacts.list_session(
+            state.session_id, include_content=False, tenant_id=state.tenant_id, all_versions=False
+        )
+        task_items = collaboration.list_tasks(
+            tenant_id=state.tenant_id, session_id=state.session_id, limit=1000
+        )
+        staff = is_staff(principal)
+        return {
+            "ok": True,
+            "role": role(principal),
+            "tenant_id": state.tenant_id,
+            "session_id": state.session_id,
+            "modules": [
+                {"id": "coach", "enabled": True, "write": True},
+                {"id": "exploration", "enabled": True, "write": True, "count": len(evidence_items)},
+                {"id": "positioning", "enabled": True, "write": True},
+                {"id": "capabilities", "enabled": True, "write": True},
+                {"id": "tasks", "enabled": True, "write": True, "count": len(task_items)},
+                {"id": "artifacts", "enabled": True, "write": True, "count": len(artifact_items)},
+                {"id": "review", "enabled": True, "write": True},
+                {"id": "interview", "enabled": True, "write": True},
+                {"id": "users", "enabled": staff, "write": staff},
+                {"id": "knowledge", "enabled": staff, "write": bool(principal.is_super_admin or role(principal) == "organization_admin")},
+                {"id": "models", "enabled": staff, "write": bool(principal.is_super_admin or role(principal) == "organization_admin")},
+            ],
+        }
+
     # -------- Evidence: canonical EvidenceStore + EvidenceGraph --------
     @router.get("/evidence")
     def list_evidence(subject_user_id: str = Query(default=""), principal=Depends(current_principal)):

@@ -1,30 +1,30 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>AI Career Coach · CareerOS</title><link rel="stylesheet" href="/static/career-os.css"></head><body>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>AI Career Coach · CareerOS</title><link rel="stylesheet" href="/static/career-os.css?v=1.5.2"></head><body>
 <div class="app-shell student-shell">
 <aside class="sidebar">
   <div class="brand"><div class="brand-mark">C</div><div class="brand-copy"><strong>CareerOS</strong><span>User Workspace</span></div></div>
   <button class="btn" id="newSession" style="width:100%;justify-content:flex-start"><i data-lucide="square-pen"></i><span>新对话</span></button>
   <div class="nav-scroll">
     <div class="nav-section">Main</div>
-    <a class="nav-item active" href="#coach"><i data-lucide="sparkles"></i><span>AI Coach</span></a>
+    <a class="nav-item active" href="#coach" data-student-view="coach"><i data-lucide="sparkles"></i><span>AI Coach</span></a>
     <div class="nav-section">我的发展</div>
-    <a class="nav-item" href="#progress"><i data-lucide="compass"></i><span>自我探索</span></a>
-    <a class="nav-item" href="#progress"><i data-lucide="target"></i><span>职业定位</span></a>
-    <a class="nav-item" href="#progress"><i data-lucide="scan-search"></i><span>能力画像</span></a>
-    <a class="nav-item" href="#progress"><i data-lucide="route"></i><span>行动计划</span></a>
+    <a class="nav-item" href="#progress" data-student-view="exploration"><i data-lucide="compass"></i><span>自我探索</span></a>
+    <a class="nav-item" href="#progress" data-student-view="positioning"><i data-lucide="target"></i><span>职业定位</span></a>
+    <a class="nav-item" href="#progress" data-student-view="capabilities"><i data-lucide="scan-search"></i><span>能力画像</span></a>
+    <a class="nav-item" href="#progress" data-student-view="tasks"><i data-lucide="route"></i><span>行动计划</span></a>
     <div class="nav-section">成果物</div>
-    <button class="nav-item" data-msg="帮我生成初稿"><i data-lucide="file-text"></i><span>简历 / 报告</span></button>
-    <button class="nav-item" data-msg="给这份作品评分"><i data-lucide="presentation"></i><span>成果评审</span></button>
-    <button class="nav-item" data-msg="开始模拟面试"><i data-lucide="mic-2"></i><span>模拟面试</span></button>
+    <button class="nav-item" data-student-view="artifacts"><i data-lucide="file-text"></i><span>简历 / 报告</span></button>
+    <button class="nav-item" data-student-view="review"><i data-lucide="presentation"></i><span>成果评审</span></button>
+    <button class="nav-item" data-student-view="interview"><i data-lucide="mic-2"></i><span>模拟面试</span></button>
     <div class="nav-section">历史</div>
-    <a class="nav-item" href="#coach"><i data-lucide="history"></i><span>对话</span></a>
+    <a class="nav-item" href="#coach" data-student-view="history"><i data-lucide="history"></i><span>对话</span></a>
     <button class="nav-item" id="uploadBtn"><i data-lucide="paperclip"></i><span>文件</span></button>
   </div>
-  <div class="sidebar-bottom"><div class="user-row"><div class="avatar">我</div><div class="user-meta"><strong id="sideName">用户</strong><span id="sideMeta">职业发展进行中</span></div><i data-lucide="chevrons-up-down" style="width:14px;margin-left:auto;color:var(--fg-3)"></i></div></div>
+  <div class="sidebar-bottom"><button class="user-row account-trigger" id="studentAccount"><div class="avatar">我</div><div class="user-meta"><strong id="sideName">用户</strong><span id="sideMeta">职业发展进行中</span></div><i data-lucide="chevrons-up-down" style="width:14px;margin-left:auto;color:var(--fg-3)"></i></button></div>
 </aside>
 <header class="topbar">
   <div class="breadcrumb">CareerOS / <b>AI Career Coach</b></div>
   <button class="global-search" id="globalSearch"><i data-lucide="search" style="width:15px"></i><span>搜索对话、任务、文件...</span><kbd>⌘K</kbd></button>
-  <div class="top-actions"><button class="icon-btn" aria-label="导入文件" id="topUpload"><i data-lucide="paperclip"></i></button><button class="icon-btn" aria-label="切换主题" data-theme-toggle><i data-lucide="sun-moon"></i></button><button class="icon-btn" aria-label="通知"><i data-lucide="bell"></i></button><div class="avatar">我</div></div>
+  <div class="top-actions"><button class="icon-btn" aria-label="导入文件" id="topUpload"><i data-lucide="paperclip"></i></button><button class="icon-btn" aria-label="切换主题" data-theme-toggle><i data-lucide="sun-moon"></i></button><button class="icon-btn" aria-label="通知" id="studentNotifications"><i data-lucide="bell"></i></button><button class="avatar avatar-button" id="studentAvatar" aria-label="账户">我</button></div>
 </header>
 <main class="student-center" id="coach">
   <div class="chat-header"><div class="coach-identity"><div class="coach-icon"><i data-lucide="sparkles"></i></div><div><strong>AI Career Coach</strong><span id="modeText">连接中...</span></div></div><span class="badge"><i data-lucide="circle-dot"></i>持续规划中</span></div>
@@ -35,7 +35,7 @@
   </div>
 </main>
 <aside class="context-inspector" id="progress">
-  <div class="inspector-tabs"><button class="inspector-tab active">Progress</button><button class="inspector-tab">Profile</button><button class="inspector-tab">Files</button></div>
+  <div class="inspector-tabs"><button class="inspector-tab active" data-inspector-view="progress">Progress</button><button class="inspector-tab" data-inspector-view="profile">Profile</button><button class="inspector-tab" data-inspector-view="files">Files</button></div>
   <div class="eyebrow">当前规划进度</div><div style="display:flex;align-items:end;justify-content:space-between;margin:8px 0 4px"><strong style="font-size:26px;letter-spacing:-.04em" id="progressText">02 / 10</strong><span class="meta" id="stageTitle">建立画像</span></div>
   <div class="workflow" id="stageList"></div>
   <div class="inspector-section"><div class="section-head" style="margin-bottom:10px"><div><h3 style="font-size:14px">当前画像</h3><p>来自你的事实材料</p></div><span class="badge" id="trackBadge">待确认</span></div><div id="profileBox"></div><p class="meta" id="trackDetail" style="margin:9px 0 0"></p></div>
@@ -46,7 +46,7 @@
 <nav class="mobile-nav" aria-label="移动端导航"><a class="active" href="#coach"><i data-lucide="sparkles"></i><span>Coach</span></a><a href="#progress"><i data-lucide="route"></i><span>进度</span></a><button data-msg="帮我生成初稿"><i data-lucide="files"></i><span>作品</span></button><button id="mobileProfile"><i data-lucide="user-round"></i><span>画像</span></button></nav>
 <input type="file" id="file" hidden accept=".docx,.pdf,.txt,.md,.json,.csv">
 <div class="toast-stack" id="toastStack"></div>
-<script src="/static/vendor/lucide.min.js"></script><script src="/static/ui.js"></script>
+<script src="/static/vendor/lucide.min.js"></script><script src="/static/ui.js?v=1.5.2"></script>
 <script>
 const $=s=>document.querySelector(s);function safeGet(k){try{return localStorage.getItem(k)||''}catch(_){return''}}function safeSet(k,v){try{localStorage.setItem(k,v)}catch(_){}}function safeRemove(k){try{localStorage.removeItem(k)}catch(_){}}let state=null,workflow=null,artifacts=[],product={},sessionId=safeGet('cc_student_session');
 const journey=[['自我探索','认识兴趣与经历'],['职业定位','明确发展方向'],['目标岗位','聚焦目标岗位'],['人岗匹配','建立能力映射'],['差距分析','识别核心差距'],['成长路径','形成行动路径'],['简历','形成个人材料'],['发展报告','完成成果评审'],['PPT','准备展示材料'],['模拟面试','迭代与训练']];
@@ -72,4 +72,4 @@ $('#copyDoc').onclick=()=>{const t=state.revised_draft||state.draft||'';navigato
 $('#mobileProfile').onclick=()=>CareerUI.toast('桌面端可在右侧 Inspector 查看完整画像；移动端优先保留 Coach 与进度操作','user-round');
 const commands=CareerUI.commandPalette([{label:'分析我的职业方向',group:'Coach',icon:'compass',action:()=>sendMessage('分析我的职业方向')},{label:'分析发展路径',group:'Coach',icon:'route',action:()=>sendMessage('根据我的画像分析最适合的发展路径')},{label:'生成成果物',group:'Artifact',icon:'file-plus-2',action:()=>sendMessage('帮我生成初稿')},{label:'严格评审当前作品',group:'AI',icon:'scan-search',action:()=>sendMessage('给这份作品评分')},{label:'导入文件',group:'File',icon:'paperclip',action:chooseFile},{label:'新建对话',group:'Workspace',icon:'square-pen',action:()=>$('#newSession').click()}]);$('#globalSearch').onclick=commands.open;
 init();
-</script></body></html>
+</script><script src="/static/student-workspace.js?v=1.5.2"></script></body></html>
