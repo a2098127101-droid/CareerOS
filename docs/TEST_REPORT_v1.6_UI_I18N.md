@@ -14,6 +14,7 @@
 - JavaScript syntax：`i18n.js`、`student-workspace.js`、`teacher-workspace.js`、`admin-extension.js` 通过。
 - pytest：**167 passed，1 个第三方 Starlette TestClient 弃用警告**。
 - `git diff --check`：通过。
+- `requirements.lock` 相对线上基线未改变；服务器外部镜像源超时时，可使用 `Dockerfile.incremental` 从既有验证镜像复制同依赖版本源码。
 
 ## 浏览器控制到 API 验证
 
