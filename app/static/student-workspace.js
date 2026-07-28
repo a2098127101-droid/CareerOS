@@ -33,6 +33,11 @@
     qsa("[data-student-view]").forEach(item => item.classList.toggle("active", item.dataset.studentView === name));
   }
 
+  function setWorkspaceLocation(name) {
+    const nextHash = name === "coach" || name === "history" ? "#coach" : `#workspace-${name}`;
+    if (window.location.hash !== nextHash) history.replaceState(null, "", nextHash);
+  }
+
   function modalList(title, description, rows, emptyMessage = "暂无数据") {
     const html = rows.length
       ? `<div class="workspace-list">${rows.join("")}</div>`
@@ -86,7 +91,7 @@
     setActiveView("positioning");
     const data = await loadWorkspace();
     const profile = data.session?.profile || {};
-    CareerUI.modal({
+    const modal = CareerUI.modal({
       title: "职业定位",
       description: "基于当前画像与事实材料推进目标聚焦",
       html: `<div class="workspace-list">
@@ -106,6 +111,7 @@
     qs("#continuePositioning").onclick = () => {
       const prompt = qs("#positioningPrompt").value.trim() || "请基于我的现有画像继续完成职业定位，并只追问缺少的事实。";
       qs("#input").value = prompt;
+      modal.close();
       qs("#coach").scrollIntoView({behavior: "smooth"});
       qs("#input").focus();
       toast("定位任务已放入输入框，请发送后继续");
@@ -343,7 +349,7 @@
     const sid = sessionId();
     const stateData = sid ? await api(`/api/sessions/${encodeURIComponent(sid)}`) : (await loadWorkspace()).session;
     const review = stateData.review;
-    CareerUI.modal({
+    const modal = CareerUI.modal({
       title: "成果评审",
       description: review ? `最近一次严格评审：${review.total_score}/100` : "当前成果尚未完成严格评审",
       html: review ? `<div class="review-layout"><div>${radarSvg(review.dimensions)}</div><div>
@@ -356,6 +362,8 @@
     const button = qs("#startReview");
     if (button) button.onclick = () => {
       qs("#input").value = "请对当前成果物进行严格评审，给出证据、问题和可执行修改建议。";
+      modal.close();
+      qs("#coach").scrollIntoView({behavior: "smooth"});
       qs("#input").focus();
       toast("评审任务已放入输入框");
     };
@@ -474,16 +482,32 @@
     interview: openInterview
   };
 
-  qsa("[data-student-view]").forEach(item => {
-    item.addEventListener("click", async event => {
-      event.preventDefault();
-      const handler = handlers[item.dataset.studentView];
-      if (!handler) return toast("当前模块未绑定操作，请刷新后重试", "triangle-alert");
-      item.setAttribute("aria-busy", "true");
-      try { await handler(); } catch (error) { toast(error.message, "triangle-alert"); }
-      finally { item.removeAttribute("aria-busy"); }
-    });
-  });
+  let openingView = "";
+  async function runView(name, item = null) {
+    const handler = handlers[name];
+    if (!handler) return toast("当前模块未绑定操作，请刷新后重试", "triangle-alert");
+    if (openingView) return toast("上一项功能仍在加载，请稍候", "loader-circle");
+    openingView = name;
+    setWorkspaceLocation(name);
+    setActiveView(name);
+    item?.setAttribute("aria-busy", "true");
+    try {
+      await handler();
+    } catch (error) {
+      toast(error.message, "triangle-alert");
+    } finally {
+      item?.removeAttribute("aria-busy");
+      openingView = "";
+    }
+  }
+
+  document.addEventListener("click", event => {
+    const item = event.target.closest("[data-student-view]");
+    if (!item) return;
+    event.preventDefault();
+    event.stopPropagation();
+    runView(item.dataset.studentView, item);
+  }, true);
 
   qsa("[data-inspector-view]").forEach(tab => {
     tab.onclick = async () => {
@@ -502,4 +526,13 @@
     event.stopImmediatePropagation();
     openPositioning().catch(error => toast(error.message, "triangle-alert"));
   }, true);
+
+  document.body.dataset.studentSidebarReady = "true";
+  window.CareerStudentWorkspace = Object.freeze({
+    open: name => runView(name),
+    availableViews: Object.keys(handlers)
+  });
+  document.dispatchEvent(new CustomEvent("careeros:student-sidebar-ready", {
+    detail: {views: Object.keys(handlers)}
+  }));
 })();

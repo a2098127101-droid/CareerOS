@@ -34,9 +34,13 @@ def test_student_visible_navigation_has_handlers_and_real_api_bindings():
         "/api/artifacts/${encodeURIComponent(item.id)}/diff",
         "/api/artifacts/${encodeURIComponent(item.id)}/restore/",
         "careerosRadarGradient", "#2B5BFF", "#00D4AA",
+        "CareerStudentWorkspace", "careeros:student-sidebar-ready",
+        "studentSidebarReady", "runView(item.dataset.studentView",
     ):
         assert control in script
-    assert 'src="/static/student-workspace.js?' in html
+    assert 'src="/static/student-workspace.js?v=1.6.2"' in html
+    for view in expected - {"coach", "history"}:
+        assert f"#workspace-{view}" in html or view in {"artifacts", "review", "interview"}
 
 
 def test_teacher_visible_navigation_has_handlers_and_real_api_bindings():

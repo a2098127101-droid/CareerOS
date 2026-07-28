@@ -7,17 +7,17 @@
     <div class="nav-section">Main</div>
     <a class="nav-item active" href="#coach" data-student-view="coach"><i data-lucide="sparkles"></i><span>AI Coach</span></a>
     <div class="nav-section">我的发展</div>
-    <a class="nav-item" href="#progress" data-student-view="exploration"><i data-lucide="compass"></i><span>自我探索</span></a>
-    <a class="nav-item" href="#progress" data-student-view="positioning"><i data-lucide="target"></i><span>职业定位</span></a>
-    <a class="nav-item" href="#progress" data-student-view="capabilities"><i data-lucide="scan-search"></i><span>能力画像</span></a>
-    <a class="nav-item" href="#progress" data-student-view="tasks"><i data-lucide="route"></i><span>行动计划</span></a>
+    <a class="nav-item" href="#workspace-exploration" data-student-view="exploration"><i data-lucide="compass"></i><span>自我探索</span></a>
+    <a class="nav-item" href="#workspace-positioning" data-student-view="positioning"><i data-lucide="target"></i><span>职业定位</span></a>
+    <a class="nav-item" href="#workspace-capabilities" data-student-view="capabilities"><i data-lucide="scan-search"></i><span>能力画像</span></a>
+    <a class="nav-item" href="#workspace-tasks" data-student-view="tasks"><i data-lucide="route"></i><span>行动计划</span></a>
     <div class="nav-section">成果物</div>
-    <button class="nav-item" data-student-view="artifacts"><i data-lucide="file-text"></i><span>简历 / 报告</span></button>
-    <button class="nav-item" data-student-view="review"><i data-lucide="presentation"></i><span>成果评审</span></button>
-    <button class="nav-item" data-student-view="interview"><i data-lucide="mic-2"></i><span>模拟面试</span></button>
+    <button class="nav-item" type="button" data-student-view="artifacts"><i data-lucide="file-text"></i><span>简历 / 报告</span></button>
+    <button class="nav-item" type="button" data-student-view="review"><i data-lucide="presentation"></i><span>成果评审</span></button>
+    <button class="nav-item" type="button" data-student-view="interview"><i data-lucide="mic-2"></i><span>模拟面试</span></button>
     <div class="nav-section">历史</div>
     <a class="nav-item" href="#coach" data-student-view="history"><i data-lucide="history"></i><span>对话</span></a>
-    <button class="nav-item" id="uploadBtn"><i data-lucide="paperclip"></i><span>文件</span></button>
+    <button class="nav-item" type="button" id="uploadBtn"><i data-lucide="paperclip"></i><span>文件</span></button>
   </div>
   <div class="sidebar-bottom"><button class="user-row account-trigger" id="studentAccount"><div class="avatar">我</div><div class="user-meta"><strong id="sideName">用户</strong><span id="sideMeta">职业发展进行中</span></div><i data-lucide="chevrons-up-down" style="width:14px;margin-left:auto;color:var(--fg-3)"></i></button></div>
 </aside>
@@ -72,4 +72,4 @@ $('#copyDoc').onclick=()=>{const t=state.revised_draft||state.draft||'';navigato
 $('#mobileProfile').onclick=()=>CareerUI.toast('桌面端可在右侧 Inspector 查看完整画像；移动端优先保留 Coach 与进度操作','user-round');
 const commands=CareerUI.commandPalette([{label:'分析我的职业方向',group:'Coach',icon:'compass',action:()=>sendMessage('分析我的职业方向')},{label:'分析发展路径',group:'Coach',icon:'route',action:()=>sendMessage('根据我的画像分析最适合的发展路径')},{label:'生成成果物',group:'Artifact',icon:'file-plus-2',action:()=>sendMessage('帮我生成初稿')},{label:'严格评审当前作品',group:'AI',icon:'scan-search',action:()=>sendMessage('给这份作品评分')},{label:'导入文件',group:'File',icon:'paperclip',action:chooseFile},{label:'新建对话',group:'Workspace',icon:'square-pen',action:()=>$('#newSession').click()}]);$('#globalSearch').onclick=commands.open;
 init();
-</script><script src="/static/student-workspace.js?v=1.6.0"></script></body></html>
+</script><script src="/static/student-workspace.js?v=1.6.2"></script></body></html>
