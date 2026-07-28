@@ -1,28 +1,250 @@
-<!doctype html><html lang="zh-CN" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>登录 · CareerOS</title><link rel="stylesheet" href="/static/career-os.css"><style>
-.auth-shell{min-height:100vh;display:grid;grid-template-columns:minmax(320px,1fr) minmax(440px,560px);background:var(--background)}
-.auth-aside{padding:40px;display:flex;flex-direction:column;border-right:1px solid var(--border);background:var(--surface-secondary)}
-.auth-main{display:flex;align-items:center;justify-content:center;padding:40px}.auth-panel{width:min(100%,420px)}
-.auth-panel h1{font-size:30px;line-height:1.15;margin:18px 0 8px}.auth-panel .lede{color:var(--foreground-secondary);line-height:1.7;margin:0 0 28px}
-.auth-form{display:grid;gap:16px}.field{display:grid;gap:7px}.field label{font-size:13px;font-weight:600}.field input,.field select{height:44px;border:1px solid var(--border);border-radius:11px;background:var(--surface);color:var(--foreground);padding:0 13px;font:inherit;outline:none;transition:150ms ease-out}.field input:focus,.field select:focus{border-color:var(--border-strong);box-shadow:0 0 0 3px rgba(0,0,0,.04)}
-.auth-error{display:none;padding:11px 12px;border-radius:10px;background:var(--danger-bg);color:var(--danger-text);font-size:13px}.auth-error.show{display:block}.auth-help{margin-top:24px;padding-top:20px;border-top:1px solid var(--border);font-size:12px;color:var(--foreground-muted);line-height:1.7}.demo-accounts{display:none;margin-top:18px}.demo-accounts.show{display:block}.demo-row{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px}.demo-row code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--foreground-secondary)}
-@media(max-width:860px){.auth-shell{grid-template-columns:1fr}.auth-aside{display:none}.auth-main{padding:24px;align-items:flex-start;padding-top:14vh}}
-</style></head><body>
-<div class="auth-shell">
-  <aside class="auth-aside"><div class="brand"><div class="brand-mark">C</div><div class="brand-copy"><strong>CareerOS</strong><span>AI Career Planning OS</span></div></div><div style="margin-top:auto;max-width:420px"><div class="eyebrow">Secure Workspace</div><h2 style="font-size:28px;margin:12px 0">一个账户，只访问被授权的学生、班级与学校数据。</h2><p class="meta" style="line-height:1.8">生产模式启用服务端认证、RBAC 与 Tenant Isolation。Showcase Edition 仍可独立离线演示。</p></div></aside>
-  <main class="auth-main"><section class="auth-panel"><div class="eyebrow">CareerOS Account</div><h1>登录工作空间</h1><p class="lede">使用学校或平台分配的账户进入你的角色工作台。</p><div id="err" class="auth-error"></div>
-    <form id="form" class="auth-form">
-      <div class="field"><label for="email">邮箱</label><input id="email" name="email" type="email" autocomplete="username" placeholder="name@school.edu.cn" required></div>
-      <div class="field"><label for="password">密码</label><input id="password" name="password" type="password" autocomplete="current-password" required></div>
-      <div class="field"><label for="role">身份（可选）</label><select id="role"><option value="">自动识别</option><option value="student">学生</option><option value="teacher">教师</option><option value="school_admin">学校管理员</option><option value="super_admin">平台管理员</option></select></div>
-      <button id="submit" class="btn primary" type="submit" style="width:100%;height:44px">登录</button>
-    </form>
-    <div id="demo" class="demo-accounts"><div class="eyebrow">Local Demo Accounts</div><div class="demo-row"><span>学生</span><code>student@demo.local</code></div><div class="demo-row"><span>教师</span><code>teacher@demo.local</code></div><div class="demo-row"><span>学校管理员</span><code>admin@demo.local</code></div><div class="demo-row"><span>平台管理员</span><code>super@demo.local</code></div><p class="meta" style="margin-top:10px">本地开发默认密码：<code>CareerOS-Demo-123!</code>。生产环境不会自动创建这些账户。</p></div>
-    <div class="auth-help">无法登录时请联系学校管理员。密码重置 API 已预留；正式上线前应接入邮件或学校身份系统完成验证码/通知流程。</div>
-  </section></main>
-</div>
-<script src="/static/vendor/lucide.min.js"></script><script src="/static/ui.js"></script><script>
-const form=document.getElementById('form'),err=document.getElementById('err'),btn=document.getElementById('submit');
-const params=new URLSearchParams(location.search),next=params.get('next')||'';
-async function init(){try{const h=await fetch('/api/health').then(r=>r.json());if(h.auth?.environment!=='production')document.getElementById('demo').classList.add('show')}catch{}}
-form.addEventListener('submit',async e=>{e.preventDefault();err.classList.remove('show');btn.disabled=true;btn.textContent='登录中…';try{const body={email:email.value.trim(),password:password.value,role:role.value||null};const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw new Error(d.detail||'登录失败');location.href=next||d.redirect||'/'}catch(ex){err.textContent=ex.message||'登录失败';err.classList.add('show')}finally{btn.disabled=false;btn.textContent='登录'}});init();
-</script></body></html>
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>账户 · CareerOS</title>
+  <link rel="stylesheet" href="/static/career-os.css">
+  <style>
+    :root{--auth-radius:14px}
+    *{box-sizing:border-box}
+    .auth-shell{min-height:100dvh;display:grid;grid-template-columns:minmax(360px,1fr) minmax(480px,600px);background:var(--background)}
+    .auth-aside{position:relative;overflow:hidden;padding:44px 48px;display:flex;flex-direction:column;border-right:1px solid var(--border);background:var(--surface-secondary)}
+    .auth-aside:after{content:"";position:absolute;right:-120px;bottom:-140px;width:420px;height:420px;border:1px solid var(--border);border-radius:50%;opacity:.65;pointer-events:none}
+    .auth-brand{position:relative;z-index:1;display:flex;align-items:center;gap:12px}
+    .auth-brand-mark{width:38px;height:38px;display:grid;place-items:center;border-radius:11px;background:var(--foreground);color:var(--background)}
+    .auth-brand-mark svg{width:19px;height:19px}
+    .auth-brand-copy{display:grid;gap:2px}.auth-brand-copy strong{font-size:15px}.auth-brand-copy span{font-size:12px;color:var(--foreground-muted)}
+    .auth-statement{position:relative;z-index:1;margin-top:auto;max-width:520px;padding-bottom:8px}
+    .auth-statement h2{max-width:12ch;margin:0 0 16px;font-size:clamp(32px,4vw,54px);line-height:1.04;letter-spacing:-.045em;font-weight:680}
+    .auth-statement p{max-width:42ch;margin:0;color:var(--foreground-secondary);font-size:14px;line-height:1.75}
+    .auth-proof{display:flex;gap:28px;margin-top:34px;padding-top:22px;border-top:1px solid var(--border)}
+    .auth-proof div{display:grid;gap:4px}.auth-proof strong{font-size:13px}.auth-proof span{font-size:11px;color:var(--foreground-muted)}
+    .auth-main{display:flex;align-items:center;justify-content:center;padding:48px 56px;background:var(--surface)}
+    .auth-panel{width:min(100%,430px)}
+    .auth-panel h1{margin:0 0 9px;font-size:32px;line-height:1.15;letter-spacing:-.035em;font-weight:680}
+    .auth-panel .lede{margin:0 0 26px;color:var(--foreground-secondary);font-size:14px;line-height:1.65}
+    .auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:26px;padding:4px;border:1px solid var(--border);border-radius:var(--auth-radius);background:var(--surface-secondary)}
+    .auth-tab{height:38px;border:0;border-radius:10px;background:transparent;color:var(--foreground-secondary);font:inherit;font-size:13px;font-weight:620;cursor:pointer;transition:background-color 150ms ease,color 150ms ease}
+    .auth-tab:hover{color:var(--foreground)}.auth-tab.active{background:var(--surface);color:var(--foreground);box-shadow:0 1px 2px rgba(0,0,0,.05)}
+    .auth-form{display:grid;gap:15px}.auth-form[hidden]{display:none}
+    .field{display:grid;gap:7px}.field label{font-size:13px;font-weight:620}
+    .field input{width:100%;height:46px;border:1px solid var(--border);border-radius:11px;background:var(--surface);color:var(--foreground);padding:0 14px;font:inherit;font-size:14px;outline:none;transition:border-color 150ms ease,box-shadow 150ms ease}
+    .field input::placeholder{color:var(--foreground-muted)}
+    .field input:hover{border-color:var(--border-strong)}
+    .field input:focus{border-color:var(--foreground-secondary);box-shadow:0 0 0 3px color-mix(in srgb,var(--foreground) 9%,transparent)}
+    .field-help{font-size:11px;line-height:1.55;color:var(--foreground-muted)}
+    .role-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .role-option{min-height:48px;padding:0 13px;display:flex;align-items:center;justify-content:space-between;border:1px solid var(--border);border-radius:11px;background:var(--surface);color:var(--foreground-secondary);font:inherit;font-size:13px;font-weight:600;text-align:left;cursor:pointer;transition:border-color 150ms ease,background-color 150ms ease,color 150ms ease}
+    .role-option svg{width:16px;height:16px;opacity:0;transition:opacity 150ms ease}
+    .role-option:hover{border-color:var(--border-strong);color:var(--foreground)}
+    .role-option.active{border-color:var(--foreground);background:var(--foreground);color:var(--background)}
+    .role-option.active svg{opacity:1}
+    .auth-submit{width:100%;height:46px;margin-top:2px;justify-content:center;border-radius:11px}
+    .auth-submit:disabled{cursor:not-allowed;opacity:.55}
+    .auth-message{display:none;margin-bottom:16px;padding:12px 13px;border-radius:11px;font-size:12px;line-height:1.55}
+    .auth-message.show{display:block}.auth-message.error{background:var(--danger-bg);color:var(--danger-text)}.auth-message.success{background:var(--success-bg);color:var(--success-text)}
+    .invite-note{padding:12px 13px;border:1px solid var(--border);border-radius:11px;color:var(--foreground-secondary);font-size:12px;line-height:1.6;background:var(--surface-secondary)}
+    .auth-foot{margin-top:22px;font-size:11px;line-height:1.7;color:var(--foreground-muted)}
+    @media(max-width:900px){.auth-shell{grid-template-columns:1fr}.auth-aside{display:none}.auth-main{min-height:100dvh;padding:44px 22px;align-items:flex-start}.auth-panel{margin-top:4vh}}
+    @media(max-width:460px){.auth-main{padding:30px 18px}.auth-panel h1{font-size:28px}.role-grid{grid-template-columns:1fr}}
+    @media(prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important}}
+  </style>
+</head>
+<body>
+  <div class="auth-shell">
+    <aside class="auth-aside" aria-label="CareerOS 简介">
+      <div class="auth-brand">
+        <div class="auth-brand-mark"><i data-lucide="orbit"></i></div>
+        <div class="auth-brand-copy"><strong>CareerOS</strong><span>AI Career Planning OS</span></div>
+      </div>
+      <div class="auth-statement">
+        <h2>让每一步成长都有依据。</h2>
+        <p>围绕学生证据、职业目标与参赛作品，连接 AI Coach、教师指导和持续迭代。</p>
+        <div class="auth-proof" aria-label="平台能力">
+          <div><strong>证据可追溯</strong><span>Evidence Graph</span></div>
+          <div><strong>角色有边界</strong><span>Tenant RBAC</span></div>
+          <div><strong>作品有版本</strong><span>Artifact History</span></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="auth-main">
+      <section class="auth-panel">
+        <div class="auth-tabs" role="tablist" aria-label="账户操作">
+          <button class="auth-tab active" id="login-tab" type="button" role="tab" aria-selected="true" aria-controls="login-form">登录</button>
+          <button class="auth-tab" id="register-tab" type="button" role="tab" aria-selected="false" aria-controls="register-form">注册账号</button>
+        </div>
+
+        <div id="message" class="auth-message" role="alert" aria-live="polite"></div>
+
+        <form id="login-form" class="auth-form" novalidate>
+          <div>
+            <h1>欢迎回来</h1>
+            <p class="lede">登录后进入与你身份对应的工作空间。</p>
+          </div>
+          <div class="field">
+            <label for="login-email">邮箱</label>
+            <input id="login-email" name="email" type="email" autocomplete="username" placeholder="name@school.edu.cn" required>
+          </div>
+          <div class="field">
+            <label for="login-password">密码</label>
+            <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+          </div>
+          <button id="login-submit" class="btn primary auth-submit" type="submit">登录</button>
+        </form>
+
+        <form id="register-form" class="auth-form" hidden novalidate>
+          <div>
+            <h1>创建账号</h1>
+            <p class="lede">选择身份并完成对应的安全注册流程。</p>
+          </div>
+          <div class="field">
+            <label>注册身份</label>
+            <div class="role-grid" id="role-grid">
+              <button class="role-option active" type="button" data-role="student"><span>学生</span><i data-lucide="check"></i></button>
+              <button class="role-option" type="button" data-role="teacher"><span>教师</span><i data-lucide="check"></i></button>
+              <button class="role-option" type="button" data-role="school_admin"><span>学校管理员</span><i data-lucide="check"></i></button>
+              <button class="role-option" type="button" data-role="super_admin"><span>平台管理员</span><i data-lucide="check"></i></button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="register-name">姓名</label>
+            <input id="register-name" type="text" autocomplete="name" maxlength="120" required>
+          </div>
+          <div id="student-fields" class="auth-form">
+            <div class="field">
+              <label for="register-email">邮箱</label>
+              <input id="register-email" type="email" autocomplete="email" placeholder="name@school.edu.cn">
+            </div>
+            <div class="field">
+              <label for="register-tenant">学校或组织代码</label>
+              <input id="register-tenant" type="text" autocomplete="organization" placeholder="由学校提供">
+            </div>
+          </div>
+          <div id="invite-fields" class="auth-form" hidden>
+            <div class="invite-note">教师及管理员账号需要有效邀请码。邀请码由学校管理员或平台管理员签发，系统会从邀请码中识别邮箱和组织。</div>
+            <div class="field">
+              <label for="invite-token">邀请码</label>
+              <input id="invite-token" type="text" autocomplete="one-time-code" placeholder="粘贴邀请链接中的代码">
+            </div>
+          </div>
+          <div class="field">
+            <label for="register-password">设置密码</label>
+            <input id="register-password" type="password" autocomplete="new-password" minlength="10" required>
+            <span class="field-help">至少 10 个字符，建议同时包含大小写字母、数字和符号。</span>
+          </div>
+          <div class="field">
+            <label for="register-confirm">确认密码</label>
+            <input id="register-confirm" type="password" autocomplete="new-password" minlength="10" required>
+          </div>
+          <button id="register-submit" class="btn primary auth-submit" type="submit">创建学生账号</button>
+        </form>
+        <p class="auth-foot">平台管理员注册必须由现有平台管理员授权。CareerOS 不允许通过公开页面自行提升权限。</p>
+      </section>
+    </main>
+  </div>
+
+  <script src="/static/vendor/lucide.min.js"></script>
+  <script src="/static/ui.js"></script>
+  <script>
+    const loginForm=document.getElementById('login-form');
+    const registerForm=document.getElementById('register-form');
+    const loginTab=document.getElementById('login-tab');
+    const registerTab=document.getElementById('register-tab');
+    const message=document.getElementById('message');
+    const loginSubmit=document.getElementById('login-submit');
+    const registerSubmit=document.getElementById('register-submit');
+    const studentFields=document.getElementById('student-fields');
+    const inviteFields=document.getElementById('invite-fields');
+    const params=new URLSearchParams(location.search);
+    let selectedRole='student';
+
+    function showMessage(text,type='error'){
+      message.textContent=text;
+      message.className=`auth-message show ${type}`;
+    }
+    function clearMessage(){message.textContent='';message.className='auth-message'}
+    function setMode(mode){
+      const registering=mode==='register';
+      loginForm.hidden=registering;
+      registerForm.hidden=!registering;
+      loginTab.classList.toggle('active',!registering);
+      registerTab.classList.toggle('active',registering);
+      loginTab.setAttribute('aria-selected',String(!registering));
+      registerTab.setAttribute('aria-selected',String(registering));
+      clearMessage();
+      history.replaceState(null,'',registering?'#register':location.pathname+location.search);
+    }
+    function setRole(role){
+      selectedRole=role;
+      document.querySelectorAll('.role-option').forEach(button=>button.classList.toggle('active',button.dataset.role===role));
+      const isStudent=role==='student';
+      studentFields.hidden=!isStudent;
+      inviteFields.hidden=isStudent;
+      registerSubmit.textContent=isStudent?'创建学生账号':'使用邀请码注册';
+    }
+    async function initialize(){
+      const invite=new URLSearchParams(location.hash.replace(/^#/,'')).get('invite');
+      if(invite){setMode('register');setRole('teacher');document.getElementById('invite-token').value=invite}
+      else if(location.hash==='#register')setMode('register');
+      try{
+        const context=await fetch('/api/product/context').then(response=>response.ok?response.json():null);
+        const tenantId=context?.tenant?.tenant_id||'';
+        if(tenantId)document.getElementById('register-tenant').value=tenantId;
+      }catch(_){}
+    }
+
+    loginTab.addEventListener('click',()=>setMode('login'));
+    registerTab.addEventListener('click',()=>setMode('register'));
+    document.querySelectorAll('.role-option').forEach(button=>button.addEventListener('click',()=>setRole(button.dataset.role)));
+
+    loginForm.addEventListener('submit',async event=>{
+      event.preventDefault();clearMessage();
+      const email=document.getElementById('login-email').value.trim();
+      const password=document.getElementById('login-password').value;
+      if(!email||!password){showMessage('请输入邮箱和密码。');return}
+      loginSubmit.disabled=true;loginSubmit.textContent='正在登录';
+      try{
+        const response=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+        const data=await response.json();
+        if(!response.ok)throw new Error(data.detail||'登录失败');
+        location.href=params.get('next')||data.redirect||'/';
+      }catch(error){showMessage(error.message||'登录失败，请检查账号信息后重试。')}
+      finally{loginSubmit.disabled=false;loginSubmit.textContent='登录'}
+    });
+
+    registerForm.addEventListener('submit',async event=>{
+      event.preventDefault();clearMessage();
+      const displayName=document.getElementById('register-name').value.trim();
+      const password=document.getElementById('register-password').value;
+      const confirm=document.getElementById('register-confirm').value;
+      if(!displayName){showMessage('请输入姓名。');return}
+      if(password.length<10){showMessage('密码至少需要 10 个字符。');return}
+      if(password!==confirm){showMessage('两次输入的密码不一致。');return}
+      registerSubmit.disabled=true;registerSubmit.textContent='正在创建';
+      try{
+        let response;
+        if(selectedRole==='student'){
+          const email=document.getElementById('register-email').value.trim();
+          const tenantId=document.getElementById('register-tenant').value.trim();
+          if(!email||!tenantId)throw new Error('请输入邮箱和学校或组织代码。');
+          response=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,display_name:displayName,tenant_id:tenantId})});
+        }else{
+          const token=document.getElementById('invite-token').value.trim();
+          if(!token)throw new Error('该身份需要管理员签发的邀请码。');
+          response=await fetch('/api/auth/invitations/accept',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,password,display_name:displayName})});
+        }
+        const data=await response.json();
+        if(!response.ok)throw new Error(data.detail||'注册失败');
+        const registeredEmail=data.user?.email||document.getElementById('register-email').value.trim();
+        setMode('login');
+        document.getElementById('login-email').value=registeredEmail;
+        showMessage('账号创建成功，请使用新密码登录。','success');
+      }catch(error){showMessage(error.message||'注册失败，请检查信息后重试。')}
+      finally{registerSubmit.disabled=false;registerSubmit.textContent=selectedRole==='student'?'创建学生账号':'使用邀请码注册'}
+    });
+    initialize();
+  </script>
+</body>
+</html>
