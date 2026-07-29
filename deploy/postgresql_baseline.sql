@@ -525,7 +525,7 @@ CREATE TABLE workflow_instances (
 	progress INTEGER DEFAULT 0 NOT NULL, 
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
 	updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
-	template_id TEXT DEFAULT 'career_development_v1' NOT NULL, 
+	template_id TEXT NOT NULL,
 	CONSTRAINT pk_workflow_instances PRIMARY KEY (workflow_id), 
 	CONSTRAINT uq_workflow_instances_1 UNIQUE (session_id)
 );
@@ -576,8 +576,8 @@ CREATE TABLE auth_sessions (
 	revoked_at TIMESTAMP WITH TIME ZONE, 
 	CONSTRAINT pk_auth_sessions PRIMARY KEY (auth_session_id), 
 	CONSTRAINT uq_auth_sessions_1 UNIQUE (token_hash), 
-	CONSTRAINT fk_auth_sessions_1_tenant_id FOREIGN KEY(tenant_id) REFERENCES tenants (tenant_id), 
-	CONSTRAINT fk_auth_sessions_2_user_id FOREIGN KEY(user_id) REFERENCES users (user_id)
+	CONSTRAINT fk_auth_sessions_1_user_id FOREIGN KEY(user_id) REFERENCES users (user_id),
+	CONSTRAINT fk_auth_sessions_2_tenant_id FOREIGN KEY(tenant_id) REFERENCES tenants (tenant_id)
 );
 
 
@@ -619,6 +619,22 @@ CREATE TABLE password_reset_tokens (
 );
 
 
+CREATE TABLE project_templates (
+	template_id TEXT,
+	tenant_id TEXT NOT NULL,
+	name TEXT NOT NULL,
+	category TEXT DEFAULT 'career_planning' NOT NULL,
+	status TEXT DEFAULT 'draft' NOT NULL,
+	current_version_id TEXT,
+	created_by TEXT DEFAULT '' NOT NULL,
+	created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	CONSTRAINT pk_project_templates PRIMARY KEY (template_id),
+	CONSTRAINT uq_project_templates_1 UNIQUE (template_id, tenant_id),
+	CONSTRAINT fk_project_templates_1_tenant_id FOREIGN KEY(tenant_id) REFERENCES tenants (tenant_id) ON DELETE CASCADE
+);
+
+
 CREATE TABLE tenant_memberships (
 	membership_id TEXT, 
 	tenant_id TEXT NOT NULL, 
@@ -628,8 +644,8 @@ CREATE TABLE tenant_memberships (
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
 	CONSTRAINT pk_tenant_memberships PRIMARY KEY (membership_id), 
 	CONSTRAINT uq_tenant_memberships_1 UNIQUE (tenant_id, user_id, role), 
-	CONSTRAINT fk_tenant_memberships_1_user_id FOREIGN KEY(user_id) REFERENCES users (user_id), 
-	CONSTRAINT fk_tenant_memberships_2_tenant_id FOREIGN KEY(tenant_id) REFERENCES tenants (tenant_id)
+	CONSTRAINT fk_tenant_memberships_1_tenant_id FOREIGN KEY(tenant_id) REFERENCES tenants (tenant_id),
+	CONSTRAINT fk_tenant_memberships_2_user_id FOREIGN KEY(user_id) REFERENCES users (user_id)
 );
 
 
@@ -664,9 +680,75 @@ CREATE TABLE class_memberships (
 	created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, 
 	CONSTRAINT pk_class_memberships PRIMARY KEY (class_membership_id), 
 	CONSTRAINT uq_class_memberships_1 UNIQUE (class_id, user_id, role), 
-	CONSTRAINT fk_class_memberships_1_user_id FOREIGN KEY(user_id) REFERENCES users (user_id), 
+	CONSTRAINT fk_class_memberships_1_class_id FOREIGN KEY(class_id) REFERENCES classes (class_id),
 	CONSTRAINT fk_class_memberships_2_tenant_id FOREIGN KEY(tenant_id) REFERENCES tenants (tenant_id), 
-	CONSTRAINT fk_class_memberships_3_class_id FOREIGN KEY(class_id) REFERENCES classes (class_id)
+	CONSTRAINT fk_class_memberships_3_user_id FOREIGN KEY(user_id) REFERENCES users (user_id)
+);
+
+
+CREATE TABLE project_template_versions (
+	template_version_id TEXT,
+	template_id TEXT NOT NULL,
+	tenant_id TEXT NOT NULL,
+	version INTEGER NOT NULL,
+	name TEXT NOT NULL,
+	category TEXT NOT NULL,
+	description TEXT DEFAULT '' NOT NULL,
+	background TEXT DEFAULT '' NOT NULL,
+	objective TEXT DEFAULT '' NOT NULL,
+	applicable_users TEXT DEFAULT '' NOT NULL,
+	estimated_time_minutes INTEGER DEFAULT 60 NOT NULL,
+	output_type TEXT DEFAULT 'career_report' NOT NULL,
+	questions_json TEXT DEFAULT '[]' NOT NULL,
+	material_requirements_json TEXT DEFAULT '[]' NOT NULL,
+	artifact_structure_json TEXT DEFAULT '[]' NOT NULL,
+	rubric_json TEXT DEFAULT '{}' NOT NULL,
+	workflow_template_id TEXT NOT NULL,
+	artifact_template_id TEXT DEFAULT 'career_report_v1' NOT NULL,
+	status TEXT DEFAULT 'published' NOT NULL,
+	published_at TEXT,
+	created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	CONSTRAINT pk_project_template_versions PRIMARY KEY (template_version_id),
+	CONSTRAINT uq_project_template_versions_1 UNIQUE (template_id, version),
+	CONSTRAINT uq_project_template_versions_2 UNIQUE (template_version_id, tenant_id),
+	CONSTRAINT fk_project_template_versions_1_template_id FOREIGN KEY(template_id) REFERENCES project_templates (template_id) ON DELETE RESTRICT
+);
+
+
+CREATE TABLE project_instances (
+	project_id TEXT,
+	tenant_id TEXT NOT NULL,
+	owner_user_id TEXT NOT NULL,
+	template_id TEXT NOT NULL,
+	template_version_id TEXT NOT NULL,
+	session_id TEXT NOT NULL,
+	name TEXT NOT NULL,
+	status TEXT DEFAULT 'draft' NOT NULL,
+	current_step TEXT DEFAULT 'overview' NOT NULL,
+	current_artifact_id TEXT,
+	current_artifact_version_id TEXT,
+	latest_score_run_id TEXT,
+	created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	completed_at TEXT,
+	CONSTRAINT pk_project_instances PRIMARY KEY (project_id),
+	CONSTRAINT uq_project_instances_1 UNIQUE (project_id, tenant_id),
+	CONSTRAINT fk_project_instances_1_template_id FOREIGN KEY(template_id) REFERENCES project_templates (template_id) ON DELETE RESTRICT,
+	CONSTRAINT fk_project_instances_2_template_version_id FOREIGN KEY(template_version_id) REFERENCES project_template_versions (template_version_id) ON DELETE RESTRICT,
+	CONSTRAINT fk_project_instances_3_session_id FOREIGN KEY(session_id) REFERENCES sessions (session_id) ON DELETE RESTRICT
+);
+
+
+CREATE TABLE project_answers (
+	project_id TEXT NOT NULL,
+	tenant_id TEXT NOT NULL,
+	owner_user_id TEXT NOT NULL,
+	question_id TEXT NOT NULL,
+	answer_json TEXT DEFAULT 'null' NOT NULL,
+	created_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	updated_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	CONSTRAINT pk_project_answers PRIMARY KEY (project_id, question_id),
+	CONSTRAINT fk_project_answers_1_project_id FOREIGN KEY(project_id) REFERENCES project_instances (project_id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_tasks_tenant ON ai_tasks (tenant_id, status, updated_at);
@@ -679,17 +761,17 @@ CREATE INDEX idx_billing_orders_tenant ON billing_orders (tenant_id, created_at)
 CREATE INDEX idx_data_subject_requests_user ON data_subject_requests (tenant_id, user_id, created_at);
 CREATE INDEX idx_claims_session ON evidence_claims (tenant_id, session_id, created_at);
 CREATE INDEX idx_graph_edges_session ON evidence_graph_edges (tenant_id, session_id, created_at);
-CREATE INDEX idx_evidence_session ON evidence_items (session_id, created_at);
 CREATE INDEX idx_evidence_tenant_session ON evidence_items (tenant_id, session_id, created_at);
-CREATE INDEX idx_verification_history_claim ON evidence_verification_history (tenant_id, claim_id, created_at);
+CREATE INDEX idx_evidence_session ON evidence_items (session_id, created_at);
 CREATE INDEX idx_verification_history_session ON evidence_verification_history (tenant_id, session_id, created_at);
+CREATE INDEX idx_verification_history_claim ON evidence_verification_history (tenant_id, claim_id, created_at);
 CREATE INDEX idx_job_requirements_job ON job_requirements (tenant_id, job_id, importance);
 CREATE INDEX idx_jobs_title_city ON jobs (title, city, active);
 CREATE INDEX idx_jobs_tenant ON jobs (tenant_id, active, updated_at);
 CREATE INDEX idx_knowledge_embeddings_source ON knowledge_embeddings (source_id);
+CREATE INDEX idx_knowledge_tenant ON knowledge_sources (tenant_id, updated_at);
 CREATE INDEX idx_knowledge_sources_scope ON knowledge_sources (scope, active);
 CREATE INDEX idx_knowledge_sources_tenant ON knowledge_sources (tenant_id, active, updated_at);
-CREATE INDEX idx_knowledge_tenant ON knowledge_sources (tenant_id, updated_at);
 CREATE INDEX idx_llm_model_capabilities_provider ON llm_model_capabilities (provider_id, updated_at);
 CREATE INDEX idx_llm_usage_tenant ON llm_usage (tenant_id, created_at);
 CREATE INDEX idx_model_eval_runs_tenant ON model_eval_runs (tenant_id, created_at);
@@ -699,20 +781,82 @@ CREATE INDEX idx_rag_eval_runs_tenant ON rag_eval_runs (tenant_id, created_at);
 CREATE INDEX idx_review_records_session ON review_records (tenant_id, session_id, created_at);
 CREATE INDEX idx_security_audit_tenant ON security_audit_log (tenant_id, created_at);
 CREATE INDEX idx_sessions_class ON sessions (tenant_id, class_id, updated_at);
-CREATE INDEX idx_sessions_tenant_updated ON sessions (tenant_id, updated_at);
 CREATE INDEX idx_sessions_owner ON sessions (student_user_id, tenant_id);
-CREATE INDEX idx_stored_objects_tenant_owner ON stored_objects (tenant_id, owner_user_id, created_at);
+CREATE INDEX idx_sessions_tenant_updated ON sessions (tenant_id, updated_at);
 CREATE INDEX idx_stored_objects_status ON stored_objects (tenant_id, status, created_at);
-CREATE INDEX idx_feedback_session ON teacher_feedback (session_id, created_at);
+CREATE INDEX idx_stored_objects_tenant_owner ON stored_objects (tenant_id, owner_user_id, created_at);
 CREATE INDEX idx_feedback_tenant_session ON teacher_feedback (tenant_id, session_id, created_at);
-CREATE INDEX idx_user_invitations_tenant ON user_invitations (tenant_id, created_at);
+CREATE INDEX idx_feedback_session ON teacher_feedback (session_id, created_at);
 CREATE INDEX idx_user_invitations_email ON user_invitations (email, tenant_id);
+CREATE INDEX idx_user_invitations_tenant ON user_invitations (tenant_id, created_at);
 CREATE INDEX idx_workflow_template ON workflow_instances (tenant_id, template_id, updated_at);
 CREATE INDEX idx_workflow_session ON workflow_instances (tenant_id, session_id);
 CREATE INDEX idx_workflow_template_defs_tenant ON workflow_template_definitions (tenant_id, preset_id, status, version);
 CREATE INDEX idx_artifact_versions_series ON artifact_versions (artifact_id, version);
 CREATE INDEX idx_auth_sessions_token ON auth_sessions (token_hash);
 CREATE INDEX idx_knowledge_chunks_source ON knowledge_chunks (source_id);
+CREATE INDEX idx_project_templates_tenant_status ON project_templates (tenant_id, status, updated_at);
 CREATE INDEX idx_memberships_user ON tenant_memberships (user_id, tenant_id);
 CREATE INDEX idx_workflow_steps_session ON workflow_steps (tenant_id, session_id, step_index);
 CREATE INDEX idx_class_memberships_user ON class_memberships (user_id, tenant_id);
+CREATE INDEX idx_project_template_versions_tenant_template ON project_template_versions (tenant_id, template_id, version);
+CREATE INDEX idx_project_instances_tenant_template ON project_instances (tenant_id, template_version_id);
+CREATE INDEX idx_project_instances_tenant_owner_status ON project_instances (tenant_id, owner_user_id, status, updated_at);
+CREATE INDEX idx_project_answers_tenant_owner_project ON project_answers (tenant_id, owner_user_id, project_id);
+
+CREATE OR REPLACE FUNCTION reject_project_template_version_mutation()
+RETURNS trigger AS $$
+BEGIN
+  RAISE EXCEPTION 'project template versions are immutable';
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_project_template_versions_immutable
+BEFORE UPDATE OR DELETE ON project_template_versions
+FOR EACH ROW EXECUTE FUNCTION reject_project_template_version_mutation();
+
+CREATE OR REPLACE FUNCTION enforce_project_tenant_scope()
+RETURNS trigger AS $$
+BEGIN
+  IF TG_TABLE_NAME = 'project_template_versions' AND NOT EXISTS (
+    SELECT 1 FROM project_templates
+    WHERE template_id=NEW.template_id AND tenant_id=NEW.tenant_id
+  ) THEN
+    RAISE EXCEPTION 'project template version tenant mismatch';
+  ELSIF TG_TABLE_NAME = 'project_instances' AND (
+    NOT EXISTS (
+      SELECT 1 FROM project_templates
+      WHERE template_id=NEW.template_id AND tenant_id=NEW.tenant_id
+    ) OR NOT EXISTS (
+      SELECT 1 FROM project_template_versions
+      WHERE template_version_id=NEW.template_version_id
+        AND template_id=NEW.template_id AND tenant_id=NEW.tenant_id
+    ) OR NOT EXISTS (
+      SELECT 1 FROM sessions
+      WHERE session_id=NEW.session_id AND tenant_id=NEW.tenant_id
+        AND student_user_id=NEW.owner_user_id
+    )
+  ) THEN
+    RAISE EXCEPTION 'project instance tenant, owner or session mismatch';
+  ELSIF TG_TABLE_NAME = 'project_answers' AND NOT EXISTS (
+    SELECT 1 FROM project_instances
+    WHERE project_id=NEW.project_id AND tenant_id=NEW.tenant_id
+      AND owner_user_id=NEW.owner_user_id
+  ) THEN
+    RAISE EXCEPTION 'project answer tenant or owner mismatch';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_project_template_versions_tenant_guard
+BEFORE INSERT OR UPDATE ON project_template_versions
+FOR EACH ROW EXECUTE FUNCTION enforce_project_tenant_scope();
+
+CREATE TRIGGER trg_project_instances_tenant_guard
+BEFORE INSERT OR UPDATE ON project_instances
+FOR EACH ROW EXECUTE FUNCTION enforce_project_tenant_scope();
+
+CREATE TRIGGER trg_project_answers_tenant_guard
+BEFORE INSERT OR UPDATE ON project_answers
+FOR EACH ROW EXECUTE FUNCTION enforce_project_tenant_scope();

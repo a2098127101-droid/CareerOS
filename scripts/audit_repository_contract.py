@@ -19,6 +19,7 @@ PAIRS = [
     ("app/model_store.py", "ModelConfigStore", "app/repositories/postgres/model.py", "PostgresModelConfigRepository"),
     ("app/commercial_store.py", "CommercialStore", "app/repositories/postgres/commercial.py", "PostgresCommercialRepository"),
     ("app/storage.py", "StorageRegistry", "app/repositories/postgres/storage_registry.py", "PostgresStorageRegistry"),
+    ("app/repositories/interfaces/core.py", "ProjectRepositoryProtocol", "app/project_repository.py", "ProjectRepository"),
 ]
 
 

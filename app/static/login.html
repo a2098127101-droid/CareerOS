@@ -20,9 +20,9 @@
     <div class="auth-help">无法登录时请联系学校管理员。密码重置 API 已预留；正式上线前应接入邮件或学校身份系统完成验证码/通知流程。</div>
   </section></main>
 </div>
-<script src="/static/vendor/lucide.min.js"></script><script src="/static/ui.js"></script><script>
+<script src="/static/vendor/lucide.min.js"></script><script src="/static/ui.js"></script><script src="/static/safe-navigation.js"></script><script>
 const form=document.getElementById('form'),err=document.getElementById('err'),btn=document.getElementById('submit');
-const params=new URLSearchParams(location.search),next=params.get('next')||'';
+const params=new URLSearchParams(location.search),requestedNext=params.get('next')||'',next=CareerNavigation.safeSameOriginPath(requestedNext,location.origin);
 async function init(){try{const h=await fetch('/api/health').then(r=>r.json());if(h.auth?.environment!=='production')document.getElementById('demo').classList.add('show')}catch{}}
 form.addEventListener('submit',async e=>{e.preventDefault();err.classList.remove('show');btn.disabled=true;btn.textContent='登录中…';try{const body={email:email.value.trim(),password:password.value,role:role.value||null};const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw new Error(d.detail||'登录失败');location.href=next||d.redirect||'/'}catch(ex){err.textContent=ex.message||'登录失败';err.classList.add('show')}finally{btn.disabled=false;btn.textContent='登录'}});init();
 </script></body></html>

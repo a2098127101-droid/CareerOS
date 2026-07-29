@@ -1,4 +1,4 @@
-name: CareerOS CI (locked 132-test matrix)
+name: CareerOS CI (locked 144-test matrix)
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
       - run: python scripts/audit_database_access.py --json-out docs/CI_DATABASE_ACCESS_AUDIT.json
       - run: python scripts/audit_repository_contract.py --json-out docs/CI_REPOSITORY_CONTRACT_AUDIT.json
       - run: python scripts/run_test_matrix.py --timeout 120 --json-out docs/CI_TEST_MATRIX.json
-      - run: python -c "import json; report=json.load(open('docs/CI_TEST_MATRIX.json', encoding='utf-8')); assert report['ok'] and report['passed_tests'] == 132, report"
+      - run: python -c "import json; report=json.load(open('docs/CI_TEST_MATRIX.json', encoding='utf-8')); assert report['ok'] and report['passed_tests'] == 144, report"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

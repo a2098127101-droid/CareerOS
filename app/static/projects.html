@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>我的项目 · CareerOS</title>
+  <link rel="stylesheet" href="/static/career-os.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <a class="brand" href="/projects"><div class="brand-mark">C</div><div class="brand-copy"><strong>CareerOS</strong><span>Project Workspace</span></div></a>
+    <a class="btn primary" href="/projects/new" style="width:100%;justify-content:flex-start"><i data-lucide="plus"></i><span>新建项目</span></a>
+    <div class="nav-scroll">
+      <div class="nav-section">项目</div>
+      <a class="nav-item active" href="/projects"><i data-lucide="folder-kanban"></i><span>我的项目</span></a>
+      <a class="nav-item" href="/projects/new"><i data-lucide="layout-template"></i><span>项目模板</span></a>
+      <div class="nav-section">兼容工作区</div>
+      <a class="nav-item" href="/student"><i data-lucide="sparkles"></i><span>AI Career Coach</span></a>
+    </div>
+    <div class="sidebar-bottom">
+      <button class="nav-item" id="logout"><i data-lucide="log-out"></i><span>退出登录</span></button>
+    </div>
+  </aside>
+  <header class="topbar">
+    <div class="breadcrumb" id="breadcrumb">CareerOS / <b>我的项目</b></div>
+    <div class="top-actions">
+      <button class="icon-btn" aria-label="切换主题" data-theme-toggle><i data-lucide="sun-moon"></i></button>
+      <div class="avatar" id="avatar">我</div>
+    </div>
+  </header>
+  <main class="main projects-main">
+    <div id="screen">
+      <div class="project-loading">
+        <div class="skeleton skeleton-line wide"></div>
+        <div class="skeleton skeleton-line"></div>
+        <div class="project-grid" style="margin-top:24px">
+          <div class="project-card"><div class="skeleton skeleton-line wide"></div><div class="skeleton skeleton-line" style="margin-top:12px"></div></div>
+          <div class="project-card"><div class="skeleton skeleton-line wide"></div><div class="skeleton skeleton-line" style="margin-top:12px"></div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<div class="toast-stack" id="toastStack"></div>
+<script src="/static/vendor/lucide.min.js"></script>
+<script src="/static/ui.js"></script>
+<script>
+const screen=document.querySelector('#screen');
+const esc=(value='')=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const statusLabel={draft:'尚未开始',collecting:'填写信息',ready_to_generate:'待生成',solution_generated:'方案已生成',reviewed:'已评分',revision_required:'待修改',completed:'已完成'};
+async function api(url,opt={}){
+  const response=await fetch(url,{headers:opt.body?{'Content-Type':'application/json'}:{},...opt});
+  const data=await response.json().catch(()=>({}));
+  if(response.status===401){location.href='/login?next='+encodeURIComponent(location.pathname);throw new Error('请先登录')}
+  if(!response.ok)throw new Error(typeof data.detail==='string'?data.detail:'请求失败，请稍后重试');
+  return data;
+}
+function refresh(){CareerUI.refreshIcons()}
+function toast(message,icon='check'){CareerUI.toast(message,icon)}
+function setCrumb(label){document.querySelector('#breadcrumb').innerHTML=`CareerOS / <b>${esc(label)}</b>`}
+function errorState(error,retry){
+  screen.innerHTML=`<div class="empty project-empty"><div><div class="empty-icon"><i data-lucide="triangle-alert"></i></div><h3>暂时无法加载</h3><p>${esc(error.message||'请求失败')}。请检查网络后重试。</p><button class="btn primary" id="retry">重试</button></div></div>`;
+  document.querySelector('#retry').onclick=retry;refresh();
+}
+function projectCard(project){
+  const progress=project.progress||{percent:0,current:1,total:5};
+  return `<article class="project-card" data-project="${esc(project.project_id)}" tabindex="0">
+    <div class="project-card-top"><span class="badge">${esc(statusLabel[project.status]||project.status)}</span><span class="meta">${esc(project.category||'职业发展规划')}</span></div>
+    <h3>${esc(project.name)}</h3>
+    <p>${esc(project.template_name||'个人职业发展规划')}</p>
+    <div class="project-progress"><div class="progress-line"><i style="width:${Number(progress.percent)||0}%"></i></div><span>${progress.current} / ${progress.total}</span></div>
+    <div class="project-card-foot"><span class="meta">更新于 ${esc(String(project.updated_at||'').slice(0,10))}</span><span class="project-open">继续项目 <i data-lucide="arrow-right"></i></span></div>
+  </article>`;
+}
+async function listProjects(){
+  setCrumb('我的项目');
+  try{
+    const data=await api('/api/v1/projects');
+    if(!data.items.length){
+      screen.innerHTML=`<section class="project-hero"><div><div class="eyebrow">Project Workspace</div><h1>从一个真实项目开始。</h1><p>回答基础问题、整理个人证据，并由 Project Copilot 协助生成、评分和迭代成果。</p></div></section>
+      <div class="empty project-empty"><div><div class="empty-icon"><i data-lucide="folder-plus"></i></div><h3>还没有项目</h3><p>选择一个已发布模板，开始你的第一个职业发展项目。</p><a class="btn primary" href="/projects/new">开始第一个项目</a></div></div>`;
+    }else{
+      screen.innerHTML=`<div class="page-head"><div><div class="eyebrow">Project Workspace</div><h1>我的项目</h1><p>每个项目绑定创建时的模板版本，后续模板更新不会改变已开始项目。</p></div><div class="page-actions"><a class="btn primary" href="/projects/new"><i data-lucide="plus"></i>新建项目</a></div></div>
+      <section class="project-section"><div class="section-head"><div><h2>全部项目</h2><p>${data.items.length} 个项目</p></div></div><div class="project-grid">${data.items.map(projectCard).join('')}</div></section>`;
+      document.querySelectorAll('[data-project]').forEach(card=>{
+        const open=()=>location.href='/projects/'+encodeURIComponent(card.dataset.project);
+        card.onclick=open;card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}};
+      });
+    }
+    refresh();
+  }catch(error){errorState(error,listProjects)}
+}
+function templateCard(template){
+  return `<article class="template-card">
+    <div class="template-icon"><i data-lucide="file-chart-column"></i></div>
+    <div class="template-copy"><span class="badge">已发布 · V${esc(template.current_version)}</span><h3>${esc(template.name)}</h3><p>${esc(template.description)}</p>
+      <div class="template-meta"><span><i data-lucide="clock-3"></i>约 ${esc(template.estimated_time_minutes)} 分钟</span><span><i data-lucide="file-text"></i>${esc(template.output_type)}</span></div>
+    </div>
+    <button class="btn primary" data-create="${esc(template.current_version_id)}">开始项目</button>
+  </article>`;
+}
+function projectQuestion(question,answers){
+  const id=String(question.question_id||''),value=answers[id]??'',required=question.required?' required':'';
+  const label=`${esc(question.question_text)}${question.required?' <span aria-hidden="true">*</span>':''}`;
+  if(question.question_type==='single_select'&&Array.isArray(question.options)){
+    return `<label class="project-question"><span>${label}</span><select data-question="${esc(id)}"${required}><option value="">请选择</option>${question.options.map(option=>`<option value="${esc(option)}"${String(value)===String(option)?' selected':''}>${esc(option)}</option>`).join('')}</select></label>`;
+  }
+  const text=Array.isArray(value)?value.join('、'):String(value??'');
+  if(['long_text','file_upload','multi_select'].includes(question.question_type)){
+    const hint=question.question_type==='file_upload'?'<small>Phase 1 保存材料说明；实际附件仍由既有文件工作区管理。</small>':'';
+    return `<label class="project-question"><span>${label}</span>${hint}<textarea data-question="${esc(id)}"${required} rows="${question.question_type==='long_text'?4:2}">${esc(text)}</textarea></label>`;
+  }
+  return `<label class="project-question"><span>${label}</span><input data-question="${esc(id)}" value="${esc(text)}"${required}></label>`;
+}
+async function newProject(){
+  setCrumb('选择项目模板');
+  try{
+    const data=await api('/api/v1/project-templates');
+    screen.innerHTML=`<div class="page-head"><div><a class="back-link" href="/projects"><i data-lucide="arrow-left"></i>返回我的项目</a><h1>选择项目模板</h1><p>项目创建后将永久绑定当前发布版本，不受模板后续修改影响。</p></div></div>
+    <section class="template-list">${data.items.length?data.items.map(templateCard).join(''):`<div class="empty"><div><div class="empty-icon"><i data-lucide="layout-template"></i></div><h3>暂无可用模板</h3><p>请联系学校管理员发布项目模板。</p></div></div>`}</section>`;
+    document.querySelectorAll('[data-create]').forEach(button=>button.onclick=async()=>{
+      const original=button.textContent;button.disabled=true;button.textContent='正在创建…';
+      try{
+        const project=await api('/api/v1/projects',{method:'POST',body:JSON.stringify({template_version_id:button.dataset.create})});
+        toast('项目已创建');location.href='/projects/'+encodeURIComponent(project.project_id);
+      }catch(error){toast(error.message,'triangle-alert');button.disabled=false;button.textContent=original}
+    });
+    refresh();
+  }catch(error){errorState(error,newProject)}
+}
+async function projectDetail(projectId){
+  setCrumb('项目详情');
+  try{
+    const [project,form]=await Promise.all([
+      api('/api/v1/projects/'+encodeURIComponent(projectId)),
+      api('/api/v1/projects/'+encodeURIComponent(projectId)+'/form')
+    ]);
+    const template=project.template||{},steps=(project.progress||{}).steps||[];
+    screen.innerHTML=`<div class="page-head"><div><a class="back-link" href="/projects"><i data-lucide="arrow-left"></i>返回我的项目</a><div class="eyebrow">${esc(template.category||'职业发展规划')} · 模板 V${esc(project.template_version)}</div><h1>${esc(project.name)}</h1><p>${esc(template.description)}</p></div><div class="page-actions"><button class="btn primary" id="continueProject">继续填写 <i data-lucide="arrow-down"></i></button></div></div>
+    <div class="project-detail-grid">
+      <section class="project-open-section"><h2>项目要求</h2><div class="detail-block"><span>项目目标</span><p>${esc(template.objective)}</p></div><div class="detail-block"><span>适用对象</span><p>${esc(template.applicable_users)}</p></div><div class="detail-block"><span>成果结构</span><ol>${(template.artifact_structure||[]).map(item=>`<li>${esc(item)}</li>`).join('')}</ol></div></section>
+      <aside class="project-steps"><div class="section-head"><div><h2>项目进度</h2><p>${project.progress.current} / ${project.progress.total}</p></div></div>${steps.map(step=>`<div class="project-step ${esc(step.status)}"><span>${step.id}</span><div><strong>${esc(step.label)}</strong><small>${step.status==='current'?'当前步骤':step.status==='completed'?'已完成':'后续开放'}</small></div></div>`).join('')}</aside>
+    </div>
+    <section class="project-form-section" id="projectFormSection"><div class="section-head"><div><h2>项目信息</h2><p>答案仅保存到当前项目，并继续受租户与项目所有者权限约束。</p></div></div>
+      <form id="projectForm" class="project-question-list">${(form.questions||[]).map(question=>projectQuestion(question,form.answers||{})).join('')}
+        <div class="project-form-actions"><button class="btn primary" id="saveProject" type="submit">保存项目进度</button></div>
+      </form>
+    </section>`;
+    document.querySelector('#continueProject').onclick=()=>document.querySelector('#projectFormSection').scrollIntoView({behavior:'smooth',block:'start'});
+    document.querySelector('#projectForm').onsubmit=async event=>{
+      event.preventDefault();
+      const button=document.querySelector('#saveProject'),original=button.textContent;
+      button.disabled=true;button.textContent='正在保存…';
+      const answers=[...document.querySelectorAll('[data-question]')].map(input=>({question_id:input.dataset.question,answer:input.value}));
+      try{
+        await api('/api/v1/projects/'+encodeURIComponent(projectId)+'/answers',{method:'PUT',body:JSON.stringify({answers})});
+        toast('项目进度已保存');
+      }catch(error){toast(error.message,'triangle-alert')}
+      finally{button.disabled=false;button.textContent=original}
+    };
+    refresh();
+  }catch(error){errorState(error,()=>projectDetail(projectId))}
+}
+async function init(){
+  try{const me=await api('/api/auth/me');const user=me.user||{};document.querySelector('#avatar').textContent=(user.display_name||'我').slice(0,1)}catch(error){return}
+  const path=decodeURIComponent(location.pathname);
+  if(path==='/projects/new')return newProject();
+  const match=path.match(/^\/projects\/([^/]+)$/);
+  if(match)return projectDetail(match[1]);
+  return listProjects();
+}
+document.querySelector('#logout').onclick=async()=>{try{await api('/api/auth/logout',{method:'POST'});location.href='/login'}catch(error){toast(error.message,'triangle-alert')}};
+CareerUI.initTheme();refresh();init();
+</script>
+</body>
+</html>

@@ -79,6 +79,7 @@ from .job_intelligence import JobIntelligenceService
 from .routers.privacy import build_privacy_router
 from .routers.commercial import build_commercial_router
 from .routers.templates import build_template_admin_router
+from .routers.projects import build_projects_router
 
 settings = Settings()
 _runtime_errors = settings.validate_runtime()
@@ -129,6 +130,7 @@ collaboration_store = repositories.collaboration
 auth_store = repositories.identity
 commercial_store = repositories.commercial
 template_registry = repositories.templates
+project_repository = repositories.projects
 billing_runtime = build_billing_provider(settings.billing_provider, webhook_secret=settings.billing_webhook_secret)
 email_runtime = build_email_provider(
     settings.email_provider,
@@ -440,7 +442,7 @@ def auth_login(req: LoginRequest, response: Response, request: Request):
     )
     auth_store.audit(tenant_id=principal.tenant_id, user_id=principal.user_id, action="login", success=True, ip_address=(request.client.host if request.client else ""))
     commercial_store.track(tenant_id=principal.tenant_id, user_id=principal.user_id, event_name="login")
-    return {"ok": True, "user": {**principal.__dict__, "canonical_role": canonical_role(principal.role)}, "redirect": {"participant": "/participant", "advisor": "/advisor", "organization_admin": "/admin", "platform_admin": "/admin"}.get(canonical_role(principal.role), "/")}
+    return {"ok": True, "user": {**principal.__dict__, "canonical_role": canonical_role(principal.role)}, "redirect": {"participant": "/projects", "advisor": "/advisor", "organization_admin": "/admin", "platform_admin": "/admin"}.get(canonical_role(principal.role), "/")}
 
 
 @app.post("/api/auth/logout")
@@ -736,12 +738,16 @@ def runtime_metrics_snapshot(principal: Principal = Depends(require_roles("schoo
     return {"metrics": runtime_metrics.snapshot(), "observability": observability_state}
 
 
-@app.post("/api/sessions", response_model=SessionState)
-def create_session(principal: Principal = Depends(current_principal)):
+def _create_session_for_principal(principal: Principal) -> SessionState:
     if principal.authenticated and canonical_role(principal.role) not in {"participant", "platform_admin"}:
         raise HTTPException(status_code=403, detail="student account required to create a student session")
     tenant_id = principal.tenant_id if principal.authenticated else settings.bootstrap_tenant_id
-    owner_user_id = principal.user_id if principal.authenticated and canonical_role(principal.role) == "participant" else ""
+    owner_user_id = (
+        principal.user_id
+        if (principal.authenticated and canonical_role(principal.role) == "participant")
+        or (not principal.authenticated and settings.demo_mode and principal.user_id == "demo-local")
+        else ""
+    )
     class_id = "default"
     if owner_user_id:
         class_ids = sorted(auth_store.user_class_ids(owner_user_id, tenant_id, role="student"))
@@ -757,6 +763,18 @@ def create_session(principal: Principal = Depends(current_principal)):
     workflow_store.ensure(state, preset_id=_workflow_preset_id(state.tenant_id))
     commercial_store.track(tenant_id=tenant_id, user_id=owner_user_id, session_id=state.session_id, event_name="session_created")
     return state
+
+
+@app.post("/api/sessions", response_model=SessionState)
+def create_session(principal: Principal = Depends(current_principal)):
+    return _create_session_for_principal(principal)
+
+
+def _cleanup_project_session(session_id: str, tenant_id: str) -> None:
+    try:
+        workflow_store.delete_session(session_id, tenant_id=tenant_id)
+    finally:
+        store.delete_session(session_id, tenant_id=tenant_id)
 
 
 def get_state(session_id: str) -> SessionState:
@@ -1635,6 +1653,16 @@ app.include_router(build_template_admin_router(
     admin_dependency=require_roles("school_admin"),
 ))
 
+# Project aggregate APIs compose existing Session/Workflow stores and keep all object access
+# constrained by the authenticated tenant and participant owner.
+app.include_router(build_projects_router(
+    current_principal=current_principal,
+    project_repository=project_repository,
+    create_project_session=_create_session_for_principal,
+    cleanup_project_session=_cleanup_project_session,
+    allow_anonymous_demo=settings.demo_mode and not settings.auth_required,
+))
+
 
 # ---------------- Privacy / data subject rights ----------------
 # Route factories keep domain HTTP wiring out of the application composition root.
@@ -2146,6 +2174,19 @@ def index():
 @app.get("/login")
 def login_page():
     return FileResponse(STATIC_DIR / "login.html")
+
+
+@app.get("/projects")
+@app.get("/projects/new")
+def projects_page(request: Request):
+    denied = _page_guard(request, {"student"})
+    return denied or FileResponse(STATIC_DIR / "projects.html")
+
+
+@app.get("/projects/{project_id}")
+def project_detail_page(project_id: str, request: Request):
+    denied = _page_guard(request, {"student"})
+    return denied or FileResponse(STATIC_DIR / "projects.html")
 
 
 @app.get("/participant")
