@@ -15,6 +15,7 @@ from ..storage import StorageRegistry
 from ..store import SessionStore
 from ..workflow_store import WorkflowStore
 from ..template_registry import TemplateRegistry
+from ..project_repository import ProjectRepository
 from ..embedding_gateway import EmbeddingGateway
 from ..core.database import DatabaseCapabilityReport, database_capabilities, create_database_engine, BASELINE_METADATA, schema_health
 from .parity import CORE_PARITY
@@ -43,6 +44,7 @@ class RepositoryContainer:
     commercial: CommercialStore
     storage_registry: StorageRegistry
     templates: TemplateRegistry
+    projects: ProjectRepository
     capabilities: DatabaseCapabilityReport
 
     @classmethod
@@ -79,6 +81,7 @@ class RepositoryContainer:
             commercial=CommercialStore(db_path),
             storage_registry=StorageRegistry(db_path),
             templates=template_registry,
+            projects=ProjectRepository(engine),
             capabilities=caps,
         )
 
@@ -131,6 +134,7 @@ class RepositoryContainer:
             commercial=PostgresCommercialRepository(engine),
             storage_registry=PostgresStorageRegistry(engine),
             templates=template_registry,
+            projects=ProjectRepository(engine),
             capabilities=caps,
         )
 
@@ -162,4 +166,5 @@ class RepositoryContainer:
             "models": PostgresModelConfigRepository(engine, app_secret_key),
             "commercial": PostgresCommercialRepository(engine),
             "storage_registry": PostgresStorageRegistry(engine),
+            "projects": ProjectRepository(engine),
         }

@@ -28,6 +28,7 @@ def build(tmp_path: Path):
 def test_core_parity_report_is_explicit():
     assert set(CORE_PARITY.complete) >= {"sessions", "identity", "artifacts", "evidence", "workflows", "collaboration"}
     assert "knowledge" in CORE_PARITY.complete
+    assert "projects" in CORE_PARITY.complete
     assert CORE_PARITY.code_parity_complete is True
 
 

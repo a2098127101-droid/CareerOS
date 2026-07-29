@@ -8,6 +8,7 @@ from .core import (
     JobRepository,
     KnowledgeRepository,
     ModelUsageRepository,
+    ProjectRepositoryProtocol,
     SessionRepository,
     TaskRepository,
     WorkflowRepository,
@@ -16,5 +17,5 @@ from .core import (
 __all__ = [
     "AnalyticsRepository", "ArtifactRepository", "CommercialRepository", "EvidenceRepository",
     "FeedbackRepository", "IdentityRepository", "JobRepository", "KnowledgeRepository",
-    "ModelUsageRepository", "SessionRepository", "TaskRepository", "WorkflowRepository",
+    "ModelUsageRepository", "ProjectRepositoryProtocol", "SessionRepository", "TaskRepository", "WorkflowRepository",
 ]

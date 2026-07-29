@@ -772,6 +772,176 @@ def _migration_16_tenant_template_registry_and_evidence_risk(conn: sqlite3.Conne
     )
 
 
+def _migration_17_project_mvp_foundation(conn: sqlite3.Connection) -> None:
+    """Add the project aggregate without changing legacy session/artifact/evidence tables."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS project_templates (
+            template_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL DEFAULT 'career_planning',
+            status TEXT NOT NULL DEFAULT 'draft',
+            current_version_id TEXT,
+            created_by TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+            UNIQUE(template_id, tenant_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_project_templates_tenant_status
+            ON project_templates(tenant_id, status, updated_at);
+
+        CREATE TABLE IF NOT EXISTS project_template_versions (
+            template_version_id TEXT PRIMARY KEY,
+            template_id TEXT NOT NULL,
+            tenant_id TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            background TEXT NOT NULL DEFAULT '',
+            objective TEXT NOT NULL DEFAULT '',
+            applicable_users TEXT NOT NULL DEFAULT '',
+            estimated_time_minutes INTEGER NOT NULL DEFAULT 60,
+            output_type TEXT NOT NULL DEFAULT 'career_report',
+            questions_json TEXT NOT NULL DEFAULT '[]',
+            material_requirements_json TEXT NOT NULL DEFAULT '[]',
+            artifact_structure_json TEXT NOT NULL DEFAULT '[]',
+            rubric_json TEXT NOT NULL DEFAULT '{}',
+            workflow_template_id TEXT NOT NULL,
+            artifact_template_id TEXT NOT NULL DEFAULT 'career_report_v1',
+            status TEXT NOT NULL DEFAULT 'published',
+            published_at TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(template_id)
+                REFERENCES project_templates(template_id) ON DELETE RESTRICT,
+            UNIQUE(template_id, version),
+            UNIQUE(template_version_id, tenant_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_project_template_versions_tenant_template
+            ON project_template_versions(tenant_id, template_id, version);
+
+        CREATE TABLE IF NOT EXISTS project_instances (
+            project_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            owner_user_id TEXT NOT NULL,
+            template_id TEXT NOT NULL,
+            template_version_id TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'draft',
+            current_step TEXT NOT NULL DEFAULT 'overview',
+            current_artifact_id TEXT,
+            current_artifact_version_id TEXT,
+            latest_score_run_id TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            completed_at TEXT,
+            FOREIGN KEY(template_id)
+                REFERENCES project_templates(template_id) ON DELETE RESTRICT,
+            FOREIGN KEY(template_version_id)
+                REFERENCES project_template_versions(template_version_id) ON DELETE RESTRICT,
+            FOREIGN KEY(session_id) REFERENCES sessions(session_id) ON DELETE RESTRICT,
+            UNIQUE(project_id, tenant_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_project_instances_tenant_owner_status
+            ON project_instances(tenant_id, owner_user_id, status, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_project_instances_tenant_template
+            ON project_instances(tenant_id, template_version_id);
+
+        CREATE TABLE IF NOT EXISTS project_answers (
+            project_id TEXT NOT NULL,
+            tenant_id TEXT NOT NULL,
+            owner_user_id TEXT NOT NULL,
+            question_id TEXT NOT NULL,
+            answer_json TEXT NOT NULL DEFAULT 'null',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY(project_id, question_id),
+            FOREIGN KEY(project_id)
+                REFERENCES project_instances(project_id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_project_answers_tenant_owner_project
+            ON project_answers(tenant_id, owner_user_id, project_id);
+
+        CREATE TRIGGER IF NOT EXISTS trg_project_template_versions_immutable_update
+        BEFORE UPDATE ON project_template_versions
+        BEGIN
+            SELECT RAISE(ABORT, 'project template versions are immutable');
+        END;
+        CREATE TRIGGER IF NOT EXISTS trg_project_template_versions_immutable_delete
+        BEFORE DELETE ON project_template_versions
+        BEGIN
+            SELECT RAISE(ABORT, 'project template versions are immutable');
+        END;
+        CREATE TRIGGER IF NOT EXISTS trg_project_template_versions_tenant_guard
+        BEFORE INSERT ON project_template_versions
+        WHEN NOT EXISTS (
+            SELECT 1 FROM project_templates
+            WHERE template_id=NEW.template_id AND tenant_id=NEW.tenant_id
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'project template version tenant mismatch');
+        END;
+        CREATE TRIGGER IF NOT EXISTS trg_project_instances_tenant_guard
+        BEFORE INSERT ON project_instances
+        WHEN NOT EXISTS (
+            SELECT 1 FROM project_templates
+            WHERE template_id=NEW.template_id AND tenant_id=NEW.tenant_id
+        ) OR NOT EXISTS (
+            SELECT 1 FROM project_template_versions
+            WHERE template_version_id=NEW.template_version_id
+              AND template_id=NEW.template_id AND tenant_id=NEW.tenant_id
+        ) OR NOT EXISTS (
+            SELECT 1 FROM sessions
+            WHERE session_id=NEW.session_id AND tenant_id=NEW.tenant_id
+              AND student_user_id=NEW.owner_user_id
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'project instance tenant, owner or session mismatch');
+        END;
+        CREATE TRIGGER IF NOT EXISTS trg_project_instances_tenant_guard_update
+        BEFORE UPDATE ON project_instances
+        WHEN NOT EXISTS (
+            SELECT 1 FROM project_templates
+            WHERE template_id=NEW.template_id AND tenant_id=NEW.tenant_id
+        ) OR NOT EXISTS (
+            SELECT 1 FROM project_template_versions
+            WHERE template_version_id=NEW.template_version_id
+              AND template_id=NEW.template_id AND tenant_id=NEW.tenant_id
+        ) OR NOT EXISTS (
+            SELECT 1 FROM sessions
+            WHERE session_id=NEW.session_id AND tenant_id=NEW.tenant_id
+              AND student_user_id=NEW.owner_user_id
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'project instance tenant, owner or session mismatch');
+        END;
+        CREATE TRIGGER IF NOT EXISTS trg_project_answers_owner_guard
+        BEFORE INSERT ON project_answers
+        WHEN NOT EXISTS (
+            SELECT 1 FROM project_instances
+            WHERE project_id=NEW.project_id AND tenant_id=NEW.tenant_id
+              AND owner_user_id=NEW.owner_user_id
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'project answer tenant or owner mismatch');
+        END;
+        CREATE TRIGGER IF NOT EXISTS trg_project_answers_owner_guard_update
+        BEFORE UPDATE ON project_answers
+        WHEN NOT EXISTS (
+            SELECT 1 FROM project_instances
+            WHERE project_id=NEW.project_id AND tenant_id=NEW.tenant_id
+              AND owner_user_id=NEW.owner_user_id
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'project answer tenant or owner mismatch');
+        END;
+        """
+    )
+
+
 MIGRATIONS: list[Migration] = [
     (1, "identity_and_tenant_foundation", _migration_1_identity_and_tenant),
     (2, "artifact_series_v2", _migration_2_artifact_series),
@@ -789,6 +959,7 @@ MIGRATIONS: list[Migration] = [
     (14, "billing_sandbox_foundation", _migration_14_billing_sandbox_foundation),
     (15, "template_engine_foundation", _migration_15_template_engine_foundation),
     (16, "tenant_template_registry_and_evidence_risk", _migration_16_tenant_template_registry_and_evidence_risk),
+    (17, "project_mvp_foundation", _migration_17_project_mvp_foundation),
 ]
 
 

@@ -39,6 +39,7 @@ CORE_PARITY = RepositoryParityReport(
         "models",
         "commercial",
         "storage_registry",
+        "projects",
     ),
     pending=(),
     live_postgres_verified=False,
