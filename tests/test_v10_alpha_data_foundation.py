@@ -120,7 +120,7 @@ def test_alembic_baseline_upgrade_on_fresh_sqlite(tmp_path: Path):
     with sqlite3.connect(target) as conn:
         version = conn.execute("SELECT version_num FROM alembic_version").fetchone()[0]
         count = conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='sessions'").fetchone()[0]
-    assert version == "0008_project_mvp_foundation"
+    assert version == "0012_project_tenant_rls"
     assert count == 1
 
 
@@ -138,4 +138,3 @@ def test_sqlalchemy_session_repository_parity_on_baseline_schema(tmp_path: Path)
     repo.save(loaded)
     rows = repo.list(tenant_id="org-a", class_id="group-a")
     assert rows and rows[0][0].stage == "draft"
-

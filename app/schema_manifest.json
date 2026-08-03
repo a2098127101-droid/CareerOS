@@ -1,5 +1,5 @@
 {
-  "version": "1.0-beta1",
+  "version": "1.5-production-final",
   "tables": {
     "ai_tasks": {
       "columns": [
@@ -86,6 +86,20 @@
           "notnull": false,
           "default": "CURRENT_TIMESTAMP",
           "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "completed_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
         }
       ],
       "foreign_keys": [],
@@ -95,6 +109,16 @@
           "unique": false,
           "columns": [
             "tenant_id",
+            "status",
+            "updated_at"
+          ]
+        },
+        {
+          "name": "idx_tasks_owner_active",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "owner_user_id",
             "status",
             "updated_at"
           ]
@@ -235,6 +259,20 @@
           "notnull": false,
           "default": "CURRENT_TIMESTAMP",
           "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "deleted_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
         }
       ],
       "foreign_keys": [],
@@ -247,13 +285,19 @@
             "session_id",
             "updated_at"
           ]
+        },
+        {
+          "name": "idx_artifact_owner_active",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "owner_user_id",
+            "deleted_at",
+            "updated_at"
+          ]
         }
       ],
       "unique_constraints": [
-        [
-          "session_id",
-          "kind"
-        ],
         [
           "artifact_id"
         ]
@@ -350,6 +394,15 @@
       ],
       "indexes": [
         {
+          "name": "idx_artifact_versions_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "artifact_id",
+            "version"
+          ]
+        },
+        {
           "name": "idx_artifact_versions_series",
           "unique": false,
           "columns": [
@@ -436,21 +489,30 @@
       ],
       "foreign_keys": [
         {
-          "from": "user_id",
-          "table": "users",
-          "to": "user_id",
-          "on_update": "NO ACTION",
-          "on_delete": "NO ACTION"
-        },
-        {
           "from": "tenant_id",
           "table": "tenants",
           "to": "tenant_id",
           "on_update": "NO ACTION",
           "on_delete": "NO ACTION"
+        },
+        {
+          "from": "user_id",
+          "table": "users",
+          "to": "user_id",
+          "on_update": "NO ACTION",
+          "on_delete": "NO ACTION"
         }
       ],
       "indexes": [
+        {
+          "name": "idx_auth_sessions_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "user_id",
+            "expires_at"
+          ]
+        },
         {
           "name": "idx_auth_sessions_token",
           "unique": false,
@@ -515,9 +577,9 @@
       ],
       "foreign_keys": [
         {
-          "from": "class_id",
-          "table": "classes",
-          "to": "class_id",
+          "from": "user_id",
+          "table": "users",
+          "to": "user_id",
           "on_update": "NO ACTION",
           "on_delete": "NO ACTION"
         },
@@ -529,9 +591,9 @@
           "on_delete": "NO ACTION"
         },
         {
-          "from": "user_id",
-          "table": "users",
-          "to": "user_id",
+          "from": "class_id",
+          "table": "classes",
+          "to": "class_id",
           "on_update": "NO ACTION",
           "on_delete": "NO ACTION"
         }
@@ -918,16 +980,106 @@
           "notnull": false,
           "default": "CURRENT_TIMESTAMP",
           "pk": 0
+        },
+        {
+          "name": "metadata_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "deleted_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "verification_status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'SELF_REPORTED'",
+          "pk": 0
+        },
+        {
+          "name": "verification_method",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "verification_confidence",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "verified_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "verified_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "source_hash",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
         }
       ],
       "foreign_keys": [],
       "indexes": [
+        {
+          "name": "idx_evidence_owner_active",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "owner_user_id",
+            "deleted_at",
+            "updated_at"
+          ]
+        },
         {
           "name": "idx_evidence_session",
           "unique": false,
           "columns": [
             "session_id",
             "created_at"
+          ]
+        },
+        {
+          "name": "idx_evidence_verification",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "owner_user_id",
+            "verification_status",
+            "updated_at"
           ]
         },
         {
@@ -1350,6 +1502,15 @@
       "foreign_keys": [],
       "indexes": [
         {
+          "name": "idx_knowledge_sources_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "active",
+            "updated_at"
+          ]
+        },
+        {
           "name": "idx_knowledge_tenant",
           "unique": false,
           "columns": [
@@ -1363,15 +1524,6 @@
           "columns": [
             "scope",
             "active"
-          ]
-        },
-        {
-          "name": "idx_knowledge_sources_tenant",
-          "unique": false,
-          "columns": [
-            "tenant_id",
-            "active",
-            "updated_at"
           ]
         }
       ],
@@ -1999,19 +2151,19 @@
       "foreign_keys": [],
       "indexes": [
         {
-          "name": "idx_sessions_tenant_updated",
-          "unique": false,
-          "columns": [
-            "tenant_id",
-            "updated_at"
-          ]
-        },
-        {
           "name": "idx_sessions_class",
           "unique": false,
           "columns": [
             "tenant_id",
             "class_id",
+            "updated_at"
+          ]
+        },
+        {
+          "name": "idx_sessions_tenant_updated",
+          "unique": false,
+          "columns": [
+            "tenant_id",
             "updated_at"
           ]
         },
@@ -2134,20 +2286,20 @@
       "foreign_keys": [],
       "indexes": [
         {
-          "name": "idx_stored_objects_status",
-          "unique": false,
-          "columns": [
-            "tenant_id",
-            "status",
-            "created_at"
-          ]
-        },
-        {
           "name": "idx_stored_objects_tenant_owner",
           "unique": false,
           "columns": [
             "tenant_id",
             "owner_user_id",
+            "created_at"
+          ]
+        },
+        {
+          "name": "idx_stored_objects_status",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "status",
             "created_at"
           ]
         }
@@ -2234,18 +2386,18 @@
       "foreign_keys": [],
       "indexes": [
         {
-          "name": "idx_feedback_tenant_session",
+          "name": "idx_feedback_session",
           "unique": false,
           "columns": [
-            "tenant_id",
             "session_id",
             "created_at"
           ]
         },
         {
-          "name": "idx_feedback_session",
+          "name": "idx_feedback_tenant_session",
           "unique": false,
           "columns": [
+            "tenant_id",
             "session_id",
             "created_at"
           ]
@@ -2304,16 +2456,16 @@
       ],
       "foreign_keys": [
         {
-          "from": "tenant_id",
-          "table": "tenants",
-          "to": "tenant_id",
+          "from": "user_id",
+          "table": "users",
+          "to": "user_id",
           "on_update": "NO ACTION",
           "on_delete": "NO ACTION"
         },
         {
-          "from": "user_id",
-          "table": "users",
-          "to": "user_id",
+          "from": "tenant_id",
+          "table": "tenants",
+          "to": "tenant_id",
           "on_update": "NO ACTION",
           "on_delete": "NO ACTION"
         }
@@ -2598,7 +2750,7 @@
           "name": "template_id",
           "type": "TEXT",
           "notnull": true,
-          "default": null,
+          "default": "'career_development_v1'",
           "pk": 0
         }
       ],
@@ -3375,19 +3527,19 @@
       "foreign_keys": [],
       "indexes": [
         {
-          "name": "idx_user_invitations_email",
-          "unique": false,
-          "columns": [
-            "email",
-            "tenant_id"
-          ]
-        },
-        {
           "name": "idx_user_invitations_tenant",
           "unique": false,
           "columns": [
             "tenant_id",
             "created_at"
+          ]
+        },
+        {
+          "name": "idx_user_invitations_email",
+          "unique": false,
+          "columns": [
+            "email",
+            "tenant_id"
           ]
         }
       ],
@@ -3476,18 +3628,18 @@
       "foreign_keys": [],
       "indexes": [
         {
-          "name": "idx_billing_events_provider",
-          "unique": false,
-          "columns": [
-            "provider",
-            "received_at"
-          ]
-        },
-        {
           "name": "idx_billing_events_tenant",
           "unique": false,
           "columns": [
             "tenant_id",
+            "received_at"
+          ]
+        },
+        {
+          "name": "idx_billing_events_provider",
+          "unique": false,
+          "columns": [
+            "provider",
             "received_at"
           ]
         }
@@ -3784,6 +3936,20 @@
           "notnull": false,
           "default": "CURRENT_TIMESTAMP",
           "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
         }
       ],
       "foreign_keys": [],
@@ -4013,6 +4179,1790 @@
       "unique_constraints": [
         [
           "template_id"
+        ]
+      ]
+    },
+    "unified_runtime_entities": {
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "owner_user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 2
+        },
+        {
+          "name": "entity_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 3
+        },
+        {
+          "name": "entity_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 4
+        },
+        {
+          "name": "payload_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "revision",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "updated_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "deleted_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_unified_runtime_tenant_type_revision",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "entity_type",
+            "revision"
+          ]
+        },
+        {
+          "name": "idx_unified_runtime_owner",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "owner_user_id",
+            "entity_type",
+            "revision"
+          ]
+        },
+        {
+          "name": "idx_unified_runtime_tenant_type_updated",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "entity_type",
+            "updated_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "tenant_id",
+          "owner_user_id",
+          "entity_type",
+          "entity_id"
+        ]
+      ]
+    },
+    "unified_runtime_revisions": {
+      "columns": [
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "revision",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "unique_constraints": [
+        [
+          "tenant_id"
+        ]
+      ]
+    },
+    "capabilities": {
+      "columns": [
+        {
+          "name": "capability_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "taxonomy_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "capability_key",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "category",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'general'",
+          "pk": 0
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "aliases_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'[]'",
+          "pk": 0
+        },
+        {
+          "name": "level_scale_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'active'",
+          "pk": 0
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_capabilities_tenant_category",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "category",
+            "status",
+            "name"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "tenant_id",
+          "taxonomy_id",
+          "capability_key"
+        ],
+        [
+          "capability_id"
+        ]
+      ]
+    },
+    "capability_assessment_evidence": {
+      "columns": [
+        {
+          "name": "link_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "assessment_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "capability_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "claim_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "evidence_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "contribution_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "potential_weight",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "verified_weight",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "explanation",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_assessment_evidence_assessment",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "assessment_id"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "link_id"
+        ]
+      ]
+    },
+    "capability_assessments": {
+      "columns": [
+        {
+          "name": "assessment_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "owner_user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "capability_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "assessment_version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "potential_score",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "verified_score",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "confidence",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "methodology_version",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "explanation_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_capability_assessments_latest",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "session_id",
+            "capability_id",
+            "assessment_version"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "tenant_id",
+          "session_id",
+          "capability_id",
+          "assessment_version"
+        ],
+        [
+          "assessment_id"
+        ]
+      ]
+    },
+    "capability_taxonomies": {
+      "columns": [
+        {
+          "name": "taxonomy_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "name",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'active'",
+          "pk": 0
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [],
+      "unique_constraints": [
+        [
+          "tenant_id",
+          "name"
+        ],
+        [
+          "taxonomy_id"
+        ]
+      ]
+    },
+    "capability_versions": {
+      "columns": [
+        {
+          "name": "capability_version_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "capability_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "snapshot_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "changed_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "change_reason",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_capability_versions_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "capability_id",
+            "version"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "capability_id",
+          "version"
+        ],
+        [
+          "capability_version_id"
+        ]
+      ]
+    },
+    "career_gap_versions": {
+      "columns": [
+        {
+          "name": "gap_version_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "gap_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "snapshot_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "changed_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "change_reason",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_career_gap_versions_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "gap_id",
+            "version"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "gap_id",
+          "version"
+        ],
+        [
+          "gap_version_id"
+        ]
+      ]
+    },
+    "career_gaps": {
+      "columns": [
+        {
+          "name": "gap_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "owner_user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "job_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "requirement_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "capability_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "gap_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "severity",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'open'",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "potential_score",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "verified_score",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "required_score",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "60",
+          "pk": 0
+        },
+        {
+          "name": "explanation_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "deleted_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_career_gaps_session_job",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "session_id",
+            "job_id",
+            "status",
+            "severity"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "tenant_id",
+          "session_id",
+          "job_id",
+          "requirement_id",
+          "capability_id"
+        ],
+        [
+          "gap_id"
+        ]
+      ]
+    },
+    "claim_capability_links": {
+      "columns": [
+        {
+          "name": "link_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "claim_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "capability_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "relation",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'indicates'",
+          "pk": 0
+        },
+        {
+          "name": "confidence",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "explanation",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_claim_capability_capability",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "capability_id",
+            "confidence"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "tenant_id",
+          "claim_id",
+          "capability_id",
+          "relation"
+        ],
+        [
+          "link_id"
+        ]
+      ]
+    },
+    "claim_evidence_links": {
+      "columns": [
+        {
+          "name": "link_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "claim_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "evidence_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "relation",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'candidate_support'",
+          "pk": 0
+        },
+        {
+          "name": "confidence",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "verification_status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'UNVERIFIED'",
+          "pk": 0
+        },
+        {
+          "name": "explanation",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "verifier_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'deterministic'",
+          "pk": 0
+        },
+        {
+          "name": "verified_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_claim_evidence_evidence",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "evidence_id",
+            "relation"
+          ]
+        },
+        {
+          "name": "idx_claim_evidence_claim",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "claim_id",
+            "relation",
+            "confidence"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "tenant_id",
+          "claim_id",
+          "evidence_id",
+          "relation"
+        ],
+        [
+          "link_id"
+        ]
+      ]
+    },
+    "domain_audit_events": {
+      "columns": [
+        {
+          "name": "event_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "actor_user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "subject_user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "entity_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "entity_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "action",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "before_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "after_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'{}'",
+          "pk": 0
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "correlation_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_domain_audit_session",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "session_id",
+            "created_at"
+          ]
+        },
+        {
+          "name": "idx_domain_audit_entity",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "entity_type",
+            "entity_id",
+            "created_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "event_id"
+        ]
+      ]
+    },
+    "domain_claim_versions": {
+      "columns": [
+        {
+          "name": "claim_version_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "claim_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "snapshot_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "changed_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "change_reason",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_domain_claim_versions_tenant",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "claim_id",
+            "version"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "claim_id",
+          "version"
+        ],
+        [
+          "claim_version_id"
+        ]
+      ]
+    },
+    "domain_claims": {
+      "columns": [
+        {
+          "name": "claim_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "owner_user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "source_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "source_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "source_locator",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "claim_text",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "normalized_text",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "claim_type",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'experience'",
+          "pk": 0
+        },
+        {
+          "name": "status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'active'",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "supersedes_claim_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "deleted_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": null,
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_domain_claims_session",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "session_id",
+            "owner_user_id",
+            "status",
+            "updated_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "tenant_id",
+          "session_id",
+          "source_type",
+          "source_id",
+          "source_locator"
+        ],
+        [
+          "claim_id"
+        ]
+      ]
+    },
+    "evidence_item_verification_history": {
+      "columns": [
+        {
+          "name": "history_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "session_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "evidence_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "previous_status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "new_status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "decision",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "confidence",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "0",
+          "pk": 0
+        },
+        {
+          "name": "method",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "actor_user_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_evidence_item_verification_history",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "evidence_id",
+            "created_at"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "history_id"
+        ]
+      ]
+    },
+    "job_requirement_capability_links": {
+      "columns": [
+        {
+          "name": "link_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "job_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "requirement_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "capability_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "weight",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "minimum_score",
+          "type": "FLOAT",
+          "notnull": true,
+          "default": "60",
+          "pk": 0
+        },
+        {
+          "name": "mapping_status",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "'derived'",
+          "pk": 0
+        },
+        {
+          "name": "explanation",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": "1",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_requirement_capability_job",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "job_id",
+            "requirement_id"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "tenant_id",
+          "requirement_id",
+          "capability_id"
+        ],
+        [
+          "link_id"
+        ]
+      ]
+    },
+    "job_requirement_versions": {
+      "columns": [
+        {
+          "name": "requirement_version_id",
+          "type": "TEXT",
+          "notnull": false,
+          "default": null,
+          "pk": 1
+        },
+        {
+          "name": "tenant_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "job_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "requirement_id",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "version",
+          "type": "INTEGER",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "snapshot_json",
+          "type": "TEXT",
+          "notnull": true,
+          "default": null,
+          "pk": 0
+        },
+        {
+          "name": "changed_by",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "change_reason",
+          "type": "TEXT",
+          "notnull": true,
+          "default": "''",
+          "pk": 0
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME",
+          "notnull": false,
+          "default": "CURRENT_TIMESTAMP",
+          "pk": 0
+        }
+      ],
+      "foreign_keys": [],
+      "indexes": [
+        {
+          "name": "idx_job_requirement_versions",
+          "unique": false,
+          "columns": [
+            "tenant_id",
+            "job_id",
+            "requirement_id",
+            "version"
+          ]
+        }
+      ],
+      "unique_constraints": [
+        [
+          "requirement_id",
+          "version"
+        ],
+        [
+          "requirement_version_id"
         ]
       ]
     },

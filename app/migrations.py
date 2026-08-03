@@ -772,7 +772,475 @@ def _migration_16_tenant_template_registry_and_evidence_risk(conn: sqlite3.Conne
     )
 
 
-def _migration_17_project_mvp_foundation(conn: sqlite3.Connection) -> None:
+def _migration_17_unified_runtime_entities(conn: sqlite3.Connection) -> None:
+    """Unified H5 runtime persistence for API-authoritative workspace entities."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS unified_runtime_entities (
+            tenant_id TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            owner_user_id TEXT NOT NULL DEFAULT '',
+            payload_json TEXT NOT NULL DEFAULT '{}',
+            deleted_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY(tenant_id, entity_type, entity_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_unified_runtime_tenant_type_updated
+            ON unified_runtime_entities(tenant_id, entity_type, updated_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_unified_runtime_owner
+            ON unified_runtime_entities(tenant_id, owner_user_id, entity_type);
+        """
+    )
+
+
+def _migration_18_unified_runtime_consistency(conn: sqlite3.Connection) -> None:
+    """v1.4 runtime isolation, optimistic concurrency, and delta-sync metadata.
+
+    Rebuild the v1.3 compatibility table so private entity IDs are unique per owner rather than
+    tenant-wide. Existing rows are preserved. A tenant revision clock allows lossless delta sync
+    without full-collection replacement.
+    """
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(unified_runtime_entities)").fetchall()}
+    pk_cols = [row[1] for row in sorted(conn.execute("PRAGMA table_info(unified_runtime_entities)").fetchall(), key=lambda r: r[5]) if row[5]]
+    needs_rebuild = (
+        "version" not in cols or "revision" not in cols or "updated_by" not in cols
+        or pk_cols != ["tenant_id", "owner_user_id", "entity_type", "entity_id"]
+    )
+    if needs_rebuild:
+        conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS unified_runtime_entities_v14 (
+                tenant_id TEXT NOT NULL,
+                owner_user_id TEXT NOT NULL DEFAULT '',
+                entity_type TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                payload_json TEXT NOT NULL DEFAULT '{}',
+                version INTEGER NOT NULL DEFAULT 1,
+                revision INTEGER NOT NULL DEFAULT 0,
+                updated_by TEXT NOT NULL DEFAULT '',
+                deleted_at DATETIME,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY(tenant_id, owner_user_id, entity_type, entity_id)
+            );
+            """
+        )
+        legacy_cols = cols
+        version_expr = "COALESCE(version,1)" if "version" in legacy_cols else "1"
+        revision_expr = "COALESCE(revision,0)" if "revision" in legacy_cols else "0"
+        updated_by_expr = "COALESCE(updated_by,'')" if "updated_by" in legacy_cols else "''"
+        conn.execute(
+            f"""INSERT OR REPLACE INTO unified_runtime_entities_v14
+            (tenant_id,owner_user_id,entity_type,entity_id,payload_json,version,revision,updated_by,deleted_at,created_at,updated_at)
+            SELECT tenant_id,COALESCE(owner_user_id,''),entity_type,entity_id,payload_json,
+                   {version_expr},{revision_expr},{updated_by_expr},deleted_at,created_at,updated_at
+            FROM unified_runtime_entities"""
+        )
+        conn.executescript(
+            """
+            DROP TABLE unified_runtime_entities;
+            ALTER TABLE unified_runtime_entities_v14 RENAME TO unified_runtime_entities;
+            """
+        )
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS unified_runtime_revisions (
+            tenant_id TEXT PRIMARY KEY,
+            revision INTEGER NOT NULL DEFAULT 0,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_unified_runtime_tenant_type_revision
+            ON unified_runtime_entities(tenant_id, entity_type, revision);
+        CREATE INDEX IF NOT EXISTS idx_unified_runtime_owner
+            ON unified_runtime_entities(tenant_id, owner_user_id, entity_type, revision);
+        """
+    )
+    tenants = conn.execute("SELECT DISTINCT tenant_id FROM unified_runtime_entities").fetchall()
+    for row in tenants:
+        tenant = row[0]
+        current = conn.execute(
+            "SELECT COALESCE(MAX(revision),0) FROM unified_runtime_entities WHERE tenant_id=?", (tenant,)
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT OR IGNORE INTO unified_runtime_revisions(tenant_id,revision) VALUES(?,?)",
+            (tenant, int(current or 0)),
+        )
+
+    # Canonical-domain lifecycle metadata required by the v1.4 workspace API.
+    _add_column(conn, "evidence_items", "metadata_json TEXT NOT NULL DEFAULT '{}'")
+    _add_column(conn, "evidence_items", "version INTEGER NOT NULL DEFAULT 1")
+    _add_column(conn, "evidence_items", "updated_at DATETIME")
+    _add_column(conn, "evidence_items", "deleted_at DATETIME")
+    _add_column(conn, "artifact_series", "version INTEGER NOT NULL DEFAULT 1")
+    _add_column(conn, "artifact_series", "deleted_at DATETIME")
+    _add_column(conn, "ai_tasks", "version INTEGER NOT NULL DEFAULT 1")
+    _add_column(conn, "ai_tasks", "completed_at DATETIME")
+    if _table_exists(conn, "evidence_items"):
+        conn.execute("UPDATE evidence_items SET updated_at=COALESCE(updated_at,created_at,CURRENT_TIMESTAMP)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_evidence_owner_active ON evidence_items(tenant_id,owner_user_id,deleted_at,updated_at DESC)")
+    if _table_exists(conn, "artifact_series"):
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_artifact_owner_active ON artifact_series(tenant_id,owner_user_id,deleted_at,updated_at DESC)")
+    if _table_exists(conn, "ai_tasks"):
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_owner_active ON ai_tasks(tenant_id,owner_user_id,status,updated_at DESC)")
+
+
+
+def _migration_19_artifact_workspace_multi_series(conn: sqlite3.Connection) -> None:
+    """Allow multiple workspace artifacts of the same kind in one session.
+
+    v1.0-v1.3 enforced UNIQUE(session_id, kind), which was correct for legacy writer-agent
+    streams but wrong for a workspace where a user may maintain multiple resumes/reports.
+    Rebuild only when the legacy unique constraint is still present.
+    """
+    row = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='artifact_series'").fetchone()
+    ddl = (row[0] if row else "") or ""
+    compact = ddl.replace(" ", "").replace("\n", "").lower()
+    if "unique(session_id,kind)" not in compact:
+        return
+    conn.executescript("""
+        CREATE TABLE artifact_series_v14 (
+            artifact_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            owner_user_id TEXT NOT NULL DEFAULT '',
+            kind TEXT NOT NULL,
+            title TEXT NOT NULL,
+            current_version_id TEXT,
+            version INTEGER NOT NULL DEFAULT 1,
+            deleted_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO artifact_series_v14
+        (artifact_id,tenant_id,session_id,owner_user_id,kind,title,current_version_id,version,deleted_at,created_at,updated_at)
+        SELECT artifact_id,tenant_id,session_id,COALESCE(owner_user_id,''),kind,title,current_version_id,
+               COALESCE(version,1),deleted_at,created_at,updated_at
+        FROM artifact_series;
+        DROP TABLE artifact_series;
+        ALTER TABLE artifact_series_v14 RENAME TO artifact_series;
+        CREATE INDEX IF NOT EXISTS idx_artifact_series_session ON artifact_series(tenant_id,session_id,updated_at);
+        CREATE INDEX IF NOT EXISTS idx_artifact_owner_active ON artifact_series(tenant_id,owner_user_id,deleted_at,updated_at DESC);
+    """)
+
+
+
+def _migration_20_security_trust_and_domain_intelligence(conn: sqlite3.Connection) -> None:
+    """CareerOS v1.5 first-class Claim → Capability → Requirement → Gap domain.
+
+    Also upgrades Evidence from a client-controlled boolean to a server-owned trust lifecycle.
+    """
+    # Evidence trust lifecycle.
+    _add_column(conn, "evidence_items", "verification_status TEXT NOT NULL DEFAULT 'SELF_REPORTED'")
+    _add_column(conn, "evidence_items", "verification_method TEXT NOT NULL DEFAULT ''")
+    _add_column(conn, "evidence_items", "verification_confidence REAL NOT NULL DEFAULT 0")
+    _add_column(conn, "evidence_items", "verified_by TEXT NOT NULL DEFAULT ''")
+    _add_column(conn, "evidence_items", "verified_at DATETIME")
+    _add_column(conn, "evidence_items", "source_hash TEXT NOT NULL DEFAULT ''")
+    if _table_exists(conn, "evidence_items"):
+        conn.execute("""UPDATE evidence_items
+            SET verification_status=CASE WHEN COALESCE(verified,0)=1 THEN 'VERIFIED' ELSE 'SELF_REPORTED' END
+            WHERE verification_status IS NULL OR verification_status='' OR verification_status='SELF_REPORTED'""")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_evidence_verification ON evidence_items(tenant_id,owner_user_id,verification_status,updated_at DESC)")
+
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS evidence_item_verification_history (
+            history_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            evidence_id TEXT NOT NULL,
+            previous_status TEXT NOT NULL,
+            new_status TEXT NOT NULL,
+            decision TEXT NOT NULL DEFAULT '',
+            confidence REAL NOT NULL DEFAULT 0,
+            method TEXT NOT NULL DEFAULT '',
+            reason TEXT NOT NULL DEFAULT '',
+            actor_user_id TEXT NOT NULL DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_evidence_item_verification_history
+          ON evidence_item_verification_history(tenant_id,evidence_id,created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS capability_taxonomies (
+            taxonomy_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            version INTEGER NOT NULL DEFAULT 1,
+            status TEXT NOT NULL DEFAULT 'active',
+            created_by TEXT NOT NULL DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(tenant_id,name)
+        );
+
+        CREATE TABLE IF NOT EXISTS capabilities (
+            capability_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            taxonomy_id TEXT NOT NULL,
+            capability_key TEXT NOT NULL,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL DEFAULT 'general',
+            description TEXT NOT NULL DEFAULT '',
+            aliases_json TEXT NOT NULL DEFAULT '[]',
+            level_scale_json TEXT NOT NULL DEFAULT '{}',
+            version INTEGER NOT NULL DEFAULT 1,
+            status TEXT NOT NULL DEFAULT 'active',
+            created_by TEXT NOT NULL DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(tenant_id,taxonomy_id,capability_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_capabilities_tenant_category ON capabilities(tenant_id,category,status,name);
+
+        CREATE TABLE IF NOT EXISTS capability_versions (
+            capability_version_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            capability_id TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            snapshot_json TEXT NOT NULL,
+            changed_by TEXT NOT NULL DEFAULT '',
+            change_reason TEXT NOT NULL DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(capability_id,version)
+        );
+
+        CREATE TABLE IF NOT EXISTS domain_claims (
+            claim_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            owner_user_id TEXT NOT NULL,
+            source_type TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            source_locator TEXT NOT NULL DEFAULT '',
+            claim_text TEXT NOT NULL,
+            normalized_text TEXT NOT NULL DEFAULT '',
+            claim_type TEXT NOT NULL DEFAULT 'experience',
+            status TEXT NOT NULL DEFAULT 'active',
+            version INTEGER NOT NULL DEFAULT 1,
+            supersedes_claim_id TEXT NOT NULL DEFAULT '',
+            created_by TEXT NOT NULL DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            deleted_at DATETIME,
+            UNIQUE(tenant_id,session_id,source_type,source_id,source_locator)
+        );
+        CREATE INDEX IF NOT EXISTS idx_domain_claims_session ON domain_claims(tenant_id,session_id,owner_user_id,status,updated_at DESC);
+
+        CREATE TABLE IF NOT EXISTS domain_claim_versions (
+            claim_version_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            claim_id TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            snapshot_json TEXT NOT NULL,
+            changed_by TEXT NOT NULL DEFAULT '',
+            change_reason TEXT NOT NULL DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(claim_id,version)
+        );
+
+        CREATE TABLE IF NOT EXISTS claim_evidence_links (
+            link_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            claim_id TEXT NOT NULL,
+            evidence_id TEXT NOT NULL,
+            relation TEXT NOT NULL DEFAULT 'candidate_support',
+            confidence REAL NOT NULL DEFAULT 0,
+            verification_status TEXT NOT NULL DEFAULT 'UNVERIFIED',
+            explanation TEXT NOT NULL DEFAULT '',
+            verifier_type TEXT NOT NULL DEFAULT 'deterministic',
+            verified_by TEXT NOT NULL DEFAULT '',
+            version INTEGER NOT NULL DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(tenant_id,claim_id,evidence_id,relation)
+        );
+        CREATE INDEX IF NOT EXISTS idx_claim_evidence_claim ON claim_evidence_links(tenant_id,claim_id,relation,confidence DESC);
+        CREATE INDEX IF NOT EXISTS idx_claim_evidence_evidence ON claim_evidence_links(tenant_id,evidence_id,relation);
+
+        CREATE TABLE IF NOT EXISTS claim_capability_links (
+            link_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            claim_id TEXT NOT NULL,
+            capability_id TEXT NOT NULL,
+            relation TEXT NOT NULL DEFAULT 'indicates',
+            confidence REAL NOT NULL DEFAULT 0,
+            explanation TEXT NOT NULL DEFAULT '',
+            version INTEGER NOT NULL DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(tenant_id,claim_id,capability_id,relation)
+        );
+        CREATE INDEX IF NOT EXISTS idx_claim_capability_capability ON claim_capability_links(tenant_id,capability_id,confidence DESC);
+
+        CREATE TABLE IF NOT EXISTS job_requirement_versions (
+            requirement_version_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            job_id TEXT NOT NULL,
+            requirement_id TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            snapshot_json TEXT NOT NULL,
+            changed_by TEXT NOT NULL DEFAULT '',
+            change_reason TEXT NOT NULL DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(requirement_id,version)
+        );
+        CREATE INDEX IF NOT EXISTS idx_job_requirement_versions ON job_requirement_versions(tenant_id,job_id,requirement_id,version DESC);
+
+        CREATE TABLE IF NOT EXISTS job_requirement_capability_links (
+            link_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            job_id TEXT NOT NULL,
+            requirement_id TEXT NOT NULL,
+            capability_id TEXT NOT NULL,
+            weight REAL NOT NULL DEFAULT 1,
+            minimum_score REAL NOT NULL DEFAULT 60,
+            mapping_status TEXT NOT NULL DEFAULT 'derived',
+            explanation TEXT NOT NULL DEFAULT '',
+            version INTEGER NOT NULL DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(tenant_id,requirement_id,capability_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_requirement_capability_job ON job_requirement_capability_links(tenant_id,job_id,requirement_id);
+
+        CREATE TABLE IF NOT EXISTS capability_assessments (
+            assessment_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            owner_user_id TEXT NOT NULL,
+            capability_id TEXT NOT NULL,
+            assessment_version INTEGER NOT NULL,
+            potential_score REAL NOT NULL DEFAULT 0,
+            verified_score REAL NOT NULL DEFAULT 0,
+            confidence REAL NOT NULL DEFAULT 0,
+            methodology_version TEXT NOT NULL,
+            explanation_json TEXT NOT NULL DEFAULT '{}',
+            created_by TEXT NOT NULL DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(tenant_id,session_id,capability_id,assessment_version)
+        );
+        CREATE INDEX IF NOT EXISTS idx_capability_assessments_latest ON capability_assessments(tenant_id,session_id,capability_id,assessment_version DESC);
+
+        CREATE TABLE IF NOT EXISTS capability_assessment_evidence (
+            link_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            assessment_id TEXT NOT NULL,
+            capability_id TEXT NOT NULL,
+            claim_id TEXT NOT NULL DEFAULT '',
+            evidence_id TEXT NOT NULL DEFAULT '',
+            contribution_type TEXT NOT NULL,
+            potential_weight REAL NOT NULL DEFAULT 0,
+            verified_weight REAL NOT NULL DEFAULT 0,
+            explanation TEXT NOT NULL DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_assessment_evidence_assessment ON capability_assessment_evidence(tenant_id,assessment_id);
+
+        CREATE TABLE IF NOT EXISTS career_gaps (
+            gap_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            owner_user_id TEXT NOT NULL,
+            job_id TEXT NOT NULL,
+            requirement_id TEXT NOT NULL,
+            capability_id TEXT NOT NULL DEFAULT '',
+            gap_type TEXT NOT NULL,
+            severity REAL NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'open',
+            version INTEGER NOT NULL DEFAULT 1,
+            potential_score REAL NOT NULL DEFAULT 0,
+            verified_score REAL NOT NULL DEFAULT 0,
+            required_score REAL NOT NULL DEFAULT 60,
+            explanation_json TEXT NOT NULL DEFAULT '{}',
+            created_by TEXT NOT NULL DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            deleted_at DATETIME,
+            UNIQUE(tenant_id,session_id,job_id,requirement_id,capability_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_career_gaps_session_job ON career_gaps(tenant_id,session_id,job_id,status,severity DESC);
+
+        CREATE TABLE IF NOT EXISTS career_gap_versions (
+            gap_version_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            gap_id TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            snapshot_json TEXT NOT NULL,
+            changed_by TEXT NOT NULL DEFAULT '',
+            change_reason TEXT NOT NULL DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(gap_id,version)
+        );
+
+        CREATE TABLE IF NOT EXISTS domain_audit_events (
+            event_id TEXT PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            session_id TEXT NOT NULL DEFAULT '',
+            actor_user_id TEXT NOT NULL DEFAULT '',
+            subject_user_id TEXT NOT NULL DEFAULT '',
+            entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            before_json TEXT NOT NULL DEFAULT '{}',
+            after_json TEXT NOT NULL DEFAULT '{}',
+            reason TEXT NOT NULL DEFAULT '',
+            correlation_id TEXT NOT NULL DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_domain_audit_entity ON domain_audit_events(tenant_id,entity_type,entity_id,created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_domain_audit_session ON domain_audit_events(tenant_id,session_id,created_at DESC);
+    """)
+
+    _add_column(conn, "job_requirements", "version INTEGER NOT NULL DEFAULT 1")
+    _add_column(conn, "job_requirements", "updated_at DATETIME")
+    if _table_exists(conn, "job_requirements"):
+        conn.execute("UPDATE job_requirements SET updated_at=COALESCE(updated_at,created_at,CURRENT_TIMESTAMP)")
+
+
+def _migration_21_domain_intelligence_seed(conn: sqlite3.Connection) -> None:
+    """Seed a stable global capability taxonomy used by deterministic v1.5 mappings."""
+    taxonomy_id = "TAX-CAREEROS-CORE-V1"
+    conn.execute("""INSERT OR IGNORE INTO capability_taxonomies
+        (taxonomy_id,tenant_id,name,description,version,status,created_by)
+        VALUES(?,?,?,?,1,'active','system')""",
+        (taxonomy_id, "global", "CareerOS Core Capabilities", "Versioned baseline taxonomy for explainable career capability assessment."))
+    seeds = [
+        ("CAP-USER-RESEARCH","user_research","用户研究","research",["用户访谈","访谈","需求调研","user research","interview"]),
+        ("CAP-REQUIREMENTS","requirements_analysis","需求分析","analysis",["需求理解","需求分析","业务需求","requirements"]),
+        ("CAP-DATA-ANALYSIS","data_analysis","数据分析","analysis",["数据分析","统计分析","问卷分析","data analysis","analytics"]),
+        ("CAP-SQL","sql","SQL与数据库","technical",["sql","数据库","database"]),
+        ("CAP-PYTHON","python","Python","technical",["python","pandas","numpy"]),
+        ("CAP-COMMUNICATION","communication","沟通表达","communication",["沟通","表达","汇报","communication","presentation"]),
+        ("CAP-INSIGHT","insight_communication","洞察表达","communication",["洞察","材料总结","分析报告","insight"]),
+        ("CAP-PROJECT","project_collaboration","项目协作","collaboration",["项目协作","团队协作","项目管理","project","collaboration"]),
+        ("CAP-TOOLS","digital_tools","数字工具","technical",["工具能力","excel","power bi","tableau","办公软件"]),
+        ("CAP-WRITING","professional_writing","专业写作","communication",["写作","报告","文案","writing"]),
+    ]
+    for capability_id,key,name,category,aliases in seeds:
+        conn.execute("""INSERT OR IGNORE INTO capabilities
+            (capability_id,tenant_id,taxonomy_id,capability_key,name,category,description,aliases_json,level_scale_json,version,status,created_by)
+            VALUES(?,?,?,?,?,?,?,?,?,1,'active','system')""",
+            (capability_id,"global",taxonomy_id,key,name,category,"CareerOS core capability",json.dumps(aliases,ensure_ascii=False),json.dumps({"min":0,"max":100},ensure_ascii=False)))
+
+
+def _migration_22_tenant_index_hardening(conn: sqlite3.Connection) -> None:
+    """Keep tenant-first access paths efficient in the SQLite compatibility runtime."""
+    statements = [
+        "CREATE INDEX IF NOT EXISTS idx_artifact_versions_tenant ON artifact_versions(tenant_id,artifact_id,version)",
+        "CREATE INDEX IF NOT EXISTS idx_auth_sessions_tenant ON auth_sessions(tenant_id,user_id,expires_at)",
+        "CREATE INDEX IF NOT EXISTS idx_capability_versions_tenant ON capability_versions(tenant_id,capability_id,version)",
+        "CREATE INDEX IF NOT EXISTS idx_career_gap_versions_tenant ON career_gap_versions(tenant_id,gap_id,version)",
+        "CREATE INDEX IF NOT EXISTS idx_domain_claim_versions_tenant ON domain_claim_versions(tenant_id,claim_id,version)",
+    ]
+    for statement in statements:
+        conn.execute(statement)
+
+
+
+def _migration_23_project_mvp_foundation(conn: sqlite3.Connection) -> None:
     """Add the project aggregate without changing legacy session/artifact/evidence tables."""
     conn.executescript(
         """
@@ -959,7 +1427,13 @@ MIGRATIONS: list[Migration] = [
     (14, "billing_sandbox_foundation", _migration_14_billing_sandbox_foundation),
     (15, "template_engine_foundation", _migration_15_template_engine_foundation),
     (16, "tenant_template_registry_and_evidence_risk", _migration_16_tenant_template_registry_and_evidence_risk),
-    (17, "project_mvp_foundation", _migration_17_project_mvp_foundation),
+    (17, "unified_runtime_entities", _migration_17_unified_runtime_entities),
+    (18, "unified_runtime_consistency", _migration_18_unified_runtime_consistency),
+    (19, "artifact_workspace_multi_series", _migration_19_artifact_workspace_multi_series),
+    (20, "security_trust_and_domain_intelligence", _migration_20_security_trust_and_domain_intelligence),
+    (21, "domain_intelligence_seed", _migration_21_domain_intelligence_seed),
+    (22, "tenant_index_hardening", _migration_22_tenant_index_hardening),
+    (23, "project_mvp_foundation", _migration_23_project_mvp_foundation),
 ]
 
 

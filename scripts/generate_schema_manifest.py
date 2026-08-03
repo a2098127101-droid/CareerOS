@@ -17,7 +17,7 @@ def generate(db_path: Path, out_path: Path) -> dict:
     # Preserve tables already described by the checked-in manifest and refresh every table
     # visible in the inspected database. This prevents an incomplete migration-only fixture
     # from accidentally deleting valid schema definitions.
-    manifest = {"version": "1.0-beta1", "tables": {}}
+    manifest = {"version": "1.5-domain-intelligence", "tables": {}}
     if out_path.exists():
         try:
             existing = json.loads(out_path.read_text(encoding="utf-8"))

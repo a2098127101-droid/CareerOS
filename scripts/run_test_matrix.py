@@ -9,16 +9,30 @@ import time
 from pathlib import Path
 
 
-def run_matrix(root: Path, timeout: int = 90) -> dict:
+def _batches(items: list[Path], size: int) -> list[list[Path]]:
+    size = max(1, int(size))
+    return [items[i : i + size] for i in range(0, len(items), size)]
+
+
+def run_matrix(root: Path, timeout: int = 180, batch_size: int = 6) -> dict:
+    """Run test files in isolated batches.
+
+    A single long-lived pytest process is not reliable for this legacy-compatible
+    application because some historical tests intentionally reload process-wide
+    configuration. One subprocess per file is safe but unnecessarily slow in CI.
+    Small isolated batches preserve lifecycle isolation while keeping the GitHub
+    gate comfortably below its timeout.
+    """
     tests = sorted((root / "tests").glob("test_*.py"))
+    groups = _batches(tests, batch_size)
     results = []
     total_passed = 0
     started = time.time()
-    for path in tests:
-        rel = path.relative_to(root).as_posix()
+
+    for index, group in enumerate(groups, start=1):
+        rels = [path.relative_to(root).as_posix() for path in group]
         t0 = time.time()
-        try:
-            runner = f"""
+        runner = f"""
 import os
 import pytest
 
@@ -31,10 +45,11 @@ class _PassedCounter:
             self.passed += 1
 
 counter = _PassedCounter()
-rc = pytest.main(["-q", {rel!r}], plugins=[counter])
+rc = pytest.main(["-q", *{rels!r}], plugins=[counter])
 print(f"CAREEROS_PASSED={{counter.passed}}", flush=True)
 os._exit(int(rc))
 """
+        try:
             proc = subprocess.run(
                 [sys.executable, "-c", runner],
                 cwd=root,
@@ -46,52 +61,56 @@ os._exit(int(rc))
             )
             output = proc.stdout
             marker = re.search(r"CAREEROS_PASSED=(\d+)", output)
-            # Keep the summary fallback for older pytest versions and for
-            # diagnostic compatibility with historical matrix output.
-            passed = (
-                int(marker.group(1))
-                if marker
-                else sum(int(x) for x in re.findall(r"(\d+) passed", output))
-            )
+            passed = int(marker.group(1)) if marker else sum(int(x) for x in re.findall(r"(\d+) passed", output))
             status = "passed" if proc.returncode == 0 else "failed"
-            total_passed += passed if proc.returncode == 0 else 0
+            if status == "passed":
+                total_passed += passed
             results.append({
-                "file": rel,
+                "batch": index,
+                "files": rels,
                 "status": status,
                 "returncode": proc.returncode,
                 "passed": passed,
                 "duration_seconds": round(time.time() - t0, 2),
-                "output_tail": "\n".join(output.strip().splitlines()[-12:]),
+                "output_tail": "\n".join(output.strip().splitlines()[-16:]),
             })
         except subprocess.TimeoutExpired as exc:
             output = (exc.stdout or "") if isinstance(exc.stdout, str) else ""
             results.append({
-                "file": rel,
+                "batch": index,
+                "files": rels,
                 "status": "timeout",
                 "returncode": None,
                 "passed": 0,
                 "duration_seconds": round(time.time() - t0, 2),
-                "output_tail": "\n".join(output.strip().splitlines()[-12:]),
+                "output_tail": "\n".join(output.strip().splitlines()[-16:]),
             })
-    failed = [r for r in results if r["status"] != "passed"]
+
+    failed = [item for item in results if item["status"] != "passed"]
+    failed_files = [path for item in failed for path in item["files"]]
+    covered_files = [path for item in results for path in item["files"]]
     return {
         "ok": not failed,
-        "mode": "isolated_test_file_subprocesses",
-        "files": len(results),
+        "mode": "isolated_test_file_batches",
+        "batch_size": batch_size,
+        "batches": len(results),
+        "files": len(tests),
+        "covered_files": covered_files,
         "passed_tests": total_passed,
-        "failed_files": [r["file"] for r in failed],
+        "failed_files": failed_files,
         "duration_seconds": round(time.time() - started, 2),
         "results": results,
     }
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="Run each CareerOS pytest file in an isolated subprocess to avoid shared lifecycle state.")
-    p.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
-    p.add_argument("--timeout", type=int, default=90)
-    p.add_argument("--json-out", type=Path, default=None)
-    args = p.parse_args()
-    report = run_matrix(args.root.resolve(), timeout=args.timeout)
+    parser = argparse.ArgumentParser(description="Run CareerOS pytest files in small isolated subprocess batches.")
+    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--timeout", type=int, default=180, help="Per-batch timeout in seconds.")
+    parser.add_argument("--batch-size", type=int, default=6, help="Test files per isolated subprocess.")
+    parser.add_argument("--json-out", type=Path, default=None)
+    args = parser.parse_args()
+    report = run_matrix(args.root.resolve(), timeout=args.timeout, batch_size=args.batch_size)
     text = json.dumps(report, ensure_ascii=False, indent=2)
     print(text)
     if args.json_out:

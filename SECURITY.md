@@ -5,6 +5,7 @@
 | Version | Status |
 | --- | --- |
 | `main` | Security fixes are considered as the project evolves. |
+| `v1.2-beta` | Pre-release candidate; security review ongoing, not supported for production use. |
 | `v1.0-beta1` | Pre-release evaluation build; not supported for production use. |
 | Older builds | Not supported. |
 

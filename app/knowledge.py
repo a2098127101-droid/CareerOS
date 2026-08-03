@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from .models import KnowledgeRef
 from .embedding_gateway import EmbeddingGateway, EmbeddingConfig, local_hash_embedding
+from .retrieval import RerankerGateway, bm25_scores
 
 
 def _content_hash(text: str) -> str:
@@ -39,11 +40,17 @@ class SearchHit:
 
 
 class KnowledgeStore:
-    def __init__(self, db_path: str, embedding_gateway: EmbeddingGateway | None = None):
+    def __init__(
+        self,
+        db_path: str,
+        embedding_gateway: EmbeddingGateway | None = None,
+        reranker_gateway: RerankerGateway | None = None,
+    ):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self.embedding_gateway = embedding_gateway or EmbeddingGateway(EmbeddingConfig())
+        self.reranker_gateway = reranker_gateway or RerankerGateway()
         self._init_db()
 
     def _connect(self) -> sqlite3.Connection:
@@ -269,6 +276,10 @@ class KnowledgeStore:
         query_lower = query.lower()
         qemb = self.embedding_gateway.embed([query])
         query_vec = qemb.vectors[0] if qemb.vectors else _hash_embedding(query)
+        portable_bm25 = {
+            row["chunk_id"]: score
+            for row, score in zip(rows, bm25_scores(query, [row["content"] for row in rows]))
+        }
 
         # Best-effort FTS5 BM25 ranks. Lower bm25 is better, converted to a 0..1 score.
         bm25: dict[str, float] = {}
@@ -295,7 +306,11 @@ class KnowledgeStore:
             if query_lower and query_lower in text:
                 matched += 20.0
             legacy_lex = matched * (1 + unique / max(len(terms), 1)) / max(math.sqrt(len(text) / 500), 0.8) if matched else 0.0
-            lexical = max(bm25.get(row["chunk_id"], 0.0), min(1.0, legacy_lex / 35.0))
+            lexical = max(
+                bm25.get(row["chunk_id"], 0.0),
+                portable_bm25.get(row["chunk_id"], 0.0),
+                min(1.0, legacy_lex / 35.0),
+            )
             try:
                 vector = json.loads(row["vector_json"] or "[]")
             except Exception:
@@ -316,7 +331,19 @@ class KnowledgeStore:
                 "metadata": metadata_score, "coverage": coverage,
             })
         raw.sort(key=lambda x: x["score"], reverse=True)
-        selected = raw[:top_k]
+        rerank_pool = raw[:max(50, top_k * 10)]
+        reranked = self.reranker_gateway.rerank(
+            query,
+            [item["row"]["content"] for item in rerank_pool],
+            top_n=max(top_k, min(len(rerank_pool), top_k * 4)),
+        )
+        for index, item in enumerate(rerank_pool):
+            reranker_score = reranked.scores[index] if index < len(reranked.scores) else 0.0
+            item["reranker"] = reranker_score
+            if reranked.active:
+                item["score"] = item["score"] * 0.75 + reranker_score * 0.25
+        rerank_pool.sort(key=lambda x: x["score"], reverse=True)
+        selected = rerank_pool[:top_k]
         hits = [SearchHit(
             source_id=x["row"]["source_id"], source_title=x["row"]["source_title"],
             chunk_id=x["row"]["chunk_id"], content=x["row"]["content"],
@@ -334,18 +361,25 @@ class KnowledgeStore:
             "chunk_id": x["row"]["chunk_id"], "source_id": x["row"]["source_id"],
             "score": round(x["score"], 4), "lexical": round(x["lexical"], 4),
             "vector": round(x["vector"], 4), "metadata": round(x["metadata"], 4),
+            "reranker": round(x.get("reranker", 0.0), 4),
             "effective_year": x["row"]["effective_year"], "authority": x["row"]["authority"],
+            "source_title": x["row"]["source_title"],
         } for x in selected]
         return {
             "hits": hits,
             "breakdown": breakdown,
             "retrieval": {
                 "mode": "hybrid",
-                "bm25": bool(bm25),
+                "bm25": True,
+                "bm25_backend": "sqlite_fts5+okapi" if bm25 else "okapi",
                 "vector_backend": qemb.model,
                 "semantic_embedding": qemb.provider != "local_hash" and self.embedding_gateway.semantic_enabled,
                 "embedding_provider": qemb.provider,
                 "embedding_model": qemb.model,
+                "reranker_active": reranked.active,
+                "reranker_provider": reranked.provider,
+                "reranker_model": reranked.model,
+                "reranker_warning": reranked.warning,
                 "effective_year": inferred_year,
                 "warning": warning,
                 "note": ("已启用并成功使用远程语义 Embedding Provider。" if (qemb.provider != "local_hash" and self.embedding_gateway.semantic_enabled) else "当前检索使用 local-hash-v1 离线确定性向量通道，不等同于生产级语义 Embedding。远程 Provider 配置或调用失败时会显式降级。"),

@@ -22,6 +22,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     create_engine,
+    event,
     text,
 )
 from sqlalchemy.engine import Engine
@@ -64,7 +65,48 @@ def create_database_engine(database_url: str, db_path: str, *, echo: bool = Fals
     kwargs: dict[str, Any] = {"future": True, "pool_pre_ping": True, "echo": echo}
     if url.startswith("sqlite"):
         kwargs["connect_args"] = {"check_same_thread": False}
-    return create_engine(url, **kwargs)
+    engine = create_engine(url, **kwargs)
+    if url.startswith("postgresql"):
+        _install_postgres_tenant_context(engine)
+    return engine
+
+
+def _tenant_from_parameters(parameters: Any) -> str:
+    candidate = parameters
+    if isinstance(candidate, (list, tuple)) and candidate and isinstance(candidate[0], dict):
+        candidate = candidate[0]
+    if not isinstance(candidate, dict):
+        return ""
+    for key in ("tenant", "tenant_id", "target_tenant"):
+        value = candidate.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def _install_postgres_tenant_context(engine: Engine) -> None:
+    """Set transaction-local RLS context before tenant-scoped statements.
+
+    Repository parameters take precedence over the request context. This keeps
+    explicit cross-tenant administration auditable while ordinary requests use
+    the authenticated principal established by the API dependency.
+    """
+    from ..tenant_context import current_tenant_id, platform_admin_context
+
+    @event.listens_for(engine, "before_cursor_execute")
+    def _set_rls_context(conn, cursor, statement, parameters, context, executemany):
+        if "set_config('app.tenant_id'" in statement:
+            return
+        tenant_id = _tenant_from_parameters(parameters) or current_tenant_id()
+        if tenant_id:
+            cursor.execute(
+                "SELECT set_config('app.tenant_id', %s, true)",
+                (tenant_id,),
+            )
+        cursor.execute(
+            "SELECT set_config('app.platform_admin', %s, true)",
+            ("on" if platform_admin_context() else "off",),
+        )
 
 
 def database_capabilities(*, database_url: str, db_path: str, repository_backend: str, app_env: str) -> DatabaseCapabilityReport:

@@ -247,9 +247,9 @@ Advisor / 人工指导意见：
         revised = result.text.strip()
         return revised, audit_evidence(revised, state.profile.evidence_text), critic
 
-    async def coach(self, state: SessionState, message: str) -> tuple[str, list[KnowledgeRef]]:
+    async def coach(self, state: SessionState, message: str, locale: str = "zh-CN") -> tuple[str, list[KnowledgeRef]]:
         if not self.is_task_enabled("coach"):
-            return self._demo_coach(state, message), []
+            return self._demo_coach(state, message, locale=locale), []
         query = f"{message} {state.track if self._is_competition_mode else ''} {state.profile.target_job} {state.profile.major}".strip()
         context, refs = self.retrieve_context(query, state)
         job_context = self.retrieve_job_context(state)
@@ -269,6 +269,7 @@ Advisor / 人工指导意见：
 - 涉及外部规则、评价口径、岗位或机会事实时，只能使用知识库命中的信息，并用“【来源：资料名】”标出；
 - 未命中可靠知识时明确说需要核验，不要凭记忆编造；
 - 参与者个人经历只能来自其画像与事实材料。
+- 输出语言：{"English" if locale == "en-US" else "简体中文"}。Evidence ID、来源标题和用户原文不得翻译或改写。
 """
         result = await self.gateway.complete("coach", COACH_PROMPT, prompt, tenant_id=state.tenant_id)
         return result.text.strip(), refs
@@ -396,22 +397,31 @@ Advisor / 人工指导意见：
             "> DEMO_MODE 修订版：已按结构性规则复核；待补充项仍需用户提供真实事实后才能消除。",
         )
 
-    def _demo_coach(self, state: SessionState, message: str) -> str:
+    def _demo_coach(self, state: SessionState, message: str, locale: str = "zh-CN") -> str:
+        english = locale == "en-US"
         if not state.profile.evidence_text:
             if self._is_competition_mode:
-                return "下一步先补充真实事实材料：当前阶段、目标方向、1—3段真实经历，以及每段经历中你实际做了什么。"
-            return "下一步先补充真实事实材料：你的当前背景、目标方向、1—3段真实经历，以及每段经历中你实际做了什么。"
+                return ("First, add verified facts: your current stage, target direction, one to three real experiences, "
+                        "and what you personally did in each experience.") if english else "下一步先补充真实事实材料：当前阶段、目标方向、1—3段真实经历，以及每段经历中你实际做了什么。"
+            return ("First, add verified facts: your background, target direction, one to three real experiences, "
+                    "and what you personally did in each experience.") if english else "下一步先补充真实事实材料：你的当前背景、目标方向、1—3段真实经历，以及每段经历中你实际做了什么。"
         if self._is_competition_mode and state.track == "待确认":
-            return "下一步确认业务赛道。请结合当前有效规则与资格要求进行核验，不要仅依赖模型推断。"
+            return ("Next, confirm the competition track against current eligibility rules. Do not rely only on model inference."
+                    if english else "下一步确认业务赛道。请结合当前有效规则与资格要求进行核验，不要仅依赖模型推断。")
         if not state.draft:
             if self._is_competition_mode:
-                return f"当前已进入“{state.track}”。下一步生成成果初稿；所有事实仅从已确认材料调用，缺失部分保留待补充标记。"
-            return "下一步生成第一版成果物。系统只使用已确认事实与可追踪 Evidence；缺失信息保留待补充，不会自动编造。"
+                return (f"The current track is {state.track}. Next, generate the first artifact draft using only confirmed facts; "
+                        "missing facts remain explicitly marked.") if english else f"当前已进入“{state.track}”。下一步生成成果初稿；所有事实仅从已确认材料调用，缺失部分保留待补充标记。"
+            return ("Next, generate the first artifact. The system uses only confirmed facts and traceable Evidence; "
+                    "missing information remains marked and is never invented.") if english else "下一步生成第一版成果物。系统只使用已确认事实与可追踪 Evidence；缺失信息保留待补充，不会自动编造。"
         if not state.review:
-            return "已有初稿。下一步执行严格评审，优先检查目标—证据—行动链和事实支撑，而不是先润色语言。"
+            return ("A draft is ready. Run a rigorous review of the goal–evidence–action chain before language polishing."
+                    if english else "已有初稿。下一步执行严格评审，优先检查目标—证据—行动链和事实支撑，而不是先润色语言。")
         if not state.revised_draft:
-            return "已有评审报告。下一步由 Critic Agent 复核关键问题，再由 Revision Agent 基于证据完成修订。"
-        return "核心闭环已跑通。可继续补充真实材料、重新评审，或进入 Advisor 反馈、展示与模拟训练阶段。"
+            return ("The review is ready. Next, let the Critic Agent verify the key issues and the Revision Agent revise from evidence."
+                    if english else "已有评审报告。下一步由 Critic Agent 复核关键问题，再由 Revision Agent 基于证据完成修订。")
+        return ("The core workflow is complete. Add more verified evidence, run another review, or continue with advisor feedback and interview training."
+                if english else "核心闭环已跑通。可继续补充真实材料、重新评审，或进入 Advisor 反馈、展示与模拟训练阶段。")
 
 
 

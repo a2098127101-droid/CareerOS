@@ -1,14 +1,14 @@
 """project mvp aggregate foundation
 
-Revision ID: 0008_project_mvp_foundation
-Revises: 0007_tenant_templates_evidence_risk
+Revision ID: 0011_project_mvp_foundation
+Revises: 0010_immutable_runtime_tenant_hardening
 """
 from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0008_project_mvp_foundation"
-down_revision = "0007_tenant_templates_evidence_risk"
+revision = "0011_project_mvp_foundation"
+down_revision = "0010_immutable_runtime_tenant_hardening"
 branch_labels = None
 depends_on = None
 
@@ -180,7 +180,6 @@ def upgrade() -> None:
         if present != expected:
             missing = ", ".join(sorted(expected - present))
             raise RuntimeError(f"partial project MVP schema detected; missing: {missing}")
-        # Fresh environments receive current tables from manifest-driven revision 0001.
         _install_immutability(bind)
         return
 
@@ -198,11 +197,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.tenant_id"], ondelete="CASCADE"),
         sa.UniqueConstraint("template_id", "tenant_id", name="uq_project_templates_tenant"),
     )
-    op.create_index(
-        "idx_project_templates_tenant_status",
-        "project_templates",
-        ["tenant_id", "status", "updated_at"],
-    )
+    op.create_index("idx_project_templates_tenant_status", "project_templates", ["tenant_id", "status", "updated_at"])
 
     op.create_table(
         "project_template_versions",
@@ -231,11 +226,7 @@ def upgrade() -> None:
         sa.UniqueConstraint("template_id", "version", name="uq_project_template_versions_version"),
         sa.UniqueConstraint("template_version_id", "tenant_id", name="uq_project_template_versions_tenant"),
     )
-    op.create_index(
-        "idx_project_template_versions_tenant_template",
-        "project_template_versions",
-        ["tenant_id", "template_id", "version"],
-    )
+    op.create_index("idx_project_template_versions_tenant_template", "project_template_versions", ["tenant_id", "template_id", "version"])
 
     op.create_table(
         "project_instances",
@@ -259,16 +250,8 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["session_id"], ["sessions.session_id"], ondelete="RESTRICT"),
         sa.UniqueConstraint("project_id", "tenant_id", name="uq_project_instances_tenant"),
     )
-    op.create_index(
-        "idx_project_instances_tenant_owner_status",
-        "project_instances",
-        ["tenant_id", "owner_user_id", "status", "updated_at"],
-    )
-    op.create_index(
-        "idx_project_instances_tenant_template",
-        "project_instances",
-        ["tenant_id", "template_version_id"],
-    )
+    op.create_index("idx_project_instances_tenant_owner_status", "project_instances", ["tenant_id", "owner_user_id", "status", "updated_at"])
+    op.create_index("idx_project_instances_tenant_template", "project_instances", ["tenant_id", "template_version_id"])
 
     op.create_table(
         "project_answers",
@@ -282,12 +265,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("project_id", "question_id", name="pk_project_answers"),
         sa.ForeignKeyConstraint(["project_id"], ["project_instances.project_id"], ondelete="CASCADE"),
     )
-    op.create_index(
-        "idx_project_answers_tenant_owner_project",
-        "project_answers",
-        ["tenant_id", "owner_user_id", "project_id"],
-    )
-
+    op.create_index("idx_project_answers_tenant_owner_project", "project_answers", ["tenant_id", "owner_user_id", "project_id"])
     _install_immutability(bind)
 
 

@@ -1,139 +1,105 @@
-# CareerOS v1.0-beta1 · Business Runtime Verification Candidate
+# CareerOS v1.5 · Domain Intelligence
 
-[English](README.md) | [简体中文](README.zh-CN.md)
+CareerOS is an evidence-grounded career intelligence platform. v1.5 promotes the core chain **Claim → Capability → Job Requirement → Gap** into persistent, versioned, explainable and auditable server-side domain entities.
 
-> **Pre-release notice:** this repository is a verification candidate, not a production-ready or Runtime Verified release.
+> Release status: internal Beta / GitHub-ready source release. Domain Intelligence is implemented and regression-tested. Production infrastructure, calibrated assessment methodology and standard-browser staging certification remain separate release gates.
 
-CareerOS is an AI-native **Career Development & Talent Intelligence Platform** with two maintained delivery tracks:
+## 中文介绍：CareerOS Agent
 
-- **Showcase Edition** — one anonymous standalone HTML file; no backend, database, payment service, or API key.
-- **Production Edition** — FastAPI, authentication/RBAC/multi-tenant isolation, multi-Agent runtime, multi-model gateway, Hybrid RAG, Evidence Graph, Workflow/Artifact templates, Job Intelligence, privacy/runtime infrastructure, analytics and commercialization foundations.
+CareerOS 是面向高校职规赛与学生职业发展的 AI-native Agent 操作系统。它不是单一聊天机器人，而是由工作流编排器协调多个专业 Agent，在持续保存学生画像、事实证据、任务进度和作品版本的基础上，完成职业探索、赛道建议、岗位匹配、能力差距分析、作品生成、严格评审、迭代修订和教师协同指导。
 
-## What beta1 changes
+核心 Agent 包括：
 
-beta1 upgrades acceptance from **component connectivity** to **business-runtime verification**. A deployable staging harness can now prove whether the configured environment actually supports the CareerOS business path rather than merely whether PostgreSQL/Redis/S3/model endpoints respond.
+- **Profile Agent**：从学生主动提供的材料中提取结构化画像，不自动虚构个人经历。
+- **Coach Agent**：结合十阶段职业规划工作流，识别当前任务并驱动下一步行动。
+- **Writer Agent**：基于学生 Evidence、赛事规则和岗位要求生成简历、生涯发展报告等 Artifact。
+- **Reviewer Agent**：按照结构化 Rubric 提取证据、识别问题并给出可解释评分。
+- **Critic Agent**：独立质疑评分、论证与证据链，降低自评偏差。
+- **Revision Agent**：综合评审、教师反馈和新增证据生成新版本，保留历史版本而不覆盖旧稿。
 
-### Business E2E certification
+系统通过 Multi-Model Gateway 为不同 Agent 独立配置 OpenAI、DeepSeek、Anthropic Claude、Google Gemini 或 OpenAI-Compatible 模型，并支持 Primary/Fallback 路由。知识层严格区分学生个人 Evidence、赛事与学校文档 RAG、结构化岗位数据，避免把外部岗位要求误写成学生已具备的能力。学生端采用 Chat-first Workspace，教师端采用 Attention-first AI Operations Workspace，管理端负责模型路由、知识投喂、调用统计和安全配置。
 
-A signed, environment-bound, freshness-limited business certificate exercises:
+当前版本属于内部 Beta 与可验证源码版本。未提供真实模型凭据时使用明确标注的 Demo/降级能力；确定性评分是证据覆盖指标，不是心理测量、职业资格认证或岗位表现预测。
 
-```text
-Authenticated participant
-→ Session
-→ Profile Agent
-→ Coach
-→ Private file upload
-→ Writer / Artifact V1
-→ Reviewer
-→ Evidence verification
-→ Critic + Revision / Artifact V2
-→ Artifact trace
-→ Cross-tenant attack suite
-→ LLM usage proof
-```
+## What v1.5 adds
 
-Certification users use ephemeral random credentials and are de-identified/archived during cleanup. A known default certification password is never left in the target database.
+- First-class persistent claims and claim versions.
+- Versioned capability definitions and capability assessment history.
+- Claim ↔ Evidence and Claim ↔ Capability relations.
+- Versioned job-requirement snapshots and Requirement ↔ Capability mappings.
+- Versioned career gaps with optimistic locking and lifecycle status.
+- Potential score versus verified score, with contribution-level explanations.
+- Domain audit events for create, update, recompute, mapping and status changes.
+- SQLite and SQLAlchemy/PostgreSQL repository parity.
+- Canonical `/api/domain/v1` API and Unified H5 consumption.
+- Evidence Trust lifecycle retained: self-reported evidence is not treated as verified evidence.
 
-### Semantic RAG quality gate
+## Quick start
 
-The business certificate also seeds temporary conflicting/current knowledge and requires:
+### Windows
 
-- current-year retrieval,
-- authoritative-source selection,
-- `Recall@5` success for the certification case,
-- no cross-tenant knowledge leakage,
-- a real semantic provider rather than `local_hash`.
+1. Extract the repository.
+2. Double-click `OPEN_CareerOS.cmd`.
+3. Open the URL shown by the launcher.
 
-### Independent worker and recovery certification
-
-Runtime certification no longer self-executes a queued job inside the certifier process. A PASS requires an **independent worker process/container** to consume the Redis job. The gate also simulates an expired worker lease and requires stale-job recovery plus independent execution.
-
-### Private object HTTP verification
-
-S3-compatible certification now performs:
-
-```text
-PUT
-→ SDK GET + SHA256
-→ presigned URL
-→ real HTTP GET + SHA256
-→ DELETE
-```
-
-Generating a presigned URL alone is no longer considered sufficient evidence.
-
-### Migration and disaster-recovery drills
-
-beta1 adds non-destructive staging certification harnesses for:
-
-- realistic SQLite fixture → snapshot → temporary PostgreSQL database → Alembic → import → verification → Repository read-back,
-- temporary PostgreSQL schema → `pg_dump` → drop → `pg_restore` → data-integrity read-back.
-
-### Signed release gates
-
-`/ready` in production now requires both:
-
-- a valid **Runtime Certification**, and
-- a valid **Business E2E Certification**.
-
-Certificates are HMAC signed, environment-bound and time-limited.
-
-### Staging gate
-
-`deploy/docker-compose.staging.yml` provides a PostgreSQL+pgvector, Redis, MinIO, API, worker and certifier topology. `scripts/staging_runtime_gate.py` gates on:
-
-1. preflight,
-2. Alembic,
-3. PostgreSQL Repository certification,
-4. Runtime certification,
-5. Business E2E certification,
-6. SQLite→PostgreSQL migration drill,
-7. PostgreSQL backup/restore drill,
-8. measured HTTP smoke/load gate,
-9. `/live` and `/ready`.
-
-## Local start
-
-Windows:
-
-```text
-OPEN_CareerOS.cmd
-```
-
-Cross-platform:
+### Python
 
 ```bash
 python -m venv .venv
-pip install --require-hashes -r requirements.lock
-python -m uvicorn app.main:app --reload
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
 ```
 
-Offline Showcase:
+Default local demo accounts are documented in `.env.example`. Never enable demo seeding in production.
+
+## Domain Intelligence API
 
 ```text
-CareerOS_H5_Showcase.html
+POST  /api/domain/v1/recompute
+GET   /api/domain/v1/snapshot
+GET   /api/domain/v1/claims
+PATCH /api/domain/v1/claims/{claim_id}
+GET   /api/domain/v1/claims/{claim_id}/versions
+GET   /api/domain/v1/capabilities
+GET   /api/domain/v1/capabilities/{capability_id}/explain
+GET   /api/domain/v1/capabilities/{capability_id}/versions
+GET   /api/domain/v1/requirements
+GET   /api/domain/v1/requirements/{requirement_id}/versions
+GET   /api/domain/v1/gaps
+PATCH /api/domain/v1/gaps/{gap_id}
+GET   /api/domain/v1/gaps/{gap_id}/versions
+GET   /api/domain/v1/audit
 ```
 
-## Status
+## Validation
 
-**This build is not claimed as Runtime Verified.** The current build environment does not provide Docker, a live PostgreSQL/pgvector instance, Redis, MinIO/S3, real semantic embedding credentials, or a real generation-model credential. The corresponding harnesses are implemented, but live certification remains `NOT VERIFIED` until executed in a real staging environment.
+- Automated tests: **161/161 passed**
+- SQLite migration: **22/22**
+- Alembic head: `0010_immutable_runtime_tenant_hardening`
+- Immutable published-migration guard and upgrade-from-original-0007 test.
+- Canonical `/api/v1` compatibility surface with OpenAPI cookie authentication.
+- Deterministic Demo retrieval evaluation and disposable staging infrastructure probe.
+- Chrome multi-role browser E2E.
 
-The P0 stabilization fixes the route test's dependency on FastAPI's former flat internal route list, forces cross-platform LF snapshot bytes, counts pytest 9 results through a reporting hook, and adds a hash-locked dependency graph. The corresponding [GitHub Actions run](https://github.com/a2098127101-droid/CareerOS/actions/runs/29988693142) passed **132/132 tests** across 32 isolated test files on Python 3.11.9.
+Real generation-model, semantic Embedding and remote Reranker calls remain
+environment-dependent gates and were not tested without credentials.
 
-The release remains a pre-release because live PostgreSQL/pgvector, Redis, MinIO/S3, semantic embeddings, generation models, and the complete staging certification are still not verified. See `docs/TEST_REPORT_v1.0-beta1.md` for the packaged and current verification records.
+## Important boundaries
 
-Primary operational documentation:
+The deterministic v1.5 score is an explainable evidence-coverage indicator. It is **not** a psychometric test, professional certification or validated predictor of job performance. See `REMAINING_GAPS_v1.5.md` and `PRODUCTION_READINESS_v1.5.md`.
 
-- `deploy/README_BETA1_STAGING.md`
-- `docs/BUSINESS_E2E_CERTIFICATION_v1.0-beta1.md`
-- `docs/MIGRATION_RECOVERY_CERTIFICATION_v1.0-beta1.md`
-- `docs/WORKER_RECOVERY_v1.0-beta1.md`
-- `docs/TEST_REPORT_v1.0-beta1.md`
+## Documentation
 
-## License
-
-This repository is governed by the proprietary CareerOS license in `LICENSE`.
-The source is publicly viewable for evaluation and review only; no right to
-use, copy, modify, deploy, or distribute it is granted without prior written
-permission from the copyright holder. This project is not represented as
-open-source software.
+- `ARCHITECTURE_v1.5.md`
+- `DOMAIN_INTELLIGENCE_MODEL.md`
+- `API_DOMAIN_INTELLIGENCE_GUIDE.md`
+- `MIGRATION_GUIDE_v1.5.md`
+- `TEST_REPORT_v1.5.md`
+- `PRODUCTION_READINESS_v1.5.md`
+- `REMAINING_GAPS_v1.5.md`
+- `GITHUB_UPLOAD_GUIDE.md`
+- `CHANGELOG_v1.5.md`
+- `RELEASE_NOTES_v1.5.md`
+- `SOURCE_PROVENANCE_v1.5.md`

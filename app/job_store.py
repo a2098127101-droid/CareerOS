@@ -139,6 +139,16 @@ class JobStore:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def delete_job(self, job_id: str, *, tenant_id: str) -> bool:
+        with self._lock, self._connect() as conn:
+            row = conn.execute("SELECT tenant_id FROM jobs WHERE job_id=?", (job_id,)).fetchone()
+            if not row or row["tenant_id"] not in {tenant_id}:
+                return False
+            conn.execute("DELETE FROM job_requirements WHERE job_id=? AND tenant_id=?", (job_id, tenant_id))
+            cur = conn.execute("DELETE FROM jobs WHERE job_id=? AND tenant_id=?", (job_id, tenant_id))
+            conn.commit()
+            return bool(cur.rowcount)
+
     def stats(self, *, tenant_id: str = "global") -> dict:
         with self._connect() as conn:
             row = conn.execute("SELECT COUNT(*) total,COUNT(DISTINCT city) cities,COUNT(DISTINCT industry) industries FROM jobs WHERE active=1 AND tenant_id IN (?,'global')", (tenant_id,)).fetchone()
