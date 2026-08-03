@@ -64,7 +64,7 @@ jobs:
       - name: Verify checksum and archive boundaries
         shell: bash
         run: |
-          sha256sum --check dist/CareerOS-*.zip.sha256
+          (cd dist && sha256sum --check CareerOS-*.zip.sha256)
           python - <<'PY'
           import json
           import zipfile
