@@ -1,5 +1,5 @@
 {
-  email {$ACME_EMAIL:admin@{$DOMAIN}}
+  email {$ACME_EMAIL}
   admin off
   servers {
     protocols h1 h2 h3
