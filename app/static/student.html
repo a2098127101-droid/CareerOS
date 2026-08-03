@@ -1,75 +1,158 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>AI Career Coach · CareerOS</title><link rel="stylesheet" href="/static/career-os.css"></head><body>
-<div class="app-shell student-shell">
-<aside class="sidebar">
-  <div class="brand"><div class="brand-mark">C</div><div class="brand-copy"><strong>CareerOS</strong><span>User Workspace</span></div></div>
-  <a class="btn" id="newProject" href="/projects/new" style="width:100%;justify-content:flex-start"><i data-lucide="folder-plus"></i><span>新建项目</span></a>
-  <div class="nav-scroll">
-    <div class="nav-section">Main</div>
-    <a class="nav-item active" href="#coach"><i data-lucide="sparkles"></i><span>AI Coach</span></a>
-    <div class="nav-section">我的发展</div>
-    <a class="nav-item" href="#progress"><i data-lucide="compass"></i><span>自我探索</span></a>
-    <a class="nav-item" href="#progress"><i data-lucide="target"></i><span>职业定位</span></a>
-    <a class="nav-item" href="#progress"><i data-lucide="scan-search"></i><span>能力画像</span></a>
-    <a class="nav-item" href="#progress"><i data-lucide="route"></i><span>行动计划</span></a>
-    <div class="nav-section">成果物</div>
-    <button class="nav-item" data-msg="帮我生成初稿"><i data-lucide="file-text"></i><span>简历 / 报告</span></button>
-    <button class="nav-item" data-msg="给这份作品评分"><i data-lucide="presentation"></i><span>成果评审</span></button>
-    <button class="nav-item" data-msg="开始模拟面试"><i data-lucide="mic-2"></i><span>模拟面试</span></button>
-    <div class="nav-section">历史</div>
-    <a class="nav-item" href="#coach"><i data-lucide="history"></i><span>对话</span></a>
-    <button class="nav-item" id="uploadBtn"><i data-lucide="paperclip"></i><span>文件</span></button>
-  </div>
-  <div class="sidebar-bottom"><div class="user-row"><div class="avatar">我</div><div class="user-meta"><strong id="sideName">用户</strong><span id="sideMeta">职业发展进行中</span></div><i data-lucide="chevrons-up-down" style="width:14px;margin-left:auto;color:var(--fg-3)"></i></div></div>
-</aside>
-<header class="topbar">
-  <div class="breadcrumb">CareerOS / <b>AI Career Coach</b></div>
-  <button class="global-search" id="globalSearch"><i data-lucide="search" style="width:15px"></i><span>搜索对话、任务、文件...</span><kbd>⌘K</kbd></button>
-  <div class="top-actions"><button class="icon-btn" aria-label="导入文件" id="topUpload"><i data-lucide="paperclip"></i></button><button class="icon-btn" aria-label="切换主题" data-theme-toggle><i data-lucide="sun-moon"></i></button><button class="icon-btn" aria-label="通知"><i data-lucide="bell"></i></button><div class="avatar">我</div></div>
-</header>
-<main class="student-center" id="coach">
-  <div class="chat-header"><div class="coach-identity"><div class="coach-icon"><i data-lucide="sparkles"></i></div><div><strong>AI Career Coach</strong><span id="modeText">连接中...</span></div></div><span class="badge"><i data-lucide="circle-dot"></i>持续规划中</span></div>
-  <div class="chat-stream" id="messages"></div>
-  <div class="composer-zone">
-    <div class="quick-row" id="suggestions"><button class="quick-chip" data-msg="帮我分析职业方向">分析职业方向</button><button class="quick-chip" data-msg="根据我的画像分析最适合的发展路径">分析发展路径</button><button class="quick-chip" data-msg="帮我生成初稿">生成成果</button><button class="quick-chip" data-msg="给这份作品评分">严格评审</button></div>
-    <div class="composer"><textarea id="input" rows="1" placeholder="给 Career Coach 发消息..." aria-label="给 Career Coach 发消息"></textarea><div class="composer-tools"><button class="composer-tool" id="attachBtn"><i data-lucide="plus"></i>附件</button><button class="composer-tool" data-msg="请用深度分析模式帮我审查当前规划"><i data-lucide="brain"></i>深度分析</button><button class="composer-tool" data-msg="帮我生成可提交的作品"><i data-lucide="file-plus-2"></i>生成成果</button><button class="send-btn" id="send" aria-label="发送"><i data-lucide="arrow-up"></i></button></div></div>
-  </div>
-</main>
-<aside class="context-inspector" id="progress">
-  <div class="inspector-tabs"><button class="inspector-tab active">Progress</button><button class="inspector-tab">Profile</button><button class="inspector-tab">Files</button></div>
-  <div class="eyebrow">当前规划进度</div><div style="display:flex;align-items:end;justify-content:space-between;margin:8px 0 4px"><strong style="font-size:26px;letter-spacing:-.04em" id="progressText">02 / 10</strong><span class="meta" id="stageTitle">建立画像</span></div>
-  <div class="workflow" id="stageList"></div>
-  <div class="inspector-section"><div class="section-head" style="margin-bottom:10px"><div><h3 style="font-size:14px">当前画像</h3><p>来自你的事实材料</p></div><span class="badge" id="trackBadge">待确认</span></div><div id="profileBox"></div><p class="meta" id="trackDetail" style="margin:9px 0 0"></p></div>
-  <div class="inspector-section"><div class="section-head" style="margin-bottom:10px"><div><h3 style="font-size:14px">Files</h3><p id="docStatus">尚未生成成果</p></div></div><div class="file-list" id="fileList"><div class="empty" style="min-height:110px;padding:12px"><div><div class="empty-icon"><i data-lucide="file-plus-2"></i></div><p>成果生成后会出现在这里。</p></div></div></div><div id="scoreBox" style="display:none;margin-top:12px"><span class="meta">AI Review Score</span><div style="font-size:30px;font-weight:680;letter-spacing:-.04em"><span id="score">—</span><small class="meta"> / 100</small></div></div><div id="docPreview" class="preview" style="display:none;margin-top:10px"></div><div id="docActions" style="display:none;gap:6px;margin-top:8px"><button class="btn small" id="copyDoc"><i data-lucide="copy"></i>复制</button><button class="btn small" id="downloadDoc"><i data-lucide="download"></i>导出</button></div></div>
-  <div class="inspector-section"><div class="eyebrow">Session</div><div class="meta" id="sessionId" style="margin-top:7px;word-break:break-all"></div></div>
-</aside>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Project Copilot · CareerOS</title>
+  <link rel="stylesheet" href="/static/career-os.css">
+  <link rel="stylesheet" href="/static/production-workspaces.css">
+</head>
+<body>
+<div class="copilot-shell">
+  <aside class="copilot-side">
+    <a class="brand" href="/projects"><div class="brand-mark">C</div><div class="brand-copy"><strong>CareerOS</strong><span>Project Copilot</span></div></a>
+    <a class="btn" href="/projects" style="width:100%;justify-content:flex-start"><i data-lucide="arrow-left"></i><span>返回项目</span></a>
+    <div class="nav-scroll">
+      <div class="nav-section">当前项目</div>
+      <div class="nav-note" id="projectName">未绑定项目</div>
+      <div class="nav-section">直接操作</div>
+      <button class="nav-item" data-prompt="分析我的职业方向，并明确目前最需要验证的假设"><i data-lucide="compass"></i><span>明确方向</span></button>
+      <button class="nav-item" data-prompt="请根据真实经历和目标岗位，生成一版可继续修改的成果"><i data-lucide="file-plus-2"></i><span>生成成果</span></button>
+      <button class="nav-item" data-prompt="给当前成果做严格评审，区分致命问题、结构问题和表达问题"><i data-lucide="scan-search"></i><span>严格评审</span></button>
+      <button class="nav-item" data-prompt="按评审优先级修订当前成果，不添加未经证实的信息"><i data-lucide="file-pen-line"></i><span>完成修改</span></button>
+      <button class="nav-item" id="uploadSide"><i data-lucide="paperclip"></i><span>上传证据</span></button>
+    </div>
+    <div class="sidebar-bottom"><button class="nav-item" id="logout"><i data-lucide="log-out"></i><span>退出登录</span></button></div>
+  </aside>
+
+  <main class="copilot-main">
+    <header class="copilot-top">
+      <div><strong>Project Copilot</strong><div class="meta" id="modeText">连接中</div></div>
+      <span class="badge" id="projectStatus">职业项目</span>
+      <div class="top-actions" style="margin-left:auto"><button class="icon-btn" id="uploadTop" aria-label="上传证据"><i data-lucide="paperclip"></i></button><button class="icon-btn" data-theme-toggle aria-label="切换主题"><i data-lucide="sun-moon"></i></button></div>
+    </header>
+    <div class="copilot-stream" id="messages"></div>
+    <div class="copilot-composer">
+      <div class="copilot-quick" id="quickActions">
+        <button class="quick-chip" data-prompt="分析我的职业方向，并指出还缺少哪些事实">分析方向</button>
+        <button class="quick-chip" data-prompt="请根据真实经历和目标岗位，生成一版可继续修改的成果">生成成果</button>
+        <button class="quick-chip" data-prompt="给当前成果做严格评审">严格评审</button>
+      </div>
+      <div class="copilot-composer-box">
+        <textarea id="input" rows="3" placeholder="补充真实经历、岗位信息，或直接要求生成、评审、修改…"></textarea>
+        <div class="copilot-tools"><button class="btn small" id="attach"><i data-lucide="paperclip"></i>证据</button><span class="meta">不会把未确认信息写成事实</span><button class="send-btn" id="send" aria-label="发送"><i data-lucide="arrow-up"></i></button></div>
+      </div>
+    </div>
+  </main>
+
+  <aside class="copilot-inspector">
+    <section class="copilot-task" id="taskCard"><div class="eyebrow">当前任务</div><h2 id="taskTitle">加载中</h2><p id="taskDescription">正在判断项目下一步。</p><button class="btn primary" id="taskButton" style="width:100%">继续</button></section>
+    <section class="inspector-section"><div class="eyebrow">项目进度</div><div class="mini-stat"><span>当前阶段</span><strong id="stageText">—</strong></div><div class="mini-stat"><span>完成度</span><strong id="progressText">—</strong></div><div class="progress-line" style="margin-top:12px"><i id="progressBar" style="width:0"></i></div></section>
+    <section class="inspector-section"><div class="eyebrow">当前成果</div><div id="artifactBox" class="meta" style="margin-top:10px">尚未生成</div><div id="artifactActions" style="display:none;gap:7px;margin-top:10px"><button class="btn small" id="copyArtifact"><i data-lucide="copy"></i>复制</button><button class="btn small" id="downloadArtifact"><i data-lucide="download"></i>导出</button></div></section>
+    <section class="inspector-section"><div class="eyebrow">评审</div><div class="mini-stat"><span>当前分数</span><strong id="scoreText">—</strong></div><div id="reviewNote" class="meta" style="margin-top:10px">完成评审后显示关键问题。</div></section>
+    <section class="inspector-section"><div class="eyebrow">会话</div><div class="meta" id="sessionText" style="margin-top:8px;word-break:break-all">—</div></section>
+    <button class="btn" id="completeProject" style="width:100%;display:none"><i data-lucide="circle-check-big"></i>标记项目完成</button>
+  </aside>
 </div>
-<nav class="mobile-nav" aria-label="移动端导航"><a class="active" href="#coach"><i data-lucide="sparkles"></i><span>Coach</span></a><a href="#progress"><i data-lucide="route"></i><span>进度</span></a><button data-msg="帮我生成初稿"><i data-lucide="files"></i><span>作品</span></button><button id="mobileProfile"><i data-lucide="user-round"></i><span>画像</span></button></nav>
+<nav class="mobile-nav copilot-mobile-nav" aria-label="移动端导航"><a href="/projects"><i data-lucide="folder-kanban"></i><span>项目</span></a><button data-prompt="请根据真实经历和目标岗位，生成一版可继续修改的成果"><i data-lucide="file-plus-2"></i><span>生成</span></button><button data-prompt="给当前成果做严格评审"><i data-lucide="scan-search"></i><span>评审</span></button><button id="mobileUpload"><i data-lucide="paperclip"></i><span>证据</span></button></nav>
 <input type="file" id="file" hidden accept=".docx,.pdf,.txt,.md,.json,.csv">
 <div class="toast-stack" id="toastStack"></div>
 <script src="/static/vendor/lucide.min.js"></script><script src="/static/ui.js"></script>
 <script>
-const $=s=>document.querySelector(s);function safeGet(k){try{return localStorage.getItem(k)||''}catch(_){return''}}function safeSet(k,v){try{localStorage.setItem(k,v)}catch(_){}}function safeRemove(k){try{localStorage.removeItem(k)}catch(_){}}let state=null,workflow=null,artifacts=[],product={},sessionId=safeGet('cc_student_session');
-const journey=[['自我探索','认识兴趣与经历'],['职业定位','明确发展方向'],['目标岗位','聚焦目标岗位'],['人岗匹配','建立能力映射'],['差距分析','识别核心差距'],['成长路径','形成行动路径'],['简历','形成个人材料'],['发展报告','完成成果评审'],['PPT','准备展示材料'],['模拟面试','迭代与训练']];
-const stageProgress={profile:2,track:3,draft:7,review:8,revised:10};
-async function api(url,opt={}){const r=await fetch(url,{headers:opt.body instanceof FormData?{}:{'Content-Type':'application/json'},...opt});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).detail||'请求失败');return r.json()}
-function esc(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function md(s=''){return esc(s).replace(/\*\*(.*?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>')}
-function toast(t,icon='check'){CareerUI.toast(t,icon)}
-function actionFor(m){if(!m||m.role!=='assistant')return'';const a=m.action;if(a==='track')return `<div class="action-card"><div><strong>确认推荐路径</strong><p>查看建议后确认当前发展路径，后续成果物与评审将按该路径运行。</p></div><button class="btn small" data-msg="我选择${state.track==='成长赛道'?'能力成长路径':'求职准备路径'}">确认路径<i data-lucide="arrow-right"></i></button></div>`;if(a==='draft')return `<div class="artifact-card"><div class="artifact-icon"><i data-lucide="file-text"></i></div><div class="artifact-copy"><strong>${esc(state.document_type||'成果物')} · 初稿</strong><span>已生成，可继续严格评审或导出。</span></div><button class="btn small" data-msg="给这份作品评分">开始评审</button></div>`;if(a==='review'&&state.review)return `<div class="action-card"><div><strong>严格评审完成 · ${state.review.total_score}/100</strong><p>${esc((state.review.revision_priority||[])[0]||'查看评审后进入修订。')}</p></div><button class="btn small primary" data-msg="按意见修订">开始修订<i data-lucide="arrow-right"></i></button></div>`;if(a==='revise')return `<div class="artifact-card"><div class="artifact-icon"><i data-lucide="file-check-2"></i></div><div class="artifact-copy"><strong>${esc(state.document_type||'作品')} · 修订版</strong><span>Critic 复核完成，仍需人工确认事实与待补充项。</span></div><button class="btn small" id="inlineDownload">导出</button></div>`;return''}
-async function init(){try{const h=await api('/api/health');product=await api('/api/product/config').catch(()=>({}));const n=Object.values(h.tasks||{}).filter(x=>x.enabled).length;$('#modeText').textContent=h.mode==='demo'?`Demo · Knowledge ${h.knowledge?.sources||0}`:`${h.mode==='hybrid'?'Hybrid':'Live'} · ${n}/6 Agents · KB ${h.knowledge?.sources||0}`;if(sessionId){try{state=await api('/api/sessions/'+sessionId)}catch{sessionId=''}}if(!sessionId){state=await api('/api/sessions',{method:'POST',body:'{}'});sessionId=state.session_id;safeSet('cc_student_session',sessionId)}await refreshMeta();render()}catch(e){toast(e.message,'triangle-alert')}}
-async function refreshMeta(){if(!sessionId)return;try{workflow=await api('/api/sessions/'+sessionId+'/workflow');const a=await api('/api/sessions/'+sessionId+'/artifacts');artifacts=a.artifacts||[]}catch{workflow=null;artifacts=[]}}
-function render(){if(!state)return;$('#sessionId').textContent=state.session_id;renderStages();renderMessages();renderContext();CareerUI.refreshIcons()}
-function renderStages(){if(workflow&&workflow.steps){$('#progressText').textContent=String(workflow.completed).padStart(2,'0')+' / '+workflow.total;$('#stageTitle').textContent=workflow.current_step?.label||'职业发展';$('#stageList').innerHTML=workflow.steps.map(x=>`<div class="workflow-step ${x.status==='completed'?'done':''} ${x.status==='current'?'current':''}"><div class="workflow-dot">${x.status==='completed'?'<i data-lucide="check"></i>':x.index}</div><div class="workflow-label"><strong>${x.label}</strong><span>${x.description}</span></div>${x.status==='current'?'<span class="badge">当前</span>':''}</div>`).join('');return}const p=stageProgress[state.stage]||2;$('#progressText').textContent=String(p).padStart(2,'0')+' / 10';$('#stageTitle').textContent=journey[Math.max(0,p-1)][0];$('#stageList').innerHTML=journey.map((x,i)=>`<div class="workflow-step ${i<p-1?'done':''} ${i===p-1?'current':''}"><div class="workflow-dot">${i<p-1?'<i data-lucide="check"></i>':i+1}</div><div class="workflow-label"><strong>${x[0]}</strong><span>${x[1]}</span></div>${i===p-1?'<span class="badge">当前</span>':''}</div>`).join('')}
-function renderMessages(){const box=$('#messages'),msgs=state.messages||[];if(!msgs.length){box.innerHTML=`<div class="chat-empty"><div class="coach-icon"><i data-lucide="sparkles"></i></div><h2>今天想推进什么？</h2><p>我可以持续记录你的状态，帮助完成职业定位、作品优化和模拟面试。</p><div class="suggestion-grid"><button class="suggestion-card" data-msg="分析我的职业方向">分析我的职业方向</button><button class="suggestion-card" data-msg="优化我的简历">优化我的简历</button><button class="suggestion-card" data-msg="生成生涯发展报告">生成生涯发展报告</button><button class="suggestion-card" data-msg="开始模拟面试">开始模拟面试</button></div></div>`;return}box.innerHTML=msgs.map(m=>{if(m.role==='user')return `<div class="message user"><div class="user-message">${md(m.content)}</div></div>`;const refs=(m.knowledge_refs||[]),src=refs.length?`<div class="evidence-row">${[...new Map(refs.map(r=>[r.title,r])).values()].map(r=>`<span class="evidence-chip" title="${esc(r.excerpt||'')}"><i data-lucide="quote"></i>${esc(r.title)}</span>`).join('')}</div>`:'';return `<div class="message assistant"><div class="assistant-message"><div class="coach-icon"><i data-lucide="sparkles"></i></div><div class="assistant-body"><div class="assistant-name">Career Coach</div><div class="assistant-content">${md(m.content)}</div>${src}${actionFor(m)}</div></div></div>`}).join('');box.scrollTop=box.scrollHeight;CareerUI.refreshIcons();const d=$('#inlineDownload');if(d)d.onclick=downloadDoc}
-function renderContext(){const p=state.profile||{},labels=product.labels||{};$('#sideName').textContent=p.name||labels.member||'用户';$('#sideMeta').textContent=[p.major,p.grade].filter(Boolean).join(' · ')||'职业发展进行中';$('#profileBox').innerHTML=[['显示名',p.name||'未设置'],[labels.organization||'所属组织',p.school||'未设置'],['背景方向',p.major||'未设置'],['当前阶段',p.grade||'未设置'],['目标方向',p.target_job||'探索中']].map(x=>`<div class="kv"><span>${x[0]}</span><span>${esc(x[1])}</span></div>`).join('');const isCompetition=!!(product.features&&product.features.competition_template);$('#trackBadge').textContent=isCompetition?(({'成长赛道':'成长路径','就业赛道':'就业路径','待确认':'待确认'})[state.track]||state.track||'待确认'):'通用模式';const rec=state.track_recommendation;$('#trackDetail').textContent=isCompetition?(rec?`成长 ${rec.growth_score}% · 就业 ${rec.employment_score}%`:'启用赛事模板后可生成赛道建议。'):'当前按目标定位、能力映射、差距分析与行动计划推进。';const doc=state.revised_draft||state.draft||'';$('#docStatus').textContent=doc?(state.revised_draft?'最新修订版':'已有初稿'):'尚未生成成果';$('#scoreBox').style.display=state.review?'block':'none';if(state.review)$('#score').textContent=state.review.total_score;$('#docPreview').style.display=doc?'block':'none';$('#docActions').style.display=doc?'flex':'none';$('#docPreview').textContent=doc.slice(0,1600);$('#fileList').innerHTML=artifacts.length?artifacts.slice(0,4).map(a=>`<div class="file-row"><div class="file-icon"><i data-lucide="file-text"></i></div><div style="min-width:0;flex:1"><strong>${esc(a.title)} V${a.version}</strong><span>${esc(a.kind)} · ${String(a.created_at||'').slice(0,16)}</span></div><span class="badge">${(a.evidence_links||[]).length} Evidence</span><button class="btn small" data-artifact-trace="${esc(a.artifact_id)}">证据链</button></div>`).join(''):(doc?`<div class="file-row"><div class="file-icon"><i data-lucide="file-text"></i></div><div><strong>${esc(state.document_type||'成果物')}</strong><span>${state.revised_draft?'修订版':'初稿'} · ${doc.length} 字符</span></div></div>`:`<div class="empty" style="min-height:100px;padding:10px"><div><div class="empty-icon"><i data-lucide="file-plus-2"></i></div><p>暂无作品</p></div></div>`)}
-async function openArtifactTrace(artifactId){try{const d=await api('/api/artifacts/'+encodeURIComponent(artifactId)+'/trace');const versions=d.versions||[],claims=d.claims||[],evidence=d.evidence||[],edges=d.edges||[];const supported=edges.filter(x=>x.relation==='supported_by').length;const revisions=edges.filter(x=>x.relation==='revises').length;CareerUI.modal({title:'Artifact Traceability',description:`${artifactId} · ${versions.length} 个版本 · ${claims.length} 条 Claim`,html:`<div class="trace-list"><div class="trace-item"><strong>版本链</strong><span>${versions.map(v=>'V'+v.version+' · '+esc(v.source||'unknown')).join(' → ')||'暂无版本'}</span></div><div class="trace-item"><strong>Evidence Graph</strong><span>${supported} 条 supported_by 关系 · ${revisions} 条 revises 关系 · ${evidence.length} 个 Evidence 节点</span></div>${claims.slice(0,8).map(c=>`<div class="trace-item"><strong>${esc(c.claim_text).slice(0,160)}</strong><span>${esc(c.claim_id)} · ${esc(c.status)}</span></div>`).join('')||'<div class="trace-item"><span>暂无可追踪 Claim。</span></div>'}</div>`})}catch(e){toast(e.message,'triangle-alert')}}
-function showThinking(text='正在分析你的规划与材料'){const box=$('#messages');const el=document.createElement('div');el.id='thinking';el.className='message assistant';el.innerHTML=`<div class="assistant-message"><div class="coach-icon"><i data-lucide="sparkles"></i></div><div class="assistant-body"><div class="assistant-name">Career Coach</div><div class="activity-list" style="max-width:520px"><div class="activity-item"><div class="activity-icon skeleton"></div><div><div class="skeleton skeleton-line wide"></div><div class="skeleton skeleton-line" style="margin-top:8px"></div></div></div></div><div class="meta" style="margin-top:7px">${text}</div></div></div>`;box.appendChild(el);box.scrollTop=box.scrollHeight;CareerUI.refreshIcons()}
-async function sendMessage(text){text=(text||$('#input').value).trim();if(!text)return;$('#input').value='';state.messages=state.messages||[];state.messages.push({role:'user',content:text});renderMessages();showThinking();$('#send').disabled=true;try{const d=await api('/api/chat',{method:'POST',body:JSON.stringify({session_id:sessionId,message:text})});state=d.state;workflow=d.workflow||workflow;await refreshMeta();render();if(d.action!=='chat')toast({track:'路径建议已更新',confirm_track:'路径已确认',draft:'成果初稿已生成',review:'严格评审已完成',revise:'修订版已生成'}[d.action]||'任务已完成')}catch(e){state.messages.pop();renderMessages();toast(e.message,'triangle-alert')}finally{$('#send').disabled=false}}
-function downloadDoc(){const t=state.revised_draft||state.draft||'';if(!t)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'text/plain;charset=utf-8'}));a.download=(state.document_type||'作品')+(state.revised_draft?'_修订版':'_初稿')+'.txt';a.click();URL.revokeObjectURL(a.href)}
-$('#send').onclick=()=>sendMessage();$('#input').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage()}});document.addEventListener('click',e=>{const b=e.target.closest('[data-msg]');if(b){sendMessage(b.dataset.msg);return}const t=e.target.closest('[data-artifact-trace]');if(t)openArtifactTrace(t.dataset.artifactTrace)});
-function chooseFile(){$('#file').click()}$('#uploadBtn').onclick=chooseFile;$('#topUpload').onclick=chooseFile;$('#attachBtn').onclick=chooseFile;$('#file').onchange=async e=>{const f=e.target.files[0];if(!f)return;const fd=new FormData();fd.append('file',f);fd.append('session_id',sessionId);try{toast('正在读取文件','loader-circle');const d=await api('/api/files/parse',{method:'POST',body:fd});await sendMessage(`以下是我导入的材料《${d.filename}》，请先作为事实材料读取，不要编造：\n\n${d.text.slice(0,18000)}`)}catch(err){toast(err.message,'triangle-alert')}e.target.value=''};
-$('#copyDoc').onclick=()=>{const t=state.revised_draft||state.draft||'';navigator.clipboard.writeText(t);toast('已复制成果内容')};$('#downloadDoc').onclick=downloadDoc;
-$('#mobileProfile').onclick=()=>CareerUI.toast('桌面端可在右侧 Inspector 查看完整画像；移动端优先保留 Coach 与进度操作','user-round');
-const commands=CareerUI.commandPalette([{label:'分析我的职业方向',group:'Coach',icon:'compass',action:()=>sendMessage('分析我的职业方向')},{label:'分析发展路径',group:'Coach',icon:'route',action:()=>sendMessage('根据我的画像分析最适合的发展路径')},{label:'生成成果物',group:'Artifact',icon:'file-plus-2',action:()=>sendMessage('帮我生成初稿')},{label:'严格评审当前作品',group:'AI',icon:'scan-search',action:()=>sendMessage('给这份作品评分')},{label:'导入文件',group:'File',icon:'paperclip',action:chooseFile},{label:'新建项目',group:'Workspace',icon:'folder-plus',action:()=>location.href='/projects/new'}]);$('#globalSearch').onclick=commands.open;
-init();
-</script></body></html>
+const $=selector=>document.querySelector(selector);
+const params=new URLSearchParams(location.search);
+const projectId=params.get('project_id')||'';
+let sessionId=params.get('session_id')||safeGet('cc_student_session');
+let state=null,workflow=null,artifacts=[],project=null,thinking=false;
+const statusLabel={draft:'尚未开始',collecting:'补充资料',ready_to_generate:'可以生成',solution_generated:'等待评审',reviewed:'进入修改',revision_required:'必须修改',completed:'已完成'};
+function safeGet(key){try{return localStorage.getItem(key)||''}catch{return''}}
+function safeSet(key,value){try{localStorage.setItem(key,value)}catch{}}
+function esc(value=''){return String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]))}
+function md(value=''){return esc(value).replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}
+function toast(message,icon='check'){CareerUI.toast(message,icon)}
+async function api(url,opt={}){
+  const headers=opt.body instanceof FormData?{}:(opt.body?{'Content-Type':'application/json'}:{});
+  const response=await fetch(url,{...opt,headers:{...headers,...(opt.headers||{})}});
+  const data=await response.json().catch(()=>({}));
+  if(response.status===401){location.href='/login?next='+encodeURIComponent(location.pathname+location.search);throw new Error('请先登录')}
+  if(!response.ok)throw new Error(typeof data.detail==='string'?data.detail:'请求失败');
+  return data;
+}
+function currentArtifactText(){return state?.revised_draft||state?.draft||''}
+function actionCard(message){
+  if(message.action==='draft')return `<div class="artifact-summary"><strong>第一版成果已生成</strong><p class="meta">下一步不是继续堆内容，而是检查事实、岗位匹配与结构。</p><button class="btn small" data-prompt="给当前成果做严格评审">开始评审</button></div>`;
+  if(message.action==='review'&&state?.review)return `<div class="artifact-summary"><strong>严格评审：${esc(state.review.total_score)}/100</strong><p class="meta">${esc((state.review.revision_priority||[])[0]||'根据评审意见完成必要修改。')}</p><button class="btn small primary" data-prompt="按评审优先级修订当前成果，不添加未经证实的信息">开始修改</button></div>`;
+  if(message.action==='revise')return `<div class="artifact-summary"><strong>修订版已生成</strong><p class="meta">请人工核对事实、数字和岗位名称后再使用。</p></div>`;
+  return '';
+}
+function renderMessages(){
+  const messages=state?.messages||[];
+  if(!messages.length){$('#messages').innerHTML=`<div class="copilot-message"><div class="copilot-bubble"><strong>先处理一个明确任务。</strong><p>补充真实经历、目标岗位或现有简历。系统会把材料组织成项目证据，再生成可评审、可修改的成果。</p></div></div>`;return}
+  $('#messages').innerHTML=messages.map(message=>`<div class="copilot-message ${message.role==='user'?'user':'assistant'}"><div class="copilot-bubble">${md(message.content)}${message.role==='assistant'?actionCard(message):''}</div></div>`).join('')+(thinking?`<div class="copilot-message"><div class="copilot-bubble"><span class="meta">正在读取项目材料并执行当前任务…</span></div></div>`:'');
+  $('#messages').scrollTop=$('#messages').scrollHeight;CareerUI.refreshIcons();
+}
+function renderInspector(){
+  const action=project?.next_action||{title:'继续当前职业项目',description:'补充材料或执行当前任务。',cta:'继续',href:'#'};
+  $('#projectName').textContent=project?.name||'未绑定项目';$('#projectStatus').textContent=statusLabel[project?.status]||'职业项目';
+  $('#taskTitle').textContent=action.title||'继续项目';$('#taskDescription').textContent=action.description||'';$('#taskButton').textContent=action.cta||'继续';
+  $('#taskButton').onclick=()=>{const href=action.href||'#';if(href.startsWith('/student'))$('#input').focus();else location.href=href};
+  const progress=project?.progress||workflow||{};const percent=Number(progress.percent??workflow?.progress??0)||0;
+  $('#stageText').textContent=project?.progress?.steps?.find(x=>x.status==='current')?.label||workflow?.current_step?.label||state?.stage||'建立资料';
+  $('#progressText').textContent=`${Math.round(percent)}%`;$('#progressBar').style.width=`${Math.max(0,Math.min(100,percent))}%`;
+  const text=currentArtifactText();
+  if(text){$('#artifactBox').innerHTML=`<strong>${esc(state.document_type||'职业成果')}</strong><div class="meta" style="margin-top:4px">${state.revised_draft?'修订版':'初稿'} · ${text.length} 字</div>`;$('#artifactActions').style.display='flex'}else{$('#artifactBox').textContent='尚未生成';$('#artifactActions').style.display='none'}
+  const score=state?.review?.total_score;$('#scoreText').textContent=score==null?'—':`${score}/100`;$('#reviewNote').textContent=state?.review?.revision_priority?.[0]||'完成评审后显示关键问题。';
+  $('#sessionText').textContent=sessionId||'—';$('#completeProject').style.display=project&&['reviewed','revision_required'].includes(project.status)?'inline-flex':'none';
+}
+async function refreshProject(){
+  if(!projectId)return;
+  try{project=await api('/api/v1/projects/'+encodeURIComponent(projectId))}catch(error){toast(error.message,'triangle-alert')}
+}
+async function refreshState(){
+  if(!sessionId)return;
+  const results=await Promise.allSettled([api('/api/sessions/'+encodeURIComponent(sessionId)),api('/api/sessions/'+encodeURIComponent(sessionId)+'/workflow'),api('/api/sessions/'+encodeURIComponent(sessionId)+'/artifacts')]);
+  if(results[0].status==='fulfilled')state=results[0].value;else throw results[0].reason;
+  workflow=results[1].status==='fulfilled'?results[1].value:null;artifacts=results[2].status==='fulfilled'?(results[2].value.artifacts||[]):[];
+}
+async function updateMilestone(action){
+  if(!projectId)return;
+  let milestone='';
+  if(action==='draft')milestone='generated';
+  if(action==='review')milestone=(Number(state?.review?.total_score||0)<70?'revision_required':'reviewed');
+  if(action==='revise')milestone='reviewed';
+  if(!milestone)return;
+  try{const result=await api(`/api/v1/projects/${encodeURIComponent(projectId)}/milestone?milestone=${encodeURIComponent(milestone)}`,{method:'PATCH'});project=result.project}catch(error){toast(`项目状态未同步：${error.message}`,'triangle-alert')}
+}
+async function sendMessage(raw){
+  const text=(raw??$('#input').value).trim();if(!text||thinking)return;
+  $('#input').value='';state.messages=state.messages||[];state.messages.push({role:'user',content:text});thinking=true;renderMessages();$('#send').disabled=true;
+  try{const result=await api('/api/chat',{method:'POST',body:JSON.stringify({session_id:sessionId,message:text})});state=result.state;workflow=result.workflow||workflow;await updateMilestone(result.action);await Promise.all([refreshState(),refreshProject()]);renderMessages();renderInspector()}
+  catch(error){state.messages.pop();toast(error.message,'triangle-alert');renderMessages()}
+  finally{thinking=false;$('#send').disabled=false;renderMessages()}
+}
+function chooseFile(){$('#file').click()}
+async function uploadFile(file){
+  const form=new FormData();form.append('file',file);form.append('session_id',sessionId);toast('正在读取证据','loader-circle');
+  const result=await api('/api/files/parse',{method:'POST',body:form});await sendMessage(`我上传了材料《${result.filename}》。请把它作为事实证据读取，先识别可核验信息和仍需确认的内容：\n\n${result.text.slice(0,18000)}`);
+}
+async function init(){
+  try{
+    const health=await api('/api/health');$('#modeText').textContent=health.mode==='demo'?'Demo 数据模式':health.mode==='hybrid'?'Hybrid Agents':'Live Agents';
+    if(projectId){project=await api('/api/v1/projects/'+encodeURIComponent(projectId));sessionId=project.session_id||sessionId}
+    if(sessionId){try{await refreshState()}catch{sessionId=''}}
+    if(!sessionId){state=await api('/api/sessions',{method:'POST',body:'{}'});sessionId=state.session_id}
+    safeSet('cc_student_session',sessionId);await Promise.all([refreshState(),refreshProject()]);renderMessages();renderInspector();CareerUI.refreshIcons();
+  }catch(error){toast(error.message,'triangle-alert')}
+}
+document.addEventListener('click',event=>{const prompt=event.target.closest('[data-prompt]');if(prompt){sendMessage(prompt.dataset.prompt);return}});
+$('#send').onclick=()=>sendMessage();$('#input').addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}});
+[$('#attach'),$('#uploadSide'),$('#uploadTop'),$('#mobileUpload')].forEach(button=>button.onclick=chooseFile);
+$('#file').onchange=async event=>{const file=event.target.files[0];if(!file)return;try{await uploadFile(file)}catch(error){toast(error.message,'triangle-alert')}event.target.value=''};
+$('#copyArtifact').onclick=async()=>{await navigator.clipboard.writeText(currentArtifactText());toast('已复制成果')};
+$('#downloadArtifact').onclick=()=>{const text=currentArtifactText();if(!text)return;const link=document.createElement('a');link.href=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));link.download=`${state.document_type||'职业成果'}_${state.revised_draft?'修订版':'初稿'}.txt`;link.click();URL.revokeObjectURL(link.href)};
+$('#completeProject').onclick=async()=>{try{const result=await api(`/api/v1/projects/${encodeURIComponent(projectId)}/milestone?milestone=completed`,{method:'PATCH'});project=result.project;toast('项目已完成');renderInspector()}catch(error){toast(error.message,'triangle-alert')}};
+$('#logout').onclick=async()=>{try{await api('/api/auth/logout',{method:'POST'});location.href='/login'}catch(error){toast(error.message,'triangle-alert')}};
+CareerUI.initTheme();CareerUI.refreshIcons();init();
+</script>
+</body>
+</html>
