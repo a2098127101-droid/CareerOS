@@ -1,0 +1,52 @@
+{
+  email {$ACME_EMAIL:admin@{$DOMAIN}}
+  admin off
+  servers {
+    protocols h1 h2 h3
+  }
+}
+
+{$DOMAIN} {
+  encode zstd gzip
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+    -Server
+  }
+
+  @static path /static/*
+  header @static Cache-Control "public, max-age=86400, immutable"
+
+  reverse_proxy api:8000 {
+    health_uri /live
+    health_interval 15s
+    health_timeout 3s
+    header_up X-Forwarded-Proto {scheme}
+    header_up X-Real-IP {remote_host}
+  }
+
+  log {
+    output stdout
+    format json
+  }
+}
+
+{$STORAGE_DOMAIN} {
+  encode zstd gzip
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "no-referrer"
+    -Server
+  }
+  reverse_proxy minio:9000
+  log {
+    output stdout
+    format json
+  }
+}
