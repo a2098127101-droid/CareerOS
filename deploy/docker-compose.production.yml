@@ -1,0 +1,234 @@
+name: careeros-production
+
+x-careeros-env: &careeros-env
+  env_file:
+    - .env.production
+
+x-app-security: &app-security
+  restart: unless-stopped
+  init: true
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  tmpfs:
+    - /tmp:size=256m,mode=1777
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
+    <<: *careeros-env
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-careeros}
+      POSTGRES_USER: ${POSTGRES_OWNER_USER:-careeros_owner}
+      POSTGRES_PASSWORD: ${POSTGRES_OWNER_PASSWORD}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:-careeros_app}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_OWNER_USER:-careeros_owner} -d ${POSTGRES_DB:-careeros}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - careeros_pg:/var/lib/postgresql/data
+      - ./postgres/init-app-role.sh:/docker-entrypoint-initdb.d/10-init-app-role.sh:ro
+    networks:
+      - data
+
+  postgres-role-init:
+    image: pgvector/pgvector:pg16@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
+    <<: *careeros-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGPASSWORD: ${POSTGRES_OWNER_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-careeros}
+      POSTGRES_USER: ${POSTGRES_OWNER_USER:-careeros_owner}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:-careeros_app}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD}
+    entrypoint: ["/bin/bash", "/scripts/init-app-role.sh"]
+    volumes:
+      - ./postgres/init-app-role.sh:/scripts/init-app-role.sh:ro
+    restart: "no"
+    networks:
+      - data
+
+  redis:
+    image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+    <<: *careeros-env
+    restart: unless-stopped
+    command:
+      - /bin/sh
+      - -c
+      - exec redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}" --maxmemory-policy noeviction
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - careeros_redis:/data
+    networks:
+      - data
+
+  minio:
+    image: minio/minio:latest@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    <<: *careeros-env
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - careeros_minio:/data
+    ports:
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    networks:
+      - data
+      - edge
+
+  minio-init:
+    image: minio/mc:latest@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    <<: *careeros-env
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"
+        mc mb --ignore-existing "local/$${S3_BUCKET}"
+        mc anonymous set none "local/$${S3_BUCKET}"
+    restart: "no"
+    networks:
+      - data
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    <<: [*careeros-env, *app-security]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_OWNER_USER:-careeros_owner}:${POSTGRES_OWNER_PASSWORD}@postgres:5432/${POSTGRES_DB:-careeros}
+      APP_DATABASE_URL: postgresql://${POSTGRES_APP_USER:-careeros_app}:${POSTGRES_APP_PASSWORD}@postgres:5432/${POSTGRES_DB:-careeros}
+      REPOSITORY_BACKEND: postgresql
+      SCHEMA_BOOTSTRAP_MODE: alembic
+    depends_on:
+      postgres-role-init:
+        condition: service_completed_successfully
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        python scripts/staging_preflight.py --profile infrastructure
+        alembic upgrade head
+        python scripts/certify_postgres.py --database-url "$${APP_DATABASE_URL}" --out "$${POSTGRES_CERTIFICATION_FILE}"
+    volumes:
+      - careeros_runtime:/app/data
+    restart: "no"
+    networks:
+      - data
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    <<: [*careeros-env, *app-security]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+    expose:
+      - "8000"
+    volumes:
+      - careeros_runtime:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/live', timeout=2).read()"]
+      interval: 10s
+      timeout: 4s
+      retries: 30
+    networks:
+      - edge
+      - data
+
+  worker:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    <<: [*careeros-env, *app-security]
+    depends_on:
+      api:
+        condition: service_healthy
+    command: ["python", "scripts/run_worker.py"]
+    volumes:
+      - careeros_runtime:/app/data
+    networks:
+      - data
+
+  caddy:
+    image: caddy:2-alpine
+    <<: *careeros-env
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - careeros_caddy_data:/data
+      - careeros_caddy_config:/config
+    networks:
+      - edge
+
+  certifier:
+    profiles: ["certify"]
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    <<: [*careeros-env, *app-security]
+    depends_on:
+      api:
+        condition: service_healthy
+      worker:
+        condition: service_started
+    command: ["python", "scripts/staging_runtime_gate.py", "--base-url", "http://api:8000", "--storage-roundtrip"]
+    volumes:
+      - careeros_runtime:/app/data
+    networks:
+      - edge
+      - data
+
+networks:
+  edge:
+  data:
+    internal: true
+
+volumes:
+  careeros_pg:
+  careeros_redis:
+  careeros_minio:
+  careeros_runtime:
+  careeros_caddy_data:
+  careeros_caddy_config:
