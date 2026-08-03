@@ -34,10 +34,14 @@ jobs:
           python-version: '3.11.9'
           cache: pip
           cache-dependency-path: requirements.lock
-      - name: Install locked dependencies
+      - name: Install baseline locked dependencies
         run: pip install --require-hashes -r requirements.lock
       - name: Apply controlled reconciliation
         run: python scripts/reconcile_v15_final.py
+      - name: Align regression contracts and async test lock
+        run: python scripts/fix_v15_integration_regressions.py
+      - name: Install reconciled locked dependencies
+        run: pip install --require-hashes -r requirements.lock
       - name: Validate deployment syntax and Compose model
         run: |
           bash -n deploy/postgres/init-app-role.sh deploy/scripts/*.sh
