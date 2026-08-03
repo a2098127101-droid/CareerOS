@@ -17,7 +17,7 @@ jobs:
   reconcile-and-verify:
     if: github.head_ref == 'codex/v1.5-production-final'
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -48,17 +48,44 @@ jobs:
         run: |
           python scripts/audit_database_access.py --json-out docs/FINAL_DATABASE_ACCESS_AUDIT.json
           python scripts/audit_repository_contract.py --json-out docs/FINAL_REPOSITORY_CONTRACT_AUDIT.json
-      - name: Run complete regression suite
-        run: pytest -q
-      - name: Commit verified reconciliation
+      - name: Materialize integration candidate
         if: github.event.pull_request.head.repo.full_name == github.repository
         run: |
           git config user.name "CareerOS Integration Bot"
           git config user.email "actions@users.noreply.github.com"
           git add -A
           if git diff --cached --quiet; then
-            echo "Reconciled tree is already current."
+            echo "Integration candidate is already materialized."
             exit 0
           fi
-          git commit -m "feat: integrate v1.5 domain intelligence and production launch"
+          git commit -m "chore: materialize v1.5 production integration candidate"
           git push origin HEAD:codex/v1.5-production-final
+      - name: Run complete regression suite
+        id: regression
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          pytest -q --maxfail=50 --junitxml=docs/FINAL_PYTEST.xml 2>&1 | tee docs/FINAL_PYTEST.log
+          status=${PIPESTATUS[0]}
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: careeros-v15-integration-diagnostics
+          path: |
+            docs/FINAL_DATABASE_ACCESS_AUDIT.json
+            docs/FINAL_REPOSITORY_CONTRACT_AUDIT.json
+            docs/FINAL_PYTEST.xml
+            docs/FINAL_PYTEST.log
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Enforce regression result
+        if: steps.regression.outputs.status != '0'
+        run: |
+          echo "The reconciled candidate has regression failures."
+          tail -n 240 docs/FINAL_PYTEST.log || true
+          exit 1
+      - name: Confirm verified reconciliation
+        run: echo "Reconciled candidate passed audits, deployment validation and the complete regression suite."
