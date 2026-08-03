@@ -121,8 +121,8 @@ services:
       dockerfile: Dockerfile
     <<: [*careeros-env, *app-security]
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_OWNER_USER:-careeros_owner}:${POSTGRES_OWNER_PASSWORD}@postgres:5432/${POSTGRES_DB:-careeros}
-      APP_DATABASE_URL: postgresql://${POSTGRES_APP_USER:-careeros_app}:${POSTGRES_APP_PASSWORD}@postgres:5432/${POSTGRES_DB:-careeros}
+      DATABASE_URL: ${OWNER_DATABASE_URL}
+      APP_DATABASE_URL: ${DATABASE_URL}
       REPOSITORY_BACKEND: postgresql
       SCHEMA_BOOTSTRAP_MODE: alembic
     depends_on:
