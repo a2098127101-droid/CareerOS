@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>职业项目 · CareerOS</title>
   <link rel="stylesheet" href="/static/career-os.css">
+  <link rel="stylesheet" href="/static/production-workspaces.css">
 </head>
 <body>
 <div class="app-shell project-first-shell">
@@ -15,156 +16,35 @@
       <div class="nav-section">工作区</div>
       <a class="nav-item active" href="/projects"><i data-lucide="folder-kanban"></i><span>我的项目</span></a>
       <a class="nav-item" href="/student"><i data-lucide="file-check-2"></i><span>成果工作台</span></a>
-      <div class="nav-section">项目方法</div>
-      <div class="nav-note">方向 → 证据 → 成果 → 评审 → 修改</div>
+      <div class="nav-section">项目方法</div><div class="nav-note">方向 → 证据 → 成果 → 评审 → 修改</div>
     </div>
-    <div class="sidebar-bottom">
-      <button class="nav-item" id="logout"><i data-lucide="log-out"></i><span>退出登录</span></button>
-    </div>
+    <div class="sidebar-bottom"><button class="nav-item" id="logout"><i data-lucide="log-out"></i><span>退出登录</span></button></div>
   </aside>
-  <header class="topbar">
-    <div class="breadcrumb" id="breadcrumb">CareerOS / <b>我的项目</b></div>
-    <div class="top-actions">
-      <button class="icon-btn" aria-label="切换主题" data-theme-toggle><i data-lucide="sun-moon"></i></button>
-      <div class="avatar" id="avatar">我</div>
-    </div>
-  </header>
-  <main class="main projects-main">
-    <div id="screen" aria-live="polite">
-      <div class="project-loading">
-        <div class="skeleton skeleton-line wide"></div>
-        <div class="skeleton skeleton-line"></div>
-        <div class="project-grid" style="margin-top:24px"><div class="project-card"><div class="skeleton skeleton-line wide"></div></div></div>
-      </div>
-    </div>
-  </main>
+  <header class="topbar"><div class="breadcrumb" id="breadcrumb">CareerOS / <b>我的项目</b></div><div class="top-actions" style="margin-left:auto"><button class="icon-btn" data-theme-toggle><i data-lucide="sun-moon"></i></button><div class="avatar" id="avatar">我</div></div></header>
+  <main class="main projects-main"><div id="screen"><div class="project-loading"><div class="skeleton skeleton-line wide"></div><div class="skeleton skeleton-line"></div></div></div></main>
 </div>
-<nav class="mobile-nav project-mobile-nav" aria-label="学生端导航">
-  <a class="active" href="/projects"><i data-lucide="folder-kanban"></i><span>项目</span></a>
-  <a href="#nextAction"><i data-lucide="arrow-right-circle"></i><span>下一步</span></a>
-  <a href="/student"><i data-lucide="file-check-2"></i><span>成果</span></a>
-  <a href="#growth"><i data-lucide="route"></i><span>成长</span></a>
-</nav>
+<nav class="mobile-nav project-mobile-nav"><a class="active" href="/projects"><i data-lucide="folder-kanban"></i><span>项目</span></a><a href="#nextAction"><i data-lucide="arrow-right-circle"></i><span>下一步</span></a><a href="/student"><i data-lucide="file-check-2"></i><span>成果</span></a><a href="#growth"><i data-lucide="route"></i><span>成长</span></a></nav>
 <div class="toast-stack" id="toastStack"></div>
-<script src="/static/vendor/lucide.min.js"></script>
-<script src="/static/ui.js"></script>
+<script src="/static/vendor/lucide.min.js"></script><script src="/static/ui.js"></script>
 <script>
 const screen=document.querySelector('#screen');
-const esc=(value='')=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const statusLabel={draft:'尚未开始',collecting:'补充资料',ready_to_generate:'可以生成',solution_generated:'等待评审',reviewed:'进入修改',revision_required:'必须修改',completed:'已完成'};
 const statusHelp={draft:'建立方向和项目基础',collecting:'补齐真实经历与能力证据',ready_to_generate:'资料完整，可以生成第一版成果',solution_generated:'成果已生成，需要评审',reviewed:'根据评审意见继续修改',revision_required:'当前版本存在关键缺口',completed:'可以导出或制作岗位定制版本'};
-async function api(url,opt={}){
-  const headers=opt.body instanceof FormData?{}:(opt.body?{'Content-Type':'application/json'}:{});
-  const response=await fetch(url,{...opt,headers:{...headers,...(opt.headers||{})}});
-  const data=await response.json().catch(()=>({}));
-  if(response.status===401){location.href='/login?next='+encodeURIComponent(location.pathname+location.search);throw new Error('请先登录')}
-  if(!response.ok)throw new Error(typeof data.detail==='string'?data.detail:'请求失败，请稍后重试');
-  return data;
-}
-function refresh(){CareerUI.refreshIcons()}
+const esc=(value='')=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(url,opt={}){const headers=opt.body?{'Content-Type':'application/json'}:{};const response=await fetch(url,{...opt,headers:{...headers,...(opt.headers||{})}});const data=await response.json().catch(()=>({}));if(response.status===401){location.href='/login?next='+encodeURIComponent(location.pathname+location.search);throw new Error('请先登录')}if(!response.ok)throw new Error(typeof data.detail==='string'?data.detail:'请求失败');return data}
 function toast(message,icon='check'){CareerUI.toast(message,icon)}
 function setCrumb(label){document.querySelector('#breadcrumb').innerHTML=`CareerOS / <b>${esc(label)}</b>`}
-function internalHref(value,fallback='/projects'){
-  try{const url=new URL(value||fallback,location.origin);return url.origin===location.origin?url.pathname+url.search+url.hash:fallback}catch{return fallback}
-}
-function errorState(error,retry){
-  screen.innerHTML=`<div class="empty project-empty"><div><div class="empty-icon"><i data-lucide="triangle-alert"></i></div><h3>暂时无法加载</h3><p>${esc(error.message||'请求失败')}</p><button class="btn primary" id="retry">重试</button></div></div>`;
-  document.querySelector('#retry').onclick=retry;refresh();
-}
-function nextActionCard(action,project){
-  const href=internalHref(action?.href,project?`/projects/${project.project_id}`:'/projects/new');
-  return `<section class="next-action-card" id="nextAction">
-    <div class="next-action-index"><span>下一步</span><strong>01</strong></div>
-    <div class="next-action-copy"><div class="eyebrow">只处理当前最重要的任务</div><h1>${esc(action?.title||'继续职业项目')}</h1><p>${esc(action?.description||'完成当前任务后，系统会给出下一步。')}</p>${project?`<div class="next-action-context"><span>${esc(project.name)}</span><span>${esc(statusLabel[project.status]||project.status)}</span></div>`:''}</div>
-    <a class="btn primary next-action-cta" href="${esc(href)}">${esc(action?.cta||'继续')}<i data-lucide="arrow-right"></i></a>
-  </section>`;
-}
-function projectCard(project){
-  const progress=project.progress||{percent:0,current:1,total:5};
-  return `<article class="project-card compact-project-card" data-project="${esc(project.project_id)}" tabindex="0">
-    <div class="project-card-top"><span class="badge">${esc(statusLabel[project.status]||project.status)}</span><span class="meta">${esc(project.category||'职业发展')}</span></div>
-    <h3>${esc(project.name)}</h3><p>${esc(statusHelp[project.status]||project.template_name||'继续项目')}</p>
-    <div class="project-progress"><div class="progress-line"><i style="width:${Math.max(0,Math.min(100,Number(progress.percent)||0))}%"></i></div><span>${progress.current} / ${progress.total}</span></div>
-    <div class="project-card-foot"><span class="meta">${esc(String(project.updated_at||'').slice(0,10)||'刚刚更新')}</span><span class="project-open">打开 <i data-lucide="arrow-right"></i></span></div>
-  </article>`;
-}
-async function listProjects(){
-  setCrumb('我的项目');
-  try{
-    const [projectsData,nextData]=await Promise.all([api('/api/v1/projects'),api('/api/v1/me/next-action')]);
-    const items=projectsData.items||[],active=items.filter(x=>x.status!=='completed').length,completed=items.filter(x=>x.status==='completed').length;
-    screen.innerHTML=`${nextActionCard(nextData.next_action,nextData.project)}
-      <section class="project-summary-strip" id="growth">
-        <div><span>进行中</span><strong>${active}</strong></div><div><span>已完成</span><strong>${completed}</strong></div><div><span>项目总数</span><strong>${items.length}</strong></div>
-      </section>
-      <section class="project-section"><div class="section-head"><div><h2>职业项目</h2><p>每个项目保存独立的方向、证据、成果和版本。</p></div><a class="btn" href="/projects/new"><i data-lucide="plus"></i>新建</a></div>
-      ${items.length?`<div class="project-grid">${items.map(projectCard).join('')}</div>`:`<div class="empty project-empty"><div><div class="empty-icon"><i data-lucide="folder-plus"></i></div><h3>还没有职业项目</h3><p>先建立一个项目，不需要一次填写完整。</p><a class="btn primary" href="/projects/new">开始第一个项目</a></div></div>`}</section>`;
-    document.querySelectorAll('[data-project]').forEach(card=>{
-      const open=()=>location.href='/projects/'+encodeURIComponent(card.dataset.project);
-      card.onclick=open;card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}};
-    });
-    refresh();
-  }catch(error){errorState(error,listProjects)}
-}
-function templateCard(template){
-  return `<article class="template-card"><div class="template-icon"><i data-lucide="briefcase-business"></i></div>
-    <div class="template-copy"><span class="badge">可用 · V${esc(template.current_version)}</span><h3>${esc(template.name)}</h3><p>${esc(template.description)}</p><div class="template-meta"><span><i data-lucide="clock-3"></i>约 ${esc(template.estimated_time_minutes)} 分钟</span><span><i data-lucide="file-text"></i>${esc(template.output_type)}</span></div></div>
-    <button class="btn primary" data-create="${esc(template.current_version_id)}">开始项目</button></article>`;
-}
-async function newProject(){
-  setCrumb('新建项目');
-  try{
-    const data=await api('/api/v1/project-templates');
-    screen.innerHTML=`<div class="page-head"><div><a class="back-link" href="/projects"><i data-lucide="arrow-left"></i>返回</a><div class="eyebrow">选择一个明确任务</div><h1>新建职业项目</h1><p>项目创建后绑定当前模板版本，后续修改不会覆盖历史项目。</p></div></div><section class="template-list">${data.items?.length?data.items.map(templateCard).join(''):`<div class="empty"><div><h3>暂无项目模板</h3><p>请联系学校管理员发布模板。</p></div></div>`}</section>`;
-    document.querySelectorAll('[data-create]').forEach(button=>button.onclick=async()=>{
-      const original=button.textContent;button.disabled=true;button.textContent='创建中…';
-      try{const project=await api('/api/v1/projects',{method:'POST',body:JSON.stringify({template_version_id:button.dataset.create})});location.href='/projects/'+encodeURIComponent(project.project_id)}
-      catch(error){toast(error.message,'triangle-alert');button.disabled=false;button.textContent=original}
-    });refresh();
-  }catch(error){errorState(error,newProject)}
-}
-function projectQuestion(question,answers,missing){
-  const id=String(question.question_id||''),value=answers[id]??'',required=Boolean(question.required),isMissing=missing.includes(id);
-  const label=`${esc(question.question_text)}${required?' <span aria-hidden="true">*</span>':''}`;
-  const stateClass=isMissing?' question-missing':'';
-  if(question.question_type==='single_select'&&Array.isArray(question.options)){
-    return `<label class="project-question${stateClass}"><span>${label}</span><select data-question="${esc(id)}" ${required?'required':''}><option value="">请选择</option>${question.options.map(option=>`<option value="${esc(option)}"${String(value)===String(option)?' selected':''}>${esc(option)}</option>`).join('')}</select></label>`;
-  }
-  const text=Array.isArray(value)?value.join('、'):String(value??'');
-  if(['long_text','file_upload','multi_select'].includes(question.question_type)){
-    const hint=question.question_type==='file_upload'?'<small>在成果工作台上传真实文件；这里可先填写材料名称与说明。</small>':'';
-    return `<label class="project-question${stateClass}"><span>${label}</span>${hint}<textarea data-question="${esc(id)}" ${required?'required':''} rows="${question.question_type==='long_text'?4:2}">${esc(text)}</textarea></label>`;
-  }
-  return `<label class="project-question${stateClass}"><span>${label}</span><input data-question="${esc(id)}" value="${esc(text)}" ${required?'required':''}></label>`;
-}
-async function projectDetail(projectId){
-  setCrumb('项目详情');
-  try{
-    const [project,form]=await Promise.all([api('/api/v1/projects/'+encodeURIComponent(projectId)),api('/api/v1/projects/'+encodeURIComponent(projectId)+'/form')]);
-    const template=project.template||{},steps=project.progress?.steps||[],action=project.next_action||{};
-    screen.innerHTML=`<div class="project-detail-head"><a class="back-link" href="/projects"><i data-lucide="arrow-left"></i>全部项目</a><div class="project-title-row"><div><div class="eyebrow">${esc(template.category||'职业发展')} · V${esc(project.template_version)}</div><h1>${esc(project.name)}</h1><p>${esc(statusHelp[project.status]||template.description||'')}</p></div><span class="badge">${esc(statusLabel[project.status]||project.status)}</span></div></div>
-      ${nextActionCard(action,project)}
-      <section class="project-detail-grid" id="growth"><div class="open-section"><div class="section-head"><div><h2>项目进度</h2><p>完成当前步骤后自动进入下一阶段。</p></div></div><div class="horizontal-project-steps">${steps.map(step=>`<div class="project-step ${esc(step.status)}"><span>${step.status==='completed'?'<i data-lucide="check"></i>':step.id}</span><div><strong>${esc(step.label)}</strong><small>${step.status==='current'?'当前步骤':step.status==='completed'?'已完成':'尚未开放'}</small></div></div>`).join('')}</div></div>
-      <aside class="project-brief"><div class="eyebrow">项目目标</div><p>${esc(template.objective||'形成可执行、可核验、可迭代的职业发展成果。')}</p><div class="eyebrow">成果结构</div><ul>${(template.artifact_structure||[]).map(item=>`<li>${esc(item)}</li>`).join('')}</ul></aside></section>
-      <section class="project-form-section" id="projectFormSection"><div class="section-head"><div><h2>项目资料</h2><p>只填写真实信息。未确认的数据不要写成确定事实。</p></div><span class="badge ${form.missing_required?.length?'warning':''}">${form.missing_required?.length||0} 项待补充</span></div>
-      <form id="projectForm" class="project-question-list">${(form.questions||[]).map(question=>projectQuestion(question,form.answers||{},form.missing_required||[])).join('')}<div class="project-form-actions"><button class="btn primary" id="saveProject" type="submit">保存并判断下一步</button></div></form></section>`;
-    document.querySelector('#projectForm').onsubmit=async event=>{
-      event.preventDefault();const button=document.querySelector('#saveProject'),original=button.textContent;button.disabled=true;button.textContent='保存中…';
-      const answers=[...document.querySelectorAll('[data-question]')].map(input=>({question_id:input.dataset.question,answer:input.value.trim()}));
-      try{const result=await api('/api/v1/projects/'+encodeURIComponent(projectId)+'/answers',{method:'PUT',body:JSON.stringify({answers})});toast('项目资料已保存');const href=internalHref(result.next_action?.href,'');if(href&&result.status==='ready_to_generate'){setTimeout(()=>{location.href=href},500)}else{setTimeout(()=>projectDetail(projectId),450)}}
-      catch(error){toast(error.message,'triangle-alert')}finally{button.disabled=false;button.textContent=original}
-    };refresh();
-    if(location.hash==='#projectFormSection')document.querySelector('#projectFormSection')?.scrollIntoView({behavior:'smooth'});
-  }catch(error){errorState(error,()=>projectDetail(projectId))}
-}
-async function init(){
-  try{const me=await api('/api/auth/me');const user=me.user||{};document.querySelector('#avatar').textContent=(user.display_name||'我').slice(0,1)}catch{return}
-  const path=decodeURIComponent(location.pathname);
-  if(path==='/projects/new')return newProject();
-  const match=path.match(/^\/projects\/([^/]+)$/);if(match)return projectDetail(match[1]);return listProjects();
-}
-document.querySelector('#logout').onclick=async()=>{try{await api('/api/auth/logout',{method:'POST'});location.href='/login'}catch(error){toast(error.message,'triangle-alert')}};
-CareerUI.initTheme();refresh();init();
+function safeHref(value,fallback='/projects'){try{const u=new URL(value||fallback,location.origin);return u.origin===location.origin?u.pathname+u.search+u.hash:fallback}catch{return fallback}}
+function errorState(error,retry){screen.innerHTML=`<div class="empty project-empty"><div><div class="empty-icon"><i data-lucide="triangle-alert"></i></div><h3>暂时无法加载</h3><p>${esc(error.message)}</p><button class="btn primary" id="retry">重试</button></div></div>`;document.querySelector('#retry').onclick=retry;CareerUI.refreshIcons()}
+function nextAction(action,project){return `<section class="next-action-card" id="nextAction"><div class="next-action-index"><span>下一步</span><strong>01</strong></div><div class="next-action-copy"><div class="eyebrow">只处理当前最重要的任务</div><h1>${esc(action?.title||'继续职业项目')}</h1><p>${esc(action?.description||'完成当前任务后，系统会给出下一步。')}</p>${project?`<div class="next-action-context"><span>${esc(project.name)}</span><span>${esc(statusLabel[project.status]||project.status)}</span></div>`:''}</div><a class="btn primary next-action-cta" href="${esc(safeHref(action?.href,project?`/projects/${project.project_id}`:'/projects/new'))}">${esc(action?.cta||'继续')}<i data-lucide="arrow-right"></i></a></section>`}
+function card(project){const p=project.progress||{percent:0,current:1,total:5};return `<article class="project-card" data-id="${esc(project.project_id)}" tabindex="0"><div class="project-card-top"><span class="badge">${esc(statusLabel[project.status]||project.status)}</span><span class="meta">${esc(project.category||'职业发展')}</span></div><h3>${esc(project.name)}</h3><p>${esc(statusHelp[project.status]||project.template_name||'继续项目')}</p><div class="project-progress"><div class="progress-line"><i style="width:${Math.max(0,Math.min(100,Number(p.percent)||0))}%"></i></div><span>${p.current} / ${p.total}</span></div><div class="project-card-foot"><span class="meta">${esc(String(project.updated_at||'').slice(0,10)||'刚刚更新')}</span><span class="project-open">打开 <i data-lucide="arrow-right"></i></span></div></article>`}
+async function listProjects(){setCrumb('我的项目');try{const [projects,next]=await Promise.all([api('/api/v1/projects'),api('/api/v1/me/next-action')]);const items=projects.items||[],active=items.filter(x=>x.status!=='completed').length,done=items.length-active;screen.innerHTML=`${nextAction(next.next_action,next.project)}<section class="project-summary-strip" id="growth"><div><span>进行中</span><strong>${active}</strong></div><div><span>已完成</span><strong>${done}</strong></div><div><span>项目总数</span><strong>${items.length}</strong></div></section><section class="project-section"><div class="section-head"><div><h2>职业项目</h2><p>每个项目保存独立的方向、证据、成果和版本。</p></div><a class="btn" href="/projects/new"><i data-lucide="plus"></i>新建</a></div>${items.length?`<div class="project-grid">${items.map(card).join('')}</div>`:`<div class="empty project-empty"><div><h3>还没有职业项目</h3><p>先建立一个项目，不需要一次填写完整。</p><a class="btn primary" href="/projects/new">开始第一个项目</a></div></div>`}</section>`;document.querySelectorAll('[data-id]').forEach(el=>{const open=()=>location.href='/projects/'+encodeURIComponent(el.dataset.id);el.onclick=open;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}});CareerUI.refreshIcons()}catch(error){errorState(error,listProjects)}}
+function templateCard(item){return `<article class="template-card"><div class="template-icon"><i data-lucide="briefcase-business"></i></div><div class="template-copy"><span class="badge">可用 · V${esc(item.current_version)}</span><h3>${esc(item.name)}</h3><p>${esc(item.description)}</p><div class="template-meta"><span><i data-lucide="clock-3"></i>约 ${esc(item.estimated_time_minutes)} 分钟</span><span><i data-lucide="file-text"></i>${esc(item.output_type)}</span></div></div><button class="btn primary" data-create="${esc(item.current_version_id)}">开始项目</button></article>`}
+async function newProject(){setCrumb('新建项目');try{const data=await api('/api/v1/project-templates');screen.innerHTML=`<div class="page-head"><div><a class="back-link" href="/projects"><i data-lucide="arrow-left"></i>返回</a><div class="eyebrow">选择一个明确任务</div><h1>新建职业项目</h1><p>项目创建后绑定当前模板版本，历史项目不会被覆盖。</p></div></div><section class="template-list">${data.items?.length?data.items.map(templateCard).join(''):'<div class="operations-empty">暂无模板</div>'}</section>`;document.querySelectorAll('[data-create]').forEach(button=>button.onclick=async()=>{button.disabled=true;button.textContent='创建中…';try{const project=await api('/api/v1/projects',{method:'POST',body:JSON.stringify({template_version_id:button.dataset.create})});location.href='/projects/'+encodeURIComponent(project.project_id)}catch(error){toast(error.message,'triangle-alert');button.disabled=false;button.textContent='开始项目'}});CareerUI.refreshIcons()}catch(error){errorState(error,newProject)}}
+function question(item,answers,missing){const id=String(item.question_id||''),value=answers[id]??'',required=item.required?'required':'',cls=missing.includes(id)?' question-missing':'';const label=`${esc(item.question_text)}${item.required?' <span>*</span>':''}`;if(item.question_type==='single_select'&&Array.isArray(item.options))return `<label class="project-question${cls}"><span>${label}</span><select data-question="${esc(id)}" ${required}><option value="">请选择</option>${item.options.map(option=>`<option value="${esc(option)}"${String(value)===String(option)?' selected':''}>${esc(option)}</option>`).join('')}</select></label>`;const text=Array.isArray(value)?value.join('、'):String(value??'');if(['long_text','file_upload','multi_select'].includes(item.question_type))return `<label class="project-question${cls}"><span>${label}</span>${item.question_type==='file_upload'?'<small>在成果工作台上传真实文件；这里可先填写材料说明。</small>':''}<textarea data-question="${esc(id)}" ${required} rows="${item.question_type==='long_text'?4:2}">${esc(text)}</textarea></label>`;return `<label class="project-question${cls}"><span>${label}</span><input data-question="${esc(id)}" value="${esc(text)}" ${required}></label>`}
+async function detail(id){setCrumb('项目详情');try{const [project,form]=await Promise.all([api('/api/v1/projects/'+encodeURIComponent(id)),api('/api/v1/projects/'+encodeURIComponent(id)+'/form')]);const template=project.template||{},steps=project.progress?.steps||[];screen.innerHTML=`<div class="project-detail-head"><a class="back-link" href="/projects"><i data-lucide="arrow-left"></i>全部项目</a><div class="project-title-row"><div><div class="eyebrow">${esc(template.category||'职业发展')} · V${esc(project.template_version)}</div><h1>${esc(project.name)}</h1><p>${esc(statusHelp[project.status]||template.description||'')}</p></div><span class="badge">${esc(statusLabel[project.status]||project.status)}</span></div></div>${nextAction(project.next_action,project)}<section class="project-detail-grid" id="growth"><div class="open-section"><div class="section-head"><div><h2>项目进度</h2><p>完成当前步骤后自动进入下一阶段。</p></div></div><div class="horizontal-project-steps">${steps.map(step=>`<div class="project-step ${esc(step.status)}"><span>${step.status==='completed'?'<i data-lucide="check"></i>':step.id}</span><div><strong>${esc(step.label)}</strong><small>${step.status==='current'?'当前步骤':step.status==='completed'?'已完成':'尚未开放'}</small></div></div>`).join('')}</div></div><aside class="project-brief"><div class="eyebrow">项目目标</div><p>${esc(template.objective||'形成可执行、可核验、可迭代的职业发展成果。')}</p><div class="eyebrow">成果结构</div><ul>${(template.artifact_structure||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></aside></section><section class="project-form-section" id="projectFormSection"><div class="section-head"><div><h2>项目资料</h2><p>只填写真实信息；未确认数据不要写成确定事实。</p></div><span class="badge ${form.missing_required?.length?'warning':''}">${form.missing_required?.length||0} 项待补充</span></div><form id="projectForm" class="project-question-list">${(form.questions||[]).map(x=>question(x,form.answers||{},form.missing_required||[])).join('')}<div class="project-form-actions"><button class="btn primary" id="save" type="submit">保存并判断下一步</button></div></form></section>`;document.querySelector('#projectForm').onsubmit=async event=>{event.preventDefault();const button=$('#save');button.disabled=true;button.textContent='保存中…';const answers=[...document.querySelectorAll('[data-question]')].map(input=>({question_id:input.dataset.question,answer:input.value.trim()}));try{const result=await api('/api/v1/projects/'+encodeURIComponent(id)+'/answers',{method:'PUT',body:JSON.stringify({answers})});toast('项目资料已保存');if(result.status==='ready_to_generate')location.href=safeHref(result.next_action?.href,`/projects/${id}`);else setTimeout(()=>detail(id),350)}catch(error){toast(error.message,'triangle-alert')}finally{button.disabled=false;button.textContent='保存并判断下一步'}};CareerUI.refreshIcons();if(location.hash==='#projectFormSection')document.querySelector('#projectFormSection')?.scrollIntoView({behavior:'smooth'})}catch(error){errorState(error,()=>detail(id))}}
+async function init(){try{const me=await api('/api/auth/me');document.querySelector('#avatar').textContent=(me.user?.display_name||'我').slice(0,1)}catch{return}const path=decodeURIComponent(location.pathname);if(path==='/projects/new')return newProject();const match=path.match(/^\/projects\/([^/]+)$/);return match?detail(match[1]):listProjects()}
+document.querySelector('#logout').onclick=async()=>{try{await api('/api/auth/logout',{method:'POST'});location.href='/login'}catch(error){toast(error.message,'triangle-alert')}};CareerUI.initTheme();CareerUI.refreshIcons();init();
 </script>
 </body>
 </html>
