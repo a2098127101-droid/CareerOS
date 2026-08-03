@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -11,63 +10,46 @@ ROOT = Path(__file__).parents[1]
 STATIC = ROOT / "app" / "static"
 
 
-def _values(source: str, attribute: str) -> set[str]:
-    return set(re.findall(rf'{re.escape(attribute)}="([^"]+)"', source))
-
-
-def test_student_visible_navigation_has_handlers_and_real_api_bindings():
+def test_student_workspace_is_project_first_and_bound_to_real_apis():
     html = (STATIC / "student.html").read_text(encoding="utf-8")
-    script = (STATIC / "student-workspace.js").read_text(encoding="utf-8")
-    expected = {
-        "coach", "exploration", "positioning", "capabilities", "tasks",
-        "artifacts", "review", "interview", "history",
-    }
-    assert _values(html, "data-student-view") == expected
-    for view in expected:
-        assert re.search(rf"\b{re.escape(view)}\s*:", script), view
-    for control in (
-        "studentNotifications", "studentAccount", "studentAvatar",
-        "workspace/v1/evidence", "workspace/v1/tasks", "workspace/v1/artifacts",
-        "domain/v1/capabilities", "domain/v1/recompute",
-        "workspace/v1/ai/interview/evaluate", "auth/logout",
-        "artifacts/${encodeURIComponent(item.id)}/versions",
-        "/api/artifacts/${encodeURIComponent(item.id)}/diff",
-        "/api/artifacts/${encodeURIComponent(item.id)}/restore/",
-        "careerosRadarGradient", "#2B5BFF", "#00D4AA",
-        "CareerStudentWorkspace", "careeros:student-sidebar-ready",
-        "studentSidebarReady", "runView(item.dataset.studentView",
+    projects = (STATIC / "projects.html").read_text(encoding="utf-8")
+    for token in (
+        "Project Copilot", "params.get('project_id')", "params.get('session_id')",
+        "/api/chat", "/api/files/parse", "/milestone?milestone=",
+        "currentArtifactText", "downloadArtifact", "completeProject",
     ):
-        assert control in script
-    assert 'src="/static/student-workspace.js?v=1.6.2"' in html
-    for view in expected - {"coach", "history"}:
-        assert f"#workspace-{view}" in html or view in {"artifacts", "review", "interview"}
+        assert token in html
+    for token in (
+        "/api/v1/me/next-action", "/api/v1/project-templates",
+        "/api/v1/projects", "保存并判断下一步", "只处理当前最重要的任务",
+    ):
+        assert token in projects
+    # The contracted student flow is intentionally reduced; the old feature-catalogue
+    # navigation must not be reintroduced as the primary workspace.
+    assert "data-student-view" not in html
+    assert "student-workspace.js" not in html
 
 
-def test_teacher_visible_navigation_has_handlers_and_real_api_bindings():
+def test_teacher_workspace_is_an_intervention_queue_with_real_actions():
     html = (STATIC / "teacher.html").read_text(encoding="utf-8")
-    script = (STATIC / "teacher-workspace.js").read_text(encoding="utf-8")
-    expected = {
-        "overview", "users", "profiles", "artifacts", "paths", "agents",
-        "reviews", "tasks", "analytics", "knowledge", "settings",
-    }
-    assert _values(html, "data-teacher-view") == expected
-    for view in expected:
-        assert re.search(rf"\b{re.escape(view)}\s*:", script), view
-    for control in (
-        "workspaceSelect", "teacherHelp", "teacherNotifications",
-        "teacherAccount", "topAdvisorAvatar", "teacher/dashboard",
-        "teacher/sessions", "workspace/v1/modules", "api/tasks", "auth/logout",
-        "workspace/v1/ai/coach", "advisor_recommendation", "/api/review",
+    for token in (
+        "教师运营中心", "干预队列", "/api/v1/advisor/operations",
+        "/api/teacher/dashboard", "/api/teacher/sessions/", "/api/tasks",
+        "/feedback", "/note", "createReminder", "priorityClass",
     ):
-        assert control in html + script
-    assert 'src="/static/teacher-workspace.js?' in html
+        assert token in html
+    assert "data-teacher-view" not in html
+    assert "teacher-workspace.js" not in html
 
 
 def test_global_i18n_and_admin_configuration_contracts():
     i18n = (STATIC / "i18n.js").read_text(encoding="utf-8")
     admin_html = (STATIC / "admin.html").read_text(encoding="utf-8")
     extension = (STATIC / "admin-extension.js").read_text(encoding="utf-8")
-    for page in ("index.html", "login.html", "student.html", "teacher.html", "admin.html"):
+    for page in (
+        "index.html", "login.html", "projects.html", "student.html",
+        "teacher.html", "governance.html", "admin.html",
+    ):
         html = (STATIC / page).read_text(encoding="utf-8")
         assert "/static/i18n.js" in html, page
     for token in ("careeros_locale", "globe-2", "MutationObserver", "careeros:localechange", "en-US"):

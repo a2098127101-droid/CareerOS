@@ -68,7 +68,7 @@ def test_upgrade_from_original_0007_repairs_runtime_table(tmp_path: Path):
         indexes = {
             row[1] for row in conn.execute("PRAGMA index_list(artifact_versions)").fetchall()
         }
-    assert version == "0010_immutable_runtime_tenant_hardening"
+    assert version == "0012_project_tenant_rls"
     assert {"tenant_id", "owner_user_id", "version", "revision", "updated_by"}.issubset(columns)
     assert "idx_artifact_versions_tenant" in indexes
 

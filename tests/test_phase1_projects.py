@@ -558,9 +558,9 @@ def test_project_detail_uses_real_form_and_does_not_bypass_to_legacy_coach():
     assert "/student?project_id=" not in html
 
 
-def test_generated_postgres_baseline_includes_project_security_triggers():
-    baseline = (Path(__file__).parents[1] / "alembic" / "versions" / "0011_project_mvp_foundation.py").read_text(encoding="utf-8")
-    assert "CREATE TRIGGER trg_project_template_versions_immutable" in baseline
-    assert "CREATE TRIGGER trg_project_instances_tenant_guard" in baseline
-    assert "CREATE TRIGGER trg_project_answers_tenant_guard" in baseline
-    assert "student_user_id=NEW.owner_user_id" in baseline
+def test_project_migration_installs_immutable_and_tenant_guard_triggers():
+    migration = (Path(__file__).parents[1] / "alembic" / "versions" / "0011_project_mvp_foundation.py").read_text(encoding="utf-8")
+    assert "CREATE TRIGGER trg_project_template_versions_immutable" in migration
+    assert 'for table in ("project_template_versions", "project_instances", "project_answers")' in migration
+    assert 'f"CREATE TRIGGER {trigger} BEFORE INSERT OR UPDATE ON {table} "' in migration
+    assert "student_user_id=NEW.owner_user_id" in migration
