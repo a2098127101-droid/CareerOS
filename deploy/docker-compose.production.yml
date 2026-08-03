@@ -101,6 +101,7 @@ services:
     <<: [*careeros-env, *app-security]
     environment:
       DATABASE_URL: postgresql://${POSTGRES_OWNER_USER:-careeros_owner}:${POSTGRES_OWNER_PASSWORD}@postgres:5432/${POSTGRES_DB:-careeros}
+      APP_DATABASE_URL: postgresql://${POSTGRES_APP_USER:-careeros_app}:${POSTGRES_APP_PASSWORD}@postgres:5432/${POSTGRES_DB:-careeros}
       REPOSITORY_BACKEND: postgresql
       SCHEMA_BOOTSTRAP_MODE: alembic
     depends_on:
@@ -113,7 +114,7 @@ services:
         set -eu
         python scripts/staging_preflight.py --profile infrastructure
         alembic upgrade head
-        python scripts/certify_postgres.py --database-url "$${DATABASE_URL}" --out "$${POSTGRES_CERTIFICATION_FILE}"
+        python scripts/certify_postgres.py --database-url "$${APP_DATABASE_URL}" --out "$${POSTGRES_CERTIFICATION_FILE}"
     volumes:
       - careeros_runtime:/app/data
     restart: "no"
