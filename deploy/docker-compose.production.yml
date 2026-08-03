@@ -37,6 +37,27 @@ services:
     networks:
       - data
 
+  postgres-role-init:
+    image: pgvector/pgvector:pg16@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
+    <<: *careeros-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGPASSWORD: ${POSTGRES_OWNER_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-careeros}
+      POSTGRES_USER: ${POSTGRES_OWNER_USER:-careeros_owner}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:-careeros_app}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD}
+    entrypoint: ["/bin/bash", "/scripts/init-app-role.sh"]
+    volumes:
+      - ./postgres/init-app-role.sh:/scripts/init-app-role.sh:ro
+    restart: "no"
+    networks:
+      - data
+
   redis:
     image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
     <<: *careeros-env
@@ -105,8 +126,8 @@ services:
       REPOSITORY_BACKEND: postgresql
       SCHEMA_BOOTSTRAP_MODE: alembic
     depends_on:
-      postgres:
-        condition: service_healthy
+      postgres-role-init:
+        condition: service_completed_successfully
     command:
       - /bin/sh
       - -c
