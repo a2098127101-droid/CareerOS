@@ -32,7 +32,7 @@ def test_migration_17_is_additive_and_template_versions_are_db_immutable(tmp_pat
     db_path, repos = build_repositories(tmp_path)
     repos.identity.ensure_tenant("school-a", "School A")
     template = repos.projects.ensure_default_template(tenant_id="school-a")
-    assert migration_status(db_path)["current"] == 17
+    assert migration_status(db_path)["current"] == 23
     with sqlite3.connect(db_path) as conn:
         names = {
             row[0]
@@ -229,7 +229,7 @@ def test_alembic_fresh_database_reaches_project_head(tmp_path: Path):
                 "SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'trg_project_%'"
             )
         }
-    assert revision == "0008_project_mvp_foundation"
+    assert revision == "0012_project_tenant_rls"
     assert "trg_project_template_versions_immutable_update" in triggers
     assert "trg_project_instances_tenant_guard_update" in triggers
     assert "trg_project_answers_owner_guard_update" in triggers
@@ -558,9 +558,9 @@ def test_project_detail_uses_real_form_and_does_not_bypass_to_legacy_coach():
     assert "/student?project_id=" not in html
 
 
-def test_generated_postgres_baseline_includes_project_security_triggers():
-    baseline = (Path(__file__).parents[1] / "deploy" / "postgresql_baseline.sql").read_text(encoding="utf-8")
-    assert "CREATE TRIGGER trg_project_template_versions_immutable" in baseline
-    assert "CREATE TRIGGER trg_project_instances_tenant_guard" in baseline
-    assert "CREATE TRIGGER trg_project_answers_tenant_guard" in baseline
-    assert "student_user_id=NEW.owner_user_id" in baseline
+def test_project_migration_installs_immutable_and_tenant_guard_triggers():
+    migration = (Path(__file__).parents[1] / "alembic" / "versions" / "0011_project_mvp_foundation.py").read_text(encoding="utf-8")
+    assert "CREATE TRIGGER trg_project_template_versions_immutable" in migration
+    assert 'for table in ("project_template_versions", "project_instances", "project_answers")' in migration
+    assert 'f"CREATE TRIGGER {trigger} BEFORE INSERT OR UPDATE ON {table} "' in migration
+    assert "student_user_id=NEW.owner_user_id" in migration

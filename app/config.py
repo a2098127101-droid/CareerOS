@@ -62,6 +62,13 @@ class Settings:
     embedding_max_batch_size: int = int(os.getenv("EMBEDDING_MAX_BATCH_SIZE", "64"))
     embedding_max_retries: int = int(os.getenv("EMBEDDING_MAX_RETRIES", "2"))
     embedding_retry_backoff_seconds: float = float(os.getenv("EMBEDDING_RETRY_BACKOFF_SECONDS", "0.5"))
+    reranker_provider: str = os.getenv("RERANKER_PROVIDER", "disabled").strip().lower()
+    reranker_base_url: str = os.getenv("RERANKER_BASE_URL", "").strip()
+    reranker_api_key: str = os.getenv("RERANKER_API_KEY", "")
+    reranker_model: str = os.getenv("RERANKER_MODEL", "").strip()
+    reranker_timeout_seconds: int = int(os.getenv("RERANKER_TIMEOUT_SECONDS", "30"))
+    reranker_max_retries: int = int(os.getenv("RERANKER_MAX_RETRIES", "2"))
+    reranker_retry_backoff_seconds: float = float(os.getenv("RERANKER_RETRY_BACKOFF_SECONDS", "0.5"))
 
     # File storage. Local is appropriate for development; S3-compatible is intended for production.
     storage_provider: str = os.getenv("STORAGE_PROVIDER", "local").strip().lower()
@@ -162,6 +169,12 @@ class Settings:
                     errors.append("DATABASE_URL is required in production when DEMO_MODE=false")
             if self.embedding_provider in {"openai_compatible", "bge_compatible", "jina_compatible", "private_api"} and not (self.embedding_base_url and self.embedding_api_key and self.embedding_model):
                 errors.append("EMBEDDING_BASE_URL / EMBEDDING_API_KEY / EMBEDDING_MODEL are required for semantic embeddings")
+            if self.reranker_provider in {"cohere", "jina", "voyage", "compatible"} and not (
+                self.reranker_base_url and self.reranker_api_key and self.reranker_model
+            ):
+                errors.append(
+                    "remote RERANKER_PROVIDER requires RERANKER_BASE_URL, RERANKER_API_KEY and RERANKER_MODEL"
+                )
             if self.storage_provider == "s3" and not (self.s3_bucket and self.s3_access_key and self.s3_secret_key):
                 errors.append("S3_BUCKET / S3_ACCESS_KEY / S3_SECRET_KEY are required when STORAGE_PROVIDER=s3")
             if not self.demo_mode:

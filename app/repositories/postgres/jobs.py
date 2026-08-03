@@ -61,5 +61,11 @@ class PostgresJobRepository(SQLAlchemyRepo):
         return self.all("""SELECT * FROM job_requirements WHERE job_id=:job AND tenant_id IN (:tenant,'global')
         ORDER BY CASE WHEN tenant_id=:tenant THEN 0 ELSE 1 END, importance DESC, created_at""", {'job':job_id,'tenant':tenant_id})
 
+    def delete_job(self,job_id:str,*,tenant_id:str)->bool:
+        row=self.one("SELECT tenant_id FROM jobs WHERE job_id=:id",{"id":job_id})
+        if not row or row.get("tenant_id")!=tenant_id:return False
+        self.execute("DELETE FROM job_requirements WHERE job_id=:id AND tenant_id=:tenant",{"id":job_id,"tenant":tenant_id})
+        return bool(self.execute("DELETE FROM jobs WHERE job_id=:id AND tenant_id=:tenant",{"id":job_id,"tenant":tenant_id}))
+
     def stats(self,*,tenant_id:str='global')->dict:
         row=self.one("SELECT COUNT(*) total,COUNT(DISTINCT city) cities,COUNT(DISTINCT industry) industries FROM jobs WHERE active=1 AND tenant_id IN (:tenant,'global')",{'tenant':tenant_id});return dict(row or {'total':0,'cities':0,'industries':0})

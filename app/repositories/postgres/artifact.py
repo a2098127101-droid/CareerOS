@@ -27,32 +27,35 @@ class PostgresArtifactRepository(SQLAlchemyRepo):
         data["kind"] = data.get("kind", "")
         return data
 
-    def create_version(self, session_id: str, kind: str, title: str, content: str, metadata: dict | None=None, evidence_links: list[dict] | None=None, *, tenant_id: str="demo-org", owner_user_id: str="", source: str | None=None, created_by: str="") -> dict:
+    def create_version(self, session_id: str, kind: str, title: str, content: str, metadata: dict | None=None, evidence_links: list[dict] | None=None, *, tenant_id: str="demo-org", owner_user_id: str="", source: str | None=None, created_by: str="", artifact_id: str | None=None) -> dict:
         base_kind=self._base_kind(kind)
         clean_title=title.replace(" · 修订版","").replace(" · 初稿","")
         source=source or ("revision_agent" if kind.endswith("_revision") else "writer_agent")
         with self.engine.begin() as conn:
-            row=conn.execute(text("SELECT artifact_id FROM artifact_series WHERE session_id=:session AND kind=:kind AND tenant_id=:tenant"),{"session":session_id,"kind":base_kind,"tenant":tenant_id}).mappings().first()
+            if artifact_id:
+                row=conn.execute(text("SELECT artifact_id FROM artifact_series WHERE artifact_id=:id AND tenant_id=:tenant AND deleted_at IS NULL"),{"id":artifact_id,"tenant":tenant_id}).mappings().first()
+            else:
+                row=conn.execute(text("SELECT artifact_id FROM artifact_series WHERE session_id=:session AND kind=:kind AND tenant_id=:tenant AND deleted_at IS NULL"),{"session":session_id,"kind":base_kind,"tenant":tenant_id}).mappings().first()
             if row: artifact_id=row["artifact_id"]
             else:
-                artifact_id=f"ART-{uuid4().hex[:12].upper()}"
+                artifact_id=artifact_id or f"ART-{uuid4().hex[:12].upper()}"
                 conn.execute(text("""INSERT INTO artifact_series(artifact_id,tenant_id,session_id,owner_user_id,kind,title) VALUES(:id,:tenant,:session,:owner,:kind,:title)"""),{"id":artifact_id,"tenant":tenant_id,"session":session_id,"owner":owner_user_id,"kind":base_kind,"title":clean_title})
             maxv=conn.execute(text("SELECT COALESCE(MAX(version),0) AS v FROM artifact_versions WHERE artifact_id=:id AND tenant_id=:tenant"),{"id":artifact_id,"tenant":tenant_id}).mappings().first()
             version=int(maxv["v"] or 0)+1; version_id=f"VER-{uuid4().hex[:14].upper()}"
             conn.execute(text("""INSERT INTO artifact_versions(version_id,artifact_id,tenant_id,session_id,version,content,source,created_by,metadata_json,evidence_links_json) VALUES(:vid,:aid,:tenant,:session,:version,:content,:source,:created_by,:metadata,:evidence)"""),{"vid":version_id,"aid":artifact_id,"tenant":tenant_id,"session":session_id,"version":version,"content":content,"source":source,"created_by":created_by,"metadata":json.dumps(metadata or {},ensure_ascii=False),"evidence":json.dumps(evidence_links or [],ensure_ascii=False)})
-            conn.execute(text("""UPDATE artifact_series SET current_version_id=:vid,tenant_id=:tenant,owner_user_id=CASE WHEN :owner<>'' THEN :owner ELSE owner_user_id END,title=:title,updated_at=CURRENT_TIMESTAMP WHERE artifact_id=:aid AND tenant_id=:tenant"""),{"vid":version_id,"tenant":tenant_id,"owner":owner_user_id,"title":clean_title,"aid":artifact_id})
+            conn.execute(text("""UPDATE artifact_series SET current_version_id=:vid,tenant_id=:tenant,owner_user_id=CASE WHEN :owner<>'' THEN :owner ELSE owner_user_id END,title=:title,version=:version,updated_at=CURRENT_TIMESTAMP WHERE artifact_id=:aid AND tenant_id=:tenant"""),{"vid":version_id,"tenant":tenant_id,"owner":owner_user_id,"title":clean_title,"version":version,"aid":artifact_id})
         return self.get_version(version_id,tenant_id=tenant_id)
 
     def get(self, artifact_id: str, *, tenant_id: str | None=None) -> dict:
         if artifact_id.startswith("VER-"): return self.get_version(artifact_id,tenant_id=tenant_id)
-        sql="""SELECT s.title,s.kind,s.owner_user_id,s.current_version_id,v.* FROM artifact_series s JOIN artifact_versions v ON v.version_id=s.current_version_id WHERE s.artifact_id=:id"""; params={"id":artifact_id}
+        sql="""SELECT s.title,s.kind,s.owner_user_id,s.current_version_id,v.* FROM artifact_series s JOIN artifact_versions v ON v.version_id=s.current_version_id WHERE s.artifact_id=:id AND s.deleted_at IS NULL"""; params={"id":artifact_id}
         if tenant_id is not None: sql+=" AND s.tenant_id=:tenant"; params["tenant"]=tenant_id
         row=self.one(sql,params)
         if not row: raise KeyError(artifact_id)
         return self._joined_row(row)
 
     def get_version(self,version_id:str,*,tenant_id:str|None=None)->dict:
-        sql="""SELECT s.title,s.kind,s.owner_user_id,s.current_version_id,v.* FROM artifact_versions v JOIN artifact_series s ON s.artifact_id=v.artifact_id WHERE v.version_id=:id""";params={"id":version_id}
+        sql="""SELECT s.title,s.kind,s.owner_user_id,s.current_version_id,v.* FROM artifact_versions v JOIN artifact_series s ON s.artifact_id=v.artifact_id WHERE v.version_id=:id AND s.deleted_at IS NULL""";params={"id":version_id}
         if tenant_id is not None:sql+=" AND v.tenant_id=:tenant";params["tenant"]=tenant_id
         row=self.one(sql,params)
         if not row:raise KeyError(version_id)
@@ -61,18 +64,51 @@ class PostgresArtifactRepository(SQLAlchemyRepo):
     def list_session(self,session_id:str,include_content:bool=False,*,tenant_id:str|None=None,all_versions:bool=True)->list[dict]:
         params={"session":session_id}; tenant_clause=""
         if tenant_id is not None:tenant_clause=" AND s.tenant_id=:tenant";params["tenant"]=tenant_id
-        if all_versions:sql=f"""SELECT s.title,s.kind,s.owner_user_id,s.current_version_id,v.* FROM artifact_series s JOIN artifact_versions v ON v.artifact_id=s.artifact_id WHERE s.session_id=:session{tenant_clause} ORDER BY v.created_at DESC,v.version DESC"""
-        else:sql=f"""SELECT s.title,s.kind,s.owner_user_id,s.current_version_id,v.* FROM artifact_series s JOIN artifact_versions v ON v.version_id=s.current_version_id WHERE s.session_id=:session{tenant_clause} ORDER BY s.updated_at DESC"""
+        if all_versions:sql=f"""SELECT s.title,s.kind,s.owner_user_id,s.current_version_id,v.* FROM artifact_series s JOIN artifact_versions v ON v.artifact_id=s.artifact_id WHERE s.session_id=:session AND s.deleted_at IS NULL{tenant_clause} ORDER BY v.created_at DESC,v.version DESC"""
+        else:sql=f"""SELECT s.title,s.kind,s.owner_user_id,s.current_version_id,v.* FROM artifact_series s JOIN artifact_versions v ON v.version_id=s.current_version_id WHERE s.session_id=:session AND s.deleted_at IS NULL{tenant_clause} ORDER BY s.updated_at DESC"""
         result=[self._joined_row(r) for r in self.all(sql,params)]
         if not include_content:
             for item in result:item.pop("content",None)
         return result
 
     def latest(self,session_id:str,kind:str|None=None,*,tenant_id:str|None=None)->dict|None:
-        sql="""SELECT s.title,s.kind,s.owner_user_id,s.current_version_id,v.* FROM artifact_series s JOIN artifact_versions v ON v.version_id=s.current_version_id WHERE s.session_id=:session""";params={"session":session_id}
+        sql="""SELECT s.title,s.kind,s.owner_user_id,s.current_version_id,v.* FROM artifact_series s JOIN artifact_versions v ON v.version_id=s.current_version_id WHERE s.session_id=:session AND s.deleted_at IS NULL""";params={"session":session_id}
         if kind:sql+=" AND s.kind=:kind";params["kind"]=self._base_kind(kind)
         if tenant_id is not None:sql+=" AND s.tenant_id=:tenant";params["tenant"]=tenant_id
         sql+=" ORDER BY s.updated_at DESC LIMIT 1";row=self.one(sql,params);return self._joined_row(row) if row else None
+
+
+    def create_workspace_version(self,*,session_id:str,title:str,kind:str,content:str,evidence_ids:list[str]|None=None,tenant_id:str,owner_user_id:str,created_by:str="",artifact_id:str|None=None)->dict:
+        links=[{"evidence_id":x} for x in (evidence_ids or []) if x]
+        return self.create_version(session_id,kind or "custom",title or "Artifact",content or "",metadata={"workspace_evidence_ids":list(evidence_ids or [])},evidence_links=links,tenant_id=tenant_id,owner_user_id=owner_user_id,source="workspace",created_by=created_by,artifact_id=artifact_id)
+
+    def update_workspace_artifact(self,artifact_id:str,*,tenant_id:str,owner_user_id:str,title:str,content:str,kind:str|None=None,evidence_ids:list[str]|None=None,created_by:str="",expected_version:int|None=None)->dict:
+        current=self.get(artifact_id,tenant_id=tenant_id)
+        if owner_user_id and current.get("owner_user_id") not in {"",owner_user_id}:raise PermissionError("artifact owner mismatch")
+        actual=int(current.get("version") or 1)
+        if expected_version is not None and expected_version!=actual:
+            from ...unified_runtime_store import RuntimeVersionConflict
+            raise RuntimeVersionConflict(artifact_id,expected_version,actual)
+        return self.create_workspace_version(session_id=current["session_id"],title=title or current.get("title") or "Artifact",kind=kind or current.get("kind") or "custom",content=content,evidence_ids=evidence_ids,tenant_id=tenant_id,owner_user_id=owner_user_id,created_by=created_by,artifact_id=artifact_id)
+
+    def delete_artifact(self,artifact_id:str,*,tenant_id:str,owner_user_id:str,expected_version:int|None=None)->bool:
+        with self.engine.begin() as conn:
+            row=conn.execute(text("SELECT v.version,s.owner_user_id FROM artifact_series s JOIN artifact_versions v ON v.version_id=s.current_version_id WHERE s.artifact_id=:id AND s.tenant_id=:tenant AND s.deleted_at IS NULL FOR UPDATE"),{"id":artifact_id,"tenant":tenant_id}).mappings().first()
+            if not row:return False
+            if owner_user_id and row.get("owner_user_id") not in {"",owner_user_id}:raise PermissionError("artifact owner mismatch")
+            actual=int(row.get("version") or 1)
+            if expected_version is not None and expected_version!=actual:
+                from ...unified_runtime_store import RuntimeVersionConflict
+                raise RuntimeVersionConflict(artifact_id,expected_version,actual)
+            conn.execute(text("UPDATE artifact_series SET deleted_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP,version=version+1 WHERE artifact_id=:id AND tenant_id=:tenant"),{"id":artifact_id,"tenant":tenant_id})
+        return True
+
+    @staticmethod
+    def to_workspace_item(row:dict)->dict:
+        metadata=row.get("metadata") or {}
+        evidence_ids=list(metadata.get("workspace_evidence_ids") or [])
+        if not evidence_ids:evidence_ids=[x.get("evidence_id") for x in (row.get("evidence_links") or []) if x.get("evidence_id")]
+        return {"id":row.get("artifact_id",""),"title":row.get("title","Artifact"),"type":row.get("kind","custom"),"content":row.get("content",""),"evidenceIds":evidence_ids,"version":int(row.get("version") or 1),"versionId":row.get("version_id",""),"createdAt":str(row.get("created_at") or ""),"updatedAt":str(row.get("created_at") or ""),"_version":int(row.get("version") or 1)}
 
     def list_versions(self,artifact_id:str,*,tenant_id:str)->list[dict]:
         return [self._joined_row(r) for r in self.all("""SELECT s.title,s.kind,s.owner_user_id,s.current_version_id,v.* FROM artifact_versions v JOIN artifact_series s ON s.artifact_id=v.artifact_id WHERE v.artifact_id=:aid AND v.tenant_id=:tenant ORDER BY v.version DESC""",{"aid":artifact_id,"tenant":tenant_id})]

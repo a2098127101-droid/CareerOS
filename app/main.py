@@ -12,6 +12,7 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, 
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse, JSONResponse
+from fastapi.security import APIKeyCookie
 from fastapi.staticfiles import StaticFiles
 
 from .agent_service import CareerAgentService
@@ -21,7 +22,9 @@ from .lifecycle import workflow_snapshot
 from .bootstrap import bootstrap_model_config
 from .config import Settings
 from .domain_profile import get_domain_profile
+from .domain_intelligence import DomainIntelligenceService
 from .embedding_gateway import EmbeddingConfig, EmbeddingGateway
+from .retrieval import RerankerConfig, RerankerGateway
 from .evidence_verification import EvidenceVerificationService
 from .rag_evaluation import RAGEvalCase, evaluate_rag
 from .pgvector_backend import pgvector_capabilities
@@ -31,7 +34,6 @@ from .runtime_state import build_rate_limiter, redis_capabilities
 from .background_jobs import build_job_manager
 from .job_handlers import register_background_handlers
 from .observability import RuntimeMetrics, configure_observability
-from .model_evaluation import run_model_evaluation
 from .billing import build_billing_provider
 from .emailing import EmailDeliveryError, build_email_provider, invitation_email, password_reset_email
 from .runtime_certification import RuntimeCertification, load_runtime_certification, write_certification
@@ -52,11 +54,8 @@ from .models import (
     KnowledgeSourceUpdate,
     RAGEvaluationRequest, EvidenceVerificationRequest, ManualClaimVerificationRequest, JobMatchRequest,
     ProfileExtractRequest,
-    ProviderTestRequest,
-    ProviderUpsert, ModelCapabilityUpsert, ModelRecommendationRequest, ModelEvaluationRequest,
     ReviewRequest,
     ReviseRequest,
-    RouteUpsert,
     SessionState,
     TeacherFeedbackRequest,
     TeacherNoteRequest,
@@ -79,7 +78,14 @@ from .job_intelligence import JobIntelligenceService
 from .routers.privacy import build_privacy_router
 from .routers.commercial import build_commercial_router
 from .routers.templates import build_template_admin_router
+from .routers.unified_runtime import build_unified_runtime_router
+from .routers.workspace import build_workspace_router
+from .routers.domain_intelligence import build_domain_intelligence_router
+from .routers.system import build_system_router
+from .routers.model_admin import build_model_admin_router
 from .routers.projects import build_projects_router
+from .api_versioning import register_v1_compatibility_aliases
+from .tenant_context import clear_tenant_context, set_tenant_context
 
 settings = Settings()
 _runtime_errors = settings.validate_runtime()
@@ -96,6 +102,15 @@ embedding_gateway = EmbeddingGateway(EmbeddingConfig(
     max_batch_size=settings.embedding_max_batch_size, max_retries=settings.embedding_max_retries,
     retry_backoff_seconds=settings.embedding_retry_backoff_seconds,
 ))
+reranker_gateway = RerankerGateway(RerankerConfig(
+    provider=settings.reranker_provider,
+    base_url=settings.reranker_base_url,
+    api_key=settings.reranker_api_key,
+    model=settings.reranker_model,
+    timeout_seconds=settings.reranker_timeout_seconds,
+    max_retries=settings.reranker_max_retries,
+    retry_backoff_seconds=settings.reranker_retry_backoff_seconds,
+))
 # Repository container centralizes persistence wiring. v1.0-beta1 keeps SQLite local compatibility
 # while the full SQLAlchemy repository surface can be wired to PostgreSQL after Alembic provisioning.
 if settings.repository_backend == "postgresql":
@@ -105,6 +120,7 @@ if settings.repository_backend == "postgresql":
         app_secret_key=settings.app_secret_key,
         session_ttl_hours=settings.session_ttl_hours,
         embedding_gateway=embedding_gateway,
+        reranker_gateway=reranker_gateway,
         app_env=settings.app_env,
     )
 else:
@@ -114,6 +130,7 @@ else:
         app_secret_key=settings.app_secret_key,
         session_ttl_hours=settings.session_ttl_hours,
         embedding_gateway=embedding_gateway,
+        reranker_gateway=reranker_gateway,
         app_env=settings.app_env,
     )
 store = repositories.sessions
@@ -131,6 +148,9 @@ auth_store = repositories.identity
 commercial_store = repositories.commercial
 template_registry = repositories.templates
 project_repository = repositories.projects
+unified_runtime_store = repositories.runtime_entities
+domain_intelligence_store = repositories.domain_intelligence
+domain_intelligence_service = DomainIntelligenceService(domain_intelligence_store, evidence_verifier, job_intelligence)
 billing_runtime = build_billing_provider(settings.billing_provider, webhook_secret=settings.billing_webhook_secret)
 email_runtime = build_email_provider(
     settings.email_provider,
@@ -204,14 +224,28 @@ elif settings.bootstrap_superadmin_email and settings.bootstrap_superadmin_passw
         display_name="CareerOS Super Admin", tenant_id=settings.bootstrap_tenant_id, role="super_admin"
     )
 
-app = FastAPI(title=f"{settings.product_name} · AI Career Development Platform", version="1.0.0-beta1-business-runtime-verification")
+app = FastAPI(
+    title=f"{settings.product_name} · AI Career Development Platform",
+    version="1.5.1-release-hardening",
+    description=(
+        "CareerOS Production API. Canonical new integrations should use `/api/v1`; "
+        "unversioned `/api/*` endpoints remain compatibility aliases during migration."
+    ),
+    openapi_tags=[
+        {"name": "Authentication", "description": "Server-side session authentication."},
+        {"name": "Student workspace", "description": "Participant-owned workflow and artifacts."},
+        {"name": "Advisor operations", "description": "Authorized cohort operations."},
+        {"name": "AI administration", "description": "Model, retrieval, and job intelligence administration."},
+        {"name": "System", "description": "Health and operational readiness."},
+    ],
+)
 origins = list(settings.allowed_origins) if settings.allowed_origins else (["*"] if not settings.is_production else [])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=bool(settings.auth_required),
     allow_methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
-    allow_headers=["Content-Type","Authorization","X-Admin-Token","X-Request-ID","X-CSRF-Token","X-CareerOS-Billing-Signature"],
+    allow_headers=["Content-Type","Authorization","X-Admin-Token","X-Request-ID","X-CSRF-Token","X-CareerOS-Billing-Signature","Idempotency-Key"],
 )
 
 def _rate_allowed(key: tuple[str, str], limit: int, window_seconds: int = 60) -> bool:
@@ -220,6 +254,7 @@ def _rate_allowed(key: tuple[str, str], limit: int, window_seconds: int = 60) ->
 
 @app.middleware("http")
 async def security_observability_and_rate_limit(request: Request, call_next):
+    clear_tenant_context()
     path = request.url.path
     request_id = request.headers.get("X-Request-ID") or f"REQ-{uuid4().hex[:20]}"
     started = time.perf_counter()
@@ -234,8 +269,15 @@ async def security_observability_and_rate_limit(request: Request, call_next):
         host = request.client.host if request.client else "unknown"
         if path == "/api/auth/login" and not _rate_allowed((host, "login"), 10, 60):
             return JSONResponse({"detail": "too many login attempts"}, status_code=429, headers={"X-Request-ID": request_id})
-        if path in {"/api/chat", "/api/chat/stream", "/api/draft/generate", "/api/draft/generate/stream", "/api/review", "/api/review/stream", "/api/revise"} and not _rate_allowed((host, "ai"), 60, 60):
-            return JSONResponse({"detail": "rate limit exceeded"}, status_code=429, headers={"X-Request-ID": request_id})
+        legacy_ai = {"/api/chat", "/api/chat/stream", "/api/draft/generate", "/api/draft/generate/stream", "/api/review", "/api/review/stream", "/api/revise"}
+        workspace_ai_limits = {
+            "/api/workspace/v1/ai/coach": 30,
+            "/api/workspace/v1/ai/interview/evaluate": 10,
+            "/api/workspace/v1/ai/ppt/review": 5,
+        }
+        ai_limit = 60 if path in legacy_ai else workspace_ai_limits.get(path)
+        if ai_limit is not None and not _rate_allowed((host, "ai:" + path), ai_limit, 60):
+            return JSONResponse({"detail": {"code": "ai_rate_limit_exceeded", "limit": ai_limit, "window_seconds": 60}}, status_code=429, headers={"X-Request-ID": request_id})
     try:
         response = await call_next(request)
         status_code = response.status_code
@@ -244,6 +286,7 @@ async def security_observability_and_rate_limit(request: Request, call_next):
         latency_ms = (time.perf_counter() - started) * 1000
         runtime_metrics.observe(method=request.method, path=path, status_code=status_code, latency_ms=latency_ms)
         logger.exception("request failed", extra={"request_id": request_id, "path": path, "method": request.method, "status_code": status_code, "latency_ms": round(latency_ms, 2)})
+        clear_tenant_context()
         raise
     latency_ms = (time.perf_counter() - started) * 1000
     runtime_metrics.observe(method=request.method, path=path, status_code=status_code, latency_ms=latency_ms)
@@ -252,6 +295,7 @@ async def security_observability_and_rate_limit(request: Request, call_next):
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
     response.headers.setdefault("Permissions-Policy", "camera=(), geolocation=(), payment=()")
+    clear_tenant_context()
     return response
 
 STAGE_ORDER = {"profile": 1, "track": 2, "draft": 3, "review": 4, "revised": 5}
@@ -259,6 +303,12 @@ STAGE_LABELS = {"profile": "建立画像", "track": "目标确认", "draft": "�
 
 
 AUTH_COOKIE = "careeros_session"
+session_cookie = APIKeyCookie(
+    name=AUTH_COOKIE,
+    scheme_name="CareerOSSession",
+    description="HttpOnly CareerOS session cookie returned by `/api/auth/login`.",
+    auto_error=False,
+)
 
 
 def _demo_principal() -> Principal:
@@ -272,13 +322,18 @@ def _demo_principal() -> Principal:
     )
 
 
-def current_principal(request: Request) -> Principal:
-    token = request.cookies.get(AUTH_COOKIE)
+def current_principal(
+    request: Request,
+    token: str | None = Depends(session_cookie),
+) -> Principal:
     principal = auth_store.resolve_session(token)
     if principal:
+        set_tenant_context(principal.tenant_id, platform_admin=principal.is_super_admin)
         return principal
     if not settings.auth_required:
-        return _demo_principal()
+        principal = _demo_principal()
+        set_tenant_context(principal.tenant_id, platform_admin=principal.is_super_admin)
+        return principal
     raise HTTPException(status_code=401, detail="authentication required")
 
 
@@ -660,77 +715,18 @@ def admin_add_class_member(class_id: str, req: ClassMemberRequest, principal: Pr
     return {"ok": True}
 
 
-@app.get("/api/health")
-def health():
-    tasks = agents.task_status()
-    enabled_count = sum(1 for x in tasks.values() if x["enabled"])
-    mode = "demo" if settings.demo_mode or enabled_count == 0 else ("llm" if enabled_count == len(tasks) else "hybrid")
-    sources = knowledge_store.list_sources()
-    return {
-        "ok": True,
-        "version": "1.0.0-beta1-business-runtime-verification",
-        "mode": mode,
-        "product": {
-            "name": settings.product_name,
-            "preset": product_profile.profile_id,
-            "subtitle": product_profile.product_subtitle,
-            "competition_template_enabled": product_profile.enable_competition_template,
-        },
-        "tasks": tasks,
-        "knowledge": {
-            "sources": len(sources),
-            "chunks": sum(int(s["chunk_count"]) for s in sources if s["active"]),
-        },
-        "jobs": job_store.stats(),
-        "retrieval": {"embedding_model": embedding_gateway.model_name, "semantic_embedding": embedding_gateway.semantic_enabled},
-        "storage": {"provider": settings.storage_provider},
-        "runtime_state": rate_limiter.capabilities(),
-        "background_jobs": background_jobs.capabilities(),
-        "observability": observability_state,
-        "repository": {"runtime": repositories.backend, "requested": settings.repository_backend, "database_url_configured": bool(settings.database_url)},
-        "migrations": migration_status(settings.db_path),
-        "auth": {"required": settings.auth_required, "environment": settings.app_env},
-        "security": {
-            "admin_token_configured": bool(settings.admin_token),
-            "custom_secret_configured": settings.app_secret_key != "change-me-in-production",
-        },
-    }
-
-
-@app.get("/live")
-@app.get("/api/live")
-def live_probe():
-    return {"ok": True, "service": settings.otel_service_name, "version": "1.0.0-beta1"}
-
-
-@app.get("/ready")
-@app.get("/api/ready")
-def ready_probe():
-    redis_caps = redis_capabilities(settings.redis_url)
-    blockers = []
-    runtime_cert = load_runtime_certification(settings.runtime_certification_file, settings=settings)
-    business_cert = load_business_certification(settings.business_certification_file, settings=settings)
-    if settings.is_production and not settings.demo_mode:
-        if settings.runtime_state_backend != "redis" or not redis_caps.get("ready"):
-            blockers.append("distributed Redis runtime state is not ready")
-        if settings.background_job_backend != "redis":
-            blockers.append("distributed background job backend is not enabled")
-        if settings.storage_provider != "s3":
-            blockers.append("private S3-compatible object storage is not enabled")
-        if not runtime_cert.get("valid"):
-            blockers.append("signed live runtime certification is missing, stale, invalid, or incomplete")
-        if not business_cert.get("valid"):
-            blockers.append("signed business E2E certification is missing, stale, invalid, or incomplete")
-    return JSONResponse(
-        {
-            "ready": not blockers, "blockers": blockers,
-            "runtime_state": rate_limiter.capabilities(), "redis": redis_caps,
-            "background_jobs": background_jobs.capabilities(), "storage_provider": settings.storage_provider,
-            "runtime_certification": {"valid": bool(runtime_cert.get("valid")), "reason": runtime_cert.get("reason", ""), "generated_at": runtime_cert.get("generated_at")},
-            "business_certification": {"valid": bool(business_cert.get("valid")), "reason": business_cert.get("reason", ""), "generated_at": business_cert.get("generated_at")},
-        },
-        status_code=200 if not blockers else 503,
-    )
+app.include_router(build_system_router(
+    settings=settings,
+    agents=agents,
+    knowledge_store=knowledge_store,
+    job_store=job_store,
+    embedding_gateway=embedding_gateway,
+    rate_limiter=rate_limiter,
+    background_jobs=background_jobs,
+    observability_state=observability_state,
+    repositories=repositories,
+    product_profile=product_profile,
+))
 
 
 @app.get("/api/admin/system/metrics")
@@ -981,17 +977,25 @@ def _derive_track_signals(state: SessionState) -> TrackInput:
 
 def _intent(message: str) -> str:
     m = message.strip().lower()
-    if ("成长赛道" in m or "就业赛道" in m) and any(k in m for k in ["选择", "确定", "确认", "我要", "参加"]):
+    if (("成长赛道" in m or "就业赛道" in m) and any(k in m for k in ["选择", "确定", "确认", "我要", "参加"])) or (
+        ("growth track" in m or "employment track" in m) and any(k in m for k in ["choose", "confirm", "select"])
+    ):
         return "confirm_track"
-    if any(k in m for k in ["修订", "按意见改", "修改作品", "优化作品", "重新修改"]):
+    if any(k in m for k in ["修订", "按意见改", "修改作品", "优化作品", "重新修改", "revise", "revision", "improve the artifact"]):
         return "revise"
-    if any(k in m for k in ["评分", "评审", "打分", "作品问题", "看看问题"]):
+    if any(k in m for k in ["评分", "评审", "打分", "作品问题", "看看问题", "review", "score", "evaluate"]):
         return "review"
-    if any(k in m for k in ["生成初稿", "写简历", "写规划书", "生成作品", "开始写", "帮我写"]):
+    if any(k in m for k in ["生成初稿", "写简历", "写规划书", "生成作品", "开始写", "帮我写", "generate draft", "write resume", "create artifact"]):
         return "draft"
-    if ("赛道" in m and any(k in m for k in ["推荐", "选", "适合", "哪个"])) or m in {"推荐赛道", "赛道推荐"}:
+    if ("赛道" in m and any(k in m for k in ["推荐", "选", "适合", "哪个"])) or m in {"推荐赛道", "赛道推荐"} or (
+        "track" in m and any(k in m for k in ["recommend", "choose", "suitable", "which"])
+    ):
         return "track"
     return "chat"
+
+
+def _localized(locale: str, zh: str, en: str) -> str:
+    return en if locale == "en-US" else zh
 
 
 @app.post("/api/chat")
@@ -1014,10 +1018,14 @@ async def chat(req: ChatRequest, principal: Principal = Depends(current_principa
     refs = []
 
     if action == "confirm_track":
-        chosen = "就业赛道" if "就业赛道" in message else "成长赛道"
+        chosen = "就业赛道" if ("就业赛道" in message or "employment track" in message.lower()) else "成长赛道"
         state.track = chosen
         state.stage = "track"
-        reply = f"已确认 **{chosen}**。接下来我会按该赛道组织作品结构与评审口径。你可以直接说“帮我生成初稿”。"
+        reply = _localized(
+            req.locale,
+            f"已确认 **{chosen}**。接下来我会按该赛道组织作品结构与评审口径。你可以直接说“帮我生成初稿”。",
+            f"**{chosen}** is confirmed. I will use its artifact structure and review rubric. You can now ask me to generate a draft.",
+        )
         payload["confirmed_track"] = chosen
 
     elif action == "track":
@@ -1027,16 +1035,22 @@ async def chat(req: ChatRequest, principal: Principal = Depends(current_principa
         state.stage = "track"
         reasons = "；".join(rec.reasons[:3])
         if rec.recommended_track == "待确认":
-            reply = f"两条赛道适配度比较接近：成长赛道 {rec.growth_score}%，就业赛道 {rec.employment_score}%。主要依据：{reasons}。请结合当届资格要求确认，并回复“我选择成长赛道”或“我选择就业赛道”。"
+            reply = _localized(req.locale,
+                f"两条赛道适配度比较接近：成长赛道 {rec.growth_score}%，就业赛道 {rec.employment_score}%。主要依据：{reasons}。请结合当届资格要求确认，并回复“我选择成长赛道”或“我选择就业赛道”。",
+                f"The two tracks are close: Growth {rec.growth_score}% and Employment {rec.employment_score}%. Verify the current eligibility rules, then confirm the Growth Track or Employment Track.")
         else:
-            reply = f"基于你当前已确认的画像，我更建议 **{rec.recommended_track}**。成长赛道适配度 {rec.growth_score}%，就业赛道适配度 {rec.employment_score}%。主要依据：{reasons}。如认可，请回复“我选择{rec.recommended_track}”；最终仍需以当届官方资格与学校通知核验。"
+            reply = _localized(req.locale,
+                f"基于你当前已确认的画像，我更建议 **{rec.recommended_track}**。成长赛道适配度 {rec.growth_score}%，就业赛道适配度 {rec.employment_score}%。主要依据：{reasons}。如认可，请回复“我选择{rec.recommended_track}”；最终仍需以当届官方资格与学校通知核验。",
+                f"Based on your confirmed profile, I recommend **{rec.recommended_track}**. Growth fit: {rec.growth_score}%; Employment fit: {rec.employment_score}%. Verify this against current official and school eligibility rules before confirming.")
         payload["recommendation"] = rec.model_dump()
 
     elif action == "draft":
         if domain.enable_competition_template and state.track == "待确认" and "简历" not in message and "规划书" not in message:
             rec = recommend_track(_derive_track_signals(state))
             state.track_recommendation = rec
-            reply = f"在生成作品前先确认赛道。当前成长赛道适配度 {rec.growth_score}%，就业赛道适配度 {rec.employment_score}%。请回复“我选择成长赛道”或“我选择就业赛道”；也可以明确说“生成简历”或“生成职业规划书”。"
+            reply = _localized(req.locale,
+                f"在生成作品前先确认赛道。当前成长赛道适配度 {rec.growth_score}%，就业赛道适配度 {rec.employment_score}%。请回复“我选择成长赛道”或“我选择就业赛道”；也可以明确说“生成简历”或“生成职业规划书”。",
+                f"Confirm a track before generating an artifact. Current fit: Growth {rec.growth_score}%, Employment {rec.employment_score}%. Confirm a track or explicitly request a resume or career report.")
             payload["recommendation"] = rec.model_dump()
             state.messages.append(ChatMessage(role="assistant", content=reply, action="track"))
             store.save(state)
@@ -1058,7 +1072,9 @@ async def chat(req: ChatRequest, principal: Principal = Depends(current_principa
         collaboration_store.complete_matching(state.session_id, "generate_draft", tenant_id=state.tenant_id)
         collaboration_store.ensure_task("完成严格评审", "review_draft", session_id=state.session_id, tenant_id=state.tenant_id, source="workflow")
         display_type = "职业发展报告" if (doc_type in {"职业规划书", "发展报告"} and not domain.enable_competition_template) else doc_type
-        reply = f"已生成一版 **{display_type}初稿**。我只调用你已经提供或已验证的事实；缺失信息会保留“待补充”，不会替你虚构经历。下一步可以直接对我说“给这份成果评分”。"
+        reply = _localized(req.locale,
+            f"已生成一版 **{display_type}初稿**。我只调用你已经提供或已验证的事实；缺失信息会保留“待补充”，不会替你虚构经历。下一步可以直接对我说“给这份成果评分”。",
+            f"A **{display_type} draft** has been created using only supplied or verified facts. Missing information stays explicitly marked and no experience is invented. Next, ask for a rigorous review.")
         retrieval_query = (f"{state.track} {doc_type} 评分标准 作品规范 {state.profile.target_job}" if domain.enable_competition_template
                            else f"{display_type} 评价标准 成果规范 目标岗位 {state.profile.target_job}")
         _, refs = agents.retrieve_context(retrieval_query, state)
@@ -1066,7 +1082,8 @@ async def chat(req: ChatRequest, principal: Principal = Depends(current_principa
 
     elif action == "review":
         if not state.draft.strip():
-            reply = "目前还没有可评审的成果。先告诉我“生成初稿”，或者上传/粘贴已有材料。"
+            reply = _localized(req.locale, "目前还没有可评审的成果。先告诉我“生成初稿”，或者上传/粘贴已有材料。",
+                               "There is no artifact to review. Generate a draft or upload existing material first.")
         else:
             report = await agents.review(state, state.draft, student_evidence=_evidence_context(state.session_id, state))
             state.review = report
@@ -1079,13 +1096,17 @@ async def chat(req: ChatRequest, principal: Principal = Depends(current_principa
             )
             collaboration_store.complete_matching(state.session_id, "review_draft", tenant_id=state.tenant_id)
             collaboration_store.ensure_task("按评审意见完成修订", "revise_draft", session_id=state.session_id, tenant_id=state.tenant_id, priority="high" if report.total_score < 70 else "normal", source="reviewer", payload={"score": report.total_score})
-            reply = f"严格评审已完成：**{report.total_score}/100**。最高优先级不是语言润色，而是先处理：{report.revision_priority[0] if report.revision_priority else '证据链与结构问题'}。你可以继续说“按意见修订”。"
+            priority = report.revision_priority[0] if report.revision_priority else "证据链与结构问题"
+            reply = _localized(req.locale,
+                f"严格评审已完成：**{report.total_score}/100**。最高优先级不是语言润色，而是先处理：{priority}。你可以继续说“按意见修订”。",
+                f"Rigorous review complete: **{report.total_score}/100**. Address the highest-priority evidence and structural issue before language polishing, then request a revision.")
             _, refs = agents.retrieve_context(f"{state.track} 评分标准 评审规则 {state.document_type or ''}", state)
             payload["review"] = report.model_dump()
 
     elif action == "revise":
         if not state.draft.strip():
-            reply = "还没有初稿，无法修订。先生成或导入作品。"
+            reply = _localized(req.locale, "还没有初稿，无法修订。先生成或导入作品。",
+                               "There is no draft to revise. Generate or import an artifact first.")
         else:
             if state.review is None:
                 state.review = await agents.review(state, state.draft, student_evidence=_evidence_context(state.session_id, state))
@@ -1105,16 +1126,19 @@ async def chat(req: ChatRequest, principal: Principal = Depends(current_principa
             _require_artifact_version_quota(state)
             payload["artifact"] = _save_artifact_version(state, revised, revised=True, metadata={"source": "coach_revision", "score_before": state.review.total_score})
             collaboration_store.complete_matching(state.session_id, "revise_draft", tenant_id=state.tenant_id)
-            reply = "Critic 复核与修订已完成。修订版已经生成；仍存在的“待补充”表示缺少真实材料，不能由 AI 代填。"
+            reply = _localized(req.locale,
+                "Critic 复核与修订已完成。修订版已经生成；仍存在的“待补充”表示缺少真实材料，不能由 AI 代填。",
+                "Critic verification and revision are complete. Remaining missing-information markers require real evidence and cannot be filled by AI.")
             _, refs = agents.retrieve_context(f"{state.track} 评分标准 作品规范 {state.profile.target_job}", state)
             payload.update({"revised_draft": revised, "critic": critic, "evidence_audit": audit.model_dump()})
 
     else:
-        reply, refs = await agents.coach(state, message)
+        reply, refs = await agents.coach(state, message, locale=req.locale)
         open_feedback = collaboration_store.list_feedback(state.session_id, status="open", tenant_id=state.tenant_id)
         if open_feedback:
             latest = open_feedback[0]
-            reply = f"Advisor 最新反馈：{latest['content']}\n\n{reply}"
+            reply = _localized(req.locale, f"Advisor 最新反馈：{latest['content']}\n\n{reply}",
+                               f"Latest advisor feedback: {latest['content']}\n\n{reply}")
             payload["teacher_feedback"] = latest
 
     state.messages.append(ChatMessage(role="assistant", content=reply, action=action, knowledge_refs=refs))
@@ -1132,8 +1156,8 @@ def _sse_event(event: str, data) -> str:
 @app.post("/api/chat/stream")
 async def chat_stream(req: ChatRequest, principal: Principal = Depends(current_principal)):
     async def events():
-        yield _sse_event("status", {"stage": "accepted", "message": "Request accepted"})
-        yield _sse_event("status", {"stage": "analyzing", "message": "Analyzing context and evidence"})
+        yield _sse_event("status", {"stage": "accepted", "message": _localized(req.locale, "请求已接收", "Request accepted")})
+        yield _sse_event("status", {"stage": "analyzing", "message": _localized(req.locale, "正在分析上下文与证据", "Analyzing context and evidence")})
         await asyncio.sleep(0)
         try:
             result = await chat(req, principal)
@@ -1653,8 +1677,6 @@ app.include_router(build_template_admin_router(
     admin_dependency=require_roles("school_admin"),
 ))
 
-# Project aggregate APIs compose existing Session/Workflow stores and keep all object access
-# constrained by the authenticated tenant and participant owner.
 app.include_router(build_projects_router(
     current_principal=current_principal,
     project_repository=project_repository,
@@ -1689,98 +1711,43 @@ app.include_router(build_commercial_router(
     settings=settings,
 ))
 
+# ---------------- Unified H5 runtime ----------------
+# API mode now treats FastAPI persistence as authoritative for all Showcase workspace entities.
+app.include_router(build_unified_runtime_router(
+    repository=unified_runtime_store,
+    current_principal=current_principal,
+    canonical_role=canonical_role,
+    auth_store=auth_store,
+))
 
-# ---------------- Model center / multi-provider APIs ----------------
-@app.get("/api/admin/models/overview")
-def model_overview(x_admin_token: str | None = Header(default=None), principal: Principal = Depends(require_roles("super_admin"))):
-    _require_admin_legacy(x_admin_token, principal)
-    return {
-        "demo_mode": settings.demo_mode,
-        "providers": model_store.list_providers(),
-        "routes": model_store.list_routes(),
-        "capabilities": model_store.list_model_capabilities(),
-        "tasks": agents.task_status(),
-        "usage": model_store.usage_summary(limit=25),
-        "warning": "生产环境必须设置 APP_SECRET_KEY 与 ADMIN_TOKEN。" if (settings.app_secret_key == "change-me-in-production" or not settings.admin_token) else None,
-    }
+# ---------------- Canonical workspace BFF ----------------
+# The complete H5 consumes these domain-backed APIs for business entities.
+# Generic Unified Runtime is reserved for transient/UI state and compatibility.
+app.include_router(build_workspace_router(
+    sessions=store,
+    identity=auth_store,
+    evidence=evidence_store,
+    evidence_graph=evidence_graph,
+    artifacts=artifact_store,
+    collaboration=collaboration_store,
+    knowledge=knowledge_store,
+    jobs=job_store,
+    agents=agents,
+    current_principal=current_principal,
+    canonical_role=canonical_role,
+))
 
-
-@app.post("/api/admin/providers")
-def upsert_provider(req: ProviderUpsert, x_admin_token: str | None = Header(default=None), principal: Principal = Depends(require_roles("super_admin"))):
-    _require_admin_legacy(x_admin_token, principal)
-    model_store.upsert_provider(req)
-    return {"ok": True, "providers": model_store.list_providers()}
-
-
-@app.delete("/api/admin/providers/{provider_id}")
-def delete_provider(provider_id: str, x_admin_token: str | None = Header(default=None), principal: Principal = Depends(require_roles("super_admin"))):
-    _require_admin_legacy(x_admin_token, principal)
-    model_store.delete_provider(provider_id)
-    return {"ok": True}
-
-
-@app.post("/api/admin/providers/test")
-async def test_provider(req: ProviderTestRequest, x_admin_token: str | None = Header(default=None), principal: Principal = Depends(require_roles("super_admin"))):
-    _require_admin_legacy(x_admin_token, principal)
-    try:
-        return await agents.gateway.test_provider(req.provider_id, req.model)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-
-@app.put("/api/admin/routes/{task}")
-def upsert_route(task: str, req: RouteUpsert, x_admin_token: str | None = Header(default=None), principal: Principal = Depends(require_roles("super_admin"))):
-    _require_admin_legacy(x_admin_token, principal)
-    if task != req.task:
-        raise HTTPException(status_code=400, detail="URL task 与请求体 task 不一致")
-    if req.provider_id != "auto" and not model_store.get_provider(req.provider_id):
-        raise HTTPException(status_code=400, detail="主 Provider 不存在")
-    if req.fallback_provider_id and not model_store.get_provider(req.fallback_provider_id):
-        raise HTTPException(status_code=400, detail="Fallback Provider 不存在")
-    model_store.upsert_route(req)
-    return {"ok": True, "routes": model_store.list_routes(), "tasks": agents.task_status()}
-
-
-@app.put("/api/admin/models/capabilities")
-def upsert_model_capability(req: ModelCapabilityUpsert, principal: Principal = Depends(require_roles("super_admin"))):
-    if not model_store.get_provider(req.provider_id):
-        raise HTTPException(status_code=400, detail="provider not found")
-    return {"ok":True,"capability":model_store.upsert_model_capability(req)}
-
-
-@app.get("/api/admin/models/capabilities")
-def list_model_capabilities(provider_id: str = Query(default=""), principal: Principal = Depends(require_roles("super_admin"))):
-    return {"models":model_store.list_model_capabilities(provider_id or None)}
-
-
-@app.post("/api/admin/models/recommend")
-def recommend_models(req: ModelRecommendationRequest, principal: Principal = Depends(require_roles("super_admin"))):
-    required=req.required_capabilities
-    if req.task and not required:
-        defaults=agents.gateway.recommend_models_for_task(req.task)
-        return {"candidates":defaults,"mode":"task-default"}
-    return {"candidates":model_store.recommend_models(required_capabilities=required,min_context_window=req.min_context_window,max_input_cost_per_million=req.max_input_cost_per_million,max_output_cost_per_million=req.max_output_cost_per_million,prefer_latency=req.prefer_latency),"mode":"explicit"}
-
-
-@app.post("/api/admin/models/evaluate")
-async def evaluate_model(req: ModelEvaluationRequest, principal: Principal = Depends(require_roles("super_admin"))):
-    try:
-        result=await run_model_evaluation(gateway=agents.gateway,store=model_store,tenant_id=principal.tenant_id,provider_id=req.provider_id,model=req.model,task=req.task,cases=[x.model_dump() for x in req.cases])
-        return {"eval_id":result.eval_id,"metrics":result.metrics,"cases":result.cases,"live_api_test":True}
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-
-@app.get("/api/admin/models/evaluations")
-def list_model_evaluations(limit: int = Query(default=50,ge=1,le=500), principal: Principal = Depends(require_roles("super_admin"))):
-    return {"evaluations":model_store.list_model_evals(principal.tenant_id,limit=limit)}
-
-
-@app.get("/api/admin/models/usage")
-def model_usage(limit: int = Query(default=100, ge=1, le=1000), x_admin_token: str | None = Header(default=None), principal: Principal = Depends(require_roles("super_admin"))):
-    _require_admin_legacy(x_admin_token, principal)
-    return model_store.usage_summary(limit=limit)
-
+app.include_router(build_domain_intelligence_router(
+    sessions=store,
+    identity=auth_store,
+    evidence=evidence_store,
+    artifacts=artifact_store,
+    jobs=job_store,
+    domain_service=domain_intelligence_service,
+    domain_store=domain_intelligence_store,
+    current_principal=current_principal,
+    canonical_role=canonical_role,
+))
 
 # ---------------- Knowledge base / data ingestion APIs ----------------
 @app.post("/api/admin/knowledge/ingest")
@@ -1963,6 +1930,17 @@ async def ingest_jobs_csv(file: UploadFile = File(...), x_admin_token: str | Non
     content = await file.read()
     _validate_upload_security(file, content)
     return {"ok": True, **job_store.ingest_csv(content, source=file.filename or "csv", tenant_id=("global" if principal.is_super_admin else principal.tenant_id))}
+
+
+@app.delete("/api/admin/jobs/{job_id}")
+def delete_job(job_id: str, principal: Principal = Depends(require_roles("organization_admin"))):
+    tenant_id = "global" if principal.is_super_admin else principal.tenant_id
+    if tenant_id == "global" and not principal.is_super_admin:
+        raise HTTPException(status_code=403, detail="global job deletion requires super admin")
+    deleted = job_store.delete_job(job_id, tenant_id=tenant_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="job not found or not tenant-owned")
+    return {"ok": True, "deleted": True, "job_id": job_id}
 
 
 @app.get("/api/admin/jobs/{job_id}/requirements")
@@ -2171,6 +2149,11 @@ def index():
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return Response(status_code=204)
+
+
 @app.get("/login")
 def login_page():
     return FileResponse(STATIC_DIR / "login.html")
@@ -2212,3 +2195,17 @@ def admin_page(request: Request):
 @app.get("/showcase")
 def showcase_page():
     return FileResponse(STATIC_DIR / "showcase.html")
+
+
+# Model administration is registered after all legacy route declarations so
+# the final canonical API alias pass observes the complete route surface.
+app.include_router(build_model_admin_router(
+    settings=settings,
+    model_store=model_store,
+    agents=agents,
+    require_roles=require_roles,
+    require_admin_legacy=_require_admin_legacy,
+))
+
+# Register canonical aliases only after the complete compatibility surface is known.
+register_v1_compatibility_aliases(app)

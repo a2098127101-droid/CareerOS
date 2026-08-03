@@ -52,18 +52,28 @@ class ArtifactStore:
         owner_user_id: str = "",
         source: str | None = None,
         created_by: str = "",
+        artifact_id: str | None = None,
     ) -> dict:
         base_kind = self._base_kind(kind)
         clean_title = title.replace(" · 修订版", "").replace(" · 初稿", "")
         source = source or ("revision_agent" if kind.endswith("_revision") else "writer_agent")
         with self._lock, self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM artifact_series WHERE session_id=? AND kind=?", (session_id, base_kind)
-            ).fetchone()
+            if artifact_id:
+                row = conn.execute(
+                    "SELECT * FROM artifact_series WHERE artifact_id=? AND tenant_id=? AND deleted_at IS NULL",
+                    (artifact_id, tenant_id),
+                ).fetchone()
+            else:
+                # Legacy writer/revision agents that do not supply an artifact id continue the
+                # historical one-series-per-kind behavior. Workspace callers always supply an id.
+                row = conn.execute(
+                    "SELECT * FROM artifact_series WHERE session_id=? AND kind=? AND tenant_id=? AND deleted_at IS NULL",
+                    (session_id, base_kind, tenant_id),
+                ).fetchone()
             if row:
                 artifact_id = row["artifact_id"]
             else:
-                artifact_id = f"ART-{uuid4().hex[:12].upper()}"
+                artifact_id = artifact_id or f"ART-{uuid4().hex[:12].upper()}"
                 conn.execute(
                     """INSERT INTO artifact_series(artifact_id,tenant_id,session_id,owner_user_id,kind,title)
                     VALUES(?,?,?,?,?,?)""",
@@ -92,8 +102,8 @@ class ArtifactStore:
             )
             conn.execute(
                 """UPDATE artifact_series SET current_version_id=?, tenant_id=?, owner_user_id=CASE WHEN ?<>'' THEN ? ELSE owner_user_id END,
-                title=?, updated_at=CURRENT_TIMESTAMP WHERE artifact_id=?""",
-                (version_id, tenant_id, owner_user_id, owner_user_id, clean_title, artifact_id),
+                title=?, version=?, updated_at=CURRENT_TIMESTAMP WHERE artifact_id=?""",
+                (version_id, tenant_id, owner_user_id, owner_user_id, clean_title, version, artifact_id),
             )
             conn.commit()
         return self.get_version(version_id)
@@ -106,7 +116,7 @@ class ArtifactStore:
         if artifact_id.startswith("VER-"):
             return self.get_version(artifact_id, tenant_id=tenant_id)
         sql = """SELECT s.*,v.* FROM artifact_series s
-        JOIN artifact_versions v ON v.version_id=s.current_version_id WHERE s.artifact_id=?"""
+        JOIN artifact_versions v ON v.version_id=s.current_version_id WHERE s.artifact_id=? AND s.deleted_at IS NULL"""
         params: list[str] = [artifact_id]
         if tenant_id is not None:
             sql += " AND s.tenant_id=?"
@@ -120,7 +130,7 @@ class ArtifactStore:
     def get_version(self, version_id: str, *, tenant_id: str | None = None) -> dict:
         sql = """SELECT s.title,s.kind,s.owner_user_id,s.current_version_id,v.*
         FROM artifact_versions v JOIN artifact_series s ON s.artifact_id=v.artifact_id
-        WHERE v.version_id=?"""
+        WHERE v.version_id=? AND s.deleted_at IS NULL"""
         params: list[str] = [version_id]
         if tenant_id is not None:
             sql += " AND v.tenant_id=?"
@@ -147,12 +157,12 @@ class ArtifactStore:
         if all_versions:
             sql = f"""SELECT s.title,s.kind,s.owner_user_id,s.current_version_id,v.*
             FROM artifact_series s JOIN artifact_versions v ON v.artifact_id=s.artifact_id
-            WHERE s.session_id=?{tenant_clause}
+            WHERE s.session_id=? AND s.deleted_at IS NULL{tenant_clause}
             ORDER BY v.created_at DESC,v.version DESC"""
         else:
             sql = f"""SELECT s.title,s.kind,s.owner_user_id,s.current_version_id,v.*
             FROM artifact_series s JOIN artifact_versions v ON v.version_id=s.current_version_id
-            WHERE s.session_id=?{tenant_clause}
+            WHERE s.session_id=? AND s.deleted_at IS NULL{tenant_clause}
             ORDER BY s.updated_at DESC"""
         with self._connect() as conn:
             rows = conn.execute(sql, tuple(params)).fetchall()
@@ -165,7 +175,7 @@ class ArtifactStore:
     def latest(self, session_id: str, kind: str | None = None, *, tenant_id: str | None = None) -> dict | None:
         sql = """SELECT s.title,s.kind,s.owner_user_id,s.current_version_id,v.*
         FROM artifact_series s JOIN artifact_versions v ON v.version_id=s.current_version_id
-        WHERE s.session_id=?"""
+        WHERE s.session_id=? AND s.deleted_at IS NULL"""
         params: list[str] = [session_id]
         if kind:
             sql += " AND s.kind=?"
@@ -178,6 +188,96 @@ class ArtifactStore:
             row = conn.execute(sql, tuple(params)).fetchone()
         return self._joined_row(row) if row else None
 
+
+
+    def create_workspace_version(
+        self,
+        *,
+        session_id: str,
+        title: str,
+        kind: str,
+        content: str,
+        evidence_ids: list[str] | None = None,
+        tenant_id: str,
+        owner_user_id: str,
+        created_by: str = "",
+        artifact_id: str | None = None,
+    ) -> dict:
+        links = [{"evidence_id": x} for x in (evidence_ids or []) if x]
+        return self.create_version(
+            session_id=session_id, kind=kind or "custom", title=title or "Artifact", content=content or "",
+            metadata={"workspace_evidence_ids": list(evidence_ids or [])}, evidence_links=links,
+            tenant_id=tenant_id, owner_user_id=owner_user_id, source="workspace", created_by=created_by, artifact_id=artifact_id,
+        )
+
+    def update_workspace_artifact(
+        self,
+        artifact_id: str,
+        *,
+        tenant_id: str,
+        owner_user_id: str,
+        title: str,
+        content: str,
+        kind: str | None = None,
+        evidence_ids: list[str] | None = None,
+        created_by: str = "",
+        expected_version: int | None = None,
+    ) -> dict:
+        current = self.get(artifact_id, tenant_id=tenant_id)
+        if owner_user_id and current.get("owner_user_id") not in {"", owner_user_id}:
+            raise PermissionError("artifact owner mismatch")
+        actual = int(current.get("version") or 1)
+        if expected_version is not None and expected_version != actual:
+            from .unified_runtime_store import RuntimeVersionConflict
+            raise RuntimeVersionConflict(artifact_id, expected_version, actual)
+        base_kind = kind or current.get("kind") or "custom"
+        return self.create_workspace_version(
+            session_id=current["session_id"], title=title or current.get("title") or "Artifact", kind=base_kind,
+            content=content, evidence_ids=evidence_ids, tenant_id=tenant_id, owner_user_id=owner_user_id,
+            created_by=created_by, artifact_id=artifact_id,
+        )
+
+    def delete_artifact(
+        self, artifact_id: str, *, tenant_id: str, owner_user_id: str, expected_version: int | None = None
+    ) -> bool:
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT v.version,s.owner_user_id FROM artifact_series s JOIN artifact_versions v ON v.version_id=s.current_version_id WHERE s.artifact_id=? AND s.tenant_id=? AND s.deleted_at IS NULL",
+                (artifact_id, tenant_id),
+            ).fetchone()
+            if not row:
+                return False
+            if owner_user_id and row["owner_user_id"] not in {"", owner_user_id}:
+                raise PermissionError("artifact owner mismatch")
+            actual = int(row["version"] or 1)
+            if expected_version is not None and expected_version != actual:
+                from .unified_runtime_store import RuntimeVersionConflict
+                raise RuntimeVersionConflict(artifact_id, expected_version, actual)
+            conn.execute(
+                "UPDATE artifact_series SET deleted_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP,version=version+1 WHERE artifact_id=? AND tenant_id=?",
+                (artifact_id, tenant_id),
+            )
+            conn.commit()
+        return True
+
+    @staticmethod
+    def to_workspace_item(row: dict) -> dict:
+        metadata = row.get("metadata") or {}
+        evidence_ids = list(metadata.get("workspace_evidence_ids") or [])
+        if not evidence_ids:
+            evidence_ids = [x.get("evidence_id") for x in (row.get("evidence_links") or []) if x.get("evidence_id")]
+        return {
+            "id": row.get("artifact_id", ""),
+            "title": row.get("title", "Artifact"),
+            "type": row.get("kind", "custom"),
+            "content": row.get("content", ""),
+            "evidenceIds": evidence_ids,
+            "version": int(row.get("version") or 1),
+            "versionId": row.get("version_id", ""),
+            "createdAt": str(row.get("created_at") or ""),
+            "updatedAt": str(row.get("created_at") or ""),
+            "_version": int(row.get("version") or 1),
+        }
 
     def list_versions(self, artifact_id: str, *, tenant_id: str) -> list[dict]:
         with self._connect() as conn:

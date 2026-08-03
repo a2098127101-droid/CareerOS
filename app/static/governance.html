@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>AI成本与审计 · CareerOS</title>
+  <link rel="stylesheet" href="/static/career-os.css">
+  <link rel="stylesheet" href="/static/production-workspaces.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <a class="brand" href="/admin"><div class="brand-mark">C</div><div class="brand-copy"><strong>CareerOS</strong><span>治理中心</span></div></a>
+    <div class="nav-scroll"><div class="nav-section">治理</div><a class="nav-item active" href="#usage"><i data-lucide="coins"></i><span>AI成本</span></a><a class="nav-item" href="#audit"><i data-lucide="scroll-text"></i><span>审计事件</span></a><div class="nav-section">管理</div><a class="nav-item" href="/admin"><i data-lucide="settings-2"></i><span>模型与知识库</span></a><a class="nav-item" href="/teacher"><i data-lucide="list-todo"></i><span>教师运营中心</span></a><div class="nav-section">口径</div><div class="nav-note">成本只按已配置模型价格估算。未知价格的调用单独列出，不按零成本处理。</div></div>
+    <div class="sidebar-bottom"><button class="nav-item" id="logout"><i data-lucide="log-out"></i><span>退出登录</span></button></div>
+  </aside>
+  <header class="topbar"><div class="breadcrumb">CareerOS / <b>AI成本与审计</b></div><div class="top-actions" style="margin-left:auto"><button class="icon-btn" id="refresh"><i data-lucide="refresh-cw"></i></button><button class="icon-btn" data-theme-toggle><i data-lucide="sun-moon"></i></button><div class="avatar" id="avatar">管</div></div></header>
+  <main class="main"><div class="main-inner">
+    <div class="page-head"><div><div class="eyebrow">Model Governance</div><h1>AI成本与审计</h1><p>查看租户内模型调用、Token、估算成本、错误和关键操作记录。</p></div><div class="page-actions"><select class="select" id="limit" style="width:130px"><option value="100">最近100条</option><option value="300">最近300条</option><option value="1000">最近1000条</option></select></div></div>
+    <section id="usage">
+      <div class="governance-grid"><div class="governance-card"><span>调用次数</span><strong id="calls">—</strong><small>当前查询窗口</small></div><div class="governance-card"><span>Token</span><strong id="tokens">—</strong><small>输入与输出合计</small></div><div class="governance-card"><span>估算成本</span><strong id="cost">—</strong><small>USD · 已配置价格</small></div><div class="governance-card"><span>错误率</span><strong id="errorRate">—</strong><small id="priceCoverage">价格覆盖 —</small></div></div>
+      <div class="governance-layout"><section><div class="section-head"><div><h2>按任务拆分</h2><p>识别成本主要由哪个Agent或工作流产生。</p></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>任务</th><th>调用</th><th>Token</th><th>估算成本</th></tr></thead><tbody id="taskRows"></tbody></table></div></section><section><div class="section-head"><div><h2>最近调用</h2><p>模型、延迟、状态与单次估算。</p></div></div><div id="recentUsage" class="activity-list"></div></section></div>
+    </section>
+    <section class="section" id="audit"><div class="section-head"><div><h2>审计事件</h2><p>项目、证据、模型和管理操作的可追溯记录。</p></div><input class="input" id="auditSearch" placeholder="筛选动作或资源" style="width:240px;height:38px"></div><div id="auditRows"></div></section>
+  </div></main>
+</div>
+<nav class="mobile-nav"><a class="active" href="#usage"><i data-lucide="coins"></i><span>成本</span></a><a href="#audit"><i data-lucide="scroll-text"></i><span>审计</span></a><a href="/teacher"><i data-lucide="list-todo"></i><span>运营</span></a><a href="/admin"><i data-lucide="settings-2"></i><span>设置</span></a></nav>
+<div class="toast-stack" id="toastStack"></div>
+<script src="/static/vendor/lucide.min.js"></script><script src="/static/i18n.js"></script><script src="/static/ui.js"></script>
+<script>
+const $=selector=>document.querySelector(selector);let usage=null,audit=null;
+function esc(value=''){return String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]))}
+function toast(message,icon='check'){CareerUI.toast(message,icon)}
+function number(value){return new Intl.NumberFormat('zh-CN').format(Number(value)||0)}
+async function api(url,opt={}){const response=await fetch(url,opt);const data=await response.json().catch(()=>({}));if(response.status===401){location.href='/login?next=/static/governance.html';throw new Error('请先登录')}if(response.status===403)throw new Error('当前账号没有组织治理权限');if(!response.ok)throw new Error(typeof data.detail==='string'?data.detail:'请求失败');return data}
+function renderUsage(){const summary=usage.summary||{};$('#calls').textContent=number(summary.calls);$('#tokens').textContent=number(summary.tokens);$('#cost').textContent=`$${Number(summary.estimated_cost_usd||0).toFixed(4)}`;$('#errorRate').textContent=`${(Number(summary.error_rate||0)*100).toFixed(1)}%`;$('#priceCoverage').textContent=`价格覆盖 ${summary.priced_calls||0}/${summary.calls||0}，未知 ${summary.unpriced_calls||0}`;
+  const tasks=Object.entries(usage.by_task||{}).sort((a,b)=>Number(b[1].estimated_cost_usd)-Number(a[1].estimated_cost_usd));$('#taskRows').innerHTML=tasks.length?tasks.map(([task,item])=>`<tr><td><strong>${esc(task)}</strong></td><td>${number(item.calls)}</td><td>${number(item.tokens)}</td><td>$${Number(item.estimated_cost_usd||0).toFixed(4)}</td></tr>`).join(''):'<tr><td colspan="4"><div class="operations-empty">暂无模型调用</div></td></tr>';
+  const recent=(usage.recent||[]).slice(0,20);$('#recentUsage').innerHTML=recent.length?recent.map(item=>`<div class="activity-item"><div class="activity-icon"><i data-lucide="${item.success?'check':'triangle-alert'}"></i></div><div class="activity-copy"><strong>${esc(item.task)} · ${esc(item.model)}</strong><span>${number(item.total_tokens)} tokens · ${number(item.latency_ms)} ms</span></div><span class="activity-time">${item.estimated_cost_usd==null?'未定价':'$'+Number(item.estimated_cost_usd).toFixed(5)}</span></div>`).join(''):'<div class="operations-empty">暂无调用记录</div>';
+}
+function renderAudit(){const query=$('#auditSearch').value.trim().toLowerCase();const events=(audit.events||[]).filter(item=>!query||[item.action,item.resource_type,item.resource_id,item.user_id].join(' ').toLowerCase().includes(query));$('#auditRows').innerHTML=events.length?events.map(item=>`<div class="audit-row"><span>${esc(String(item.created_at||'').replace('T',' ').slice(0,19))}</span><strong>${esc(item.action)}</strong><div><span>${esc(item.resource_type||'resource')} · ${esc(item.resource_id||'—')}</span><div class="meta">用户 ${esc(item.user_id||'system')}</div></div><span class="badge ${item.success?'success':'danger'}">${item.success?'成功':'失败'}</span></div>`).join(''):'<div class="operations-empty">没有匹配的审计事件</div>';CareerUI.refreshIcons()}
+async function load(){try{const limit=$('#limit').value;const [me,usageData,auditData]=await Promise.all([api('/api/auth/me'),api(`/api/v1/governance/ai-usage?limit=${limit}`),api(`/api/v1/governance/audit-events?limit=${limit}`)]);usage=usageData;audit=auditData;$('#avatar').textContent=(me.user?.display_name||'管').slice(0,1);renderUsage();renderAudit();CareerUI.refreshIcons()}catch(error){toast(error.message,'triangle-alert');$('.main-inner').innerHTML=`<div class="empty project-empty"><div><div class="empty-icon"><i data-lucide="shield-alert"></i></div><h3>无法打开治理中心</h3><p>${esc(error.message)}</p><a class="btn" href="/admin">返回管理中心</a></div></div>`;CareerUI.refreshIcons()}}
+$('#refresh').onclick=load;$('#limit').onchange=load;$('#auditSearch').oninput=renderAudit;$('#logout').onclick=async()=>{try{await api('/api/auth/logout',{method:'POST'});location.href='/login'}catch(error){toast(error.message,'triangle-alert')}};CareerUI.initTheme();CareerUI.refreshIcons();load();
+</script>
+</body>
+</html>

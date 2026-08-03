@@ -14,9 +14,12 @@ from ..model_store import ModelConfigStore
 from ..storage import StorageRegistry
 from ..store import SessionStore
 from ..workflow_store import WorkflowStore
+from ..unified_runtime_store import UnifiedRuntimeStore
 from ..template_registry import TemplateRegistry
-from ..project_repository import ProjectRepository
 from ..embedding_gateway import EmbeddingGateway
+from ..retrieval import RerankerGateway
+from ..domain_intelligence import DomainIntelligenceStore
+from ..project_repository import ProjectRepository
 from ..core.database import DatabaseCapabilityReport, database_capabilities, create_database_engine, BASELINE_METADATA, schema_health
 from .parity import CORE_PARITY
 
@@ -45,6 +48,8 @@ class RepositoryContainer:
     storage_registry: StorageRegistry
     templates: TemplateRegistry
     projects: ProjectRepository
+    runtime_entities: object
+    domain_intelligence: object
     capabilities: DatabaseCapabilityReport
 
     @classmethod
@@ -55,6 +60,7 @@ class RepositoryContainer:
         app_secret_key: str,
         session_ttl_hours: int,
         embedding_gateway: EmbeddingGateway,
+        reranker_gateway: RerankerGateway | None = None,
         database_url: str = "",
         app_env: str = "development",
     ) -> "RepositoryContainer":
@@ -75,13 +81,19 @@ class RepositoryContainer:
             evidence_graph=EvidenceGraphStore(db_path),
             workflows=WorkflowStore(db_path, template_registry=template_registry),
             collaboration=CollaborationStore(db_path),
-            knowledge=KnowledgeStore(db_path, embedding_gateway=embedding_gateway),
+            knowledge=KnowledgeStore(
+                db_path,
+                embedding_gateway=embedding_gateway,
+                reranker_gateway=reranker_gateway,
+            ),
             jobs=JobStore(db_path),
             models=ModelConfigStore(db_path, app_secret_key),
             commercial=CommercialStore(db_path),
             storage_registry=StorageRegistry(db_path),
             templates=template_registry,
             projects=ProjectRepository(engine),
+            runtime_entities=UnifiedRuntimeStore(db_path),
+            domain_intelligence=DomainIntelligenceStore(db_path),
             capabilities=caps,
         )
 
@@ -94,6 +106,7 @@ class RepositoryContainer:
         app_secret_key: str,
         session_ttl_hours: int,
         embedding_gateway: EmbeddingGateway,
+        reranker_gateway: RerankerGateway | None = None,
         app_env: str = "development",
     ) -> "RepositoryContainer":
         if not CORE_PARITY.code_parity_complete:
@@ -117,7 +130,7 @@ class RepositoryContainer:
             PostgresArtifactRepository, PostgresCollaborationRepository, PostgresCommercialRepository,
             PostgresEvidenceGraphRepository, PostgresEvidenceRepository, PostgresIdentityRepository,
             PostgresJobRepository, PostgresKnowledgeRepository, PostgresModelConfigRepository,
-            PostgresSessionRepository, PostgresStorageRegistry, PostgresWorkflowRepository,
+            PostgresSessionRepository, PostgresStorageRegistry, PostgresWorkflowRepository, PostgresUnifiedRuntimeRepository, PostgresDomainIntelligenceRepository,
         )
         return cls(
             backend="postgresql",
@@ -128,19 +141,26 @@ class RepositoryContainer:
             evidence_graph=PostgresEvidenceGraphRepository(engine),
             workflows=PostgresWorkflowRepository(engine, template_registry=template_registry),
             collaboration=PostgresCollaborationRepository(engine),
-            knowledge=PostgresKnowledgeRepository(engine, embedding_gateway=embedding_gateway),
+            knowledge=PostgresKnowledgeRepository(
+                engine,
+                embedding_gateway=embedding_gateway,
+                reranker_gateway=reranker_gateway,
+            ),
             jobs=PostgresJobRepository(engine),
             models=PostgresModelConfigRepository(engine, app_secret_key),
             commercial=PostgresCommercialRepository(engine),
             storage_registry=PostgresStorageRegistry(engine),
             templates=template_registry,
             projects=ProjectRepository(engine),
+            runtime_entities=PostgresUnifiedRuntimeRepository(engine),
+            domain_intelligence=PostgresDomainIntelligenceRepository(engine),
             capabilities=caps,
         )
 
     @classmethod
     def build_sqlalchemy_core_for_testing(
-        cls, *, engine, db_path: str, app_secret_key: str, session_ttl_hours: int, embedding_gateway: EmbeddingGateway
+        cls, *, engine, db_path: str, app_secret_key: str, session_ttl_hours: int,
+        embedding_gateway: EmbeddingGateway, reranker_gateway: RerankerGateway | None = None,
     ) -> dict[str, object]:
         """Build only repositories with SQLAlchemy parity.
 
@@ -151,7 +171,7 @@ class RepositoryContainer:
             PostgresArtifactRepository, PostgresCollaborationRepository, PostgresCommercialRepository,
             PostgresEvidenceGraphRepository, PostgresEvidenceRepository, PostgresIdentityRepository,
             PostgresJobRepository, PostgresKnowledgeRepository, PostgresModelConfigRepository,
-            PostgresSessionRepository, PostgresStorageRegistry, PostgresWorkflowRepository,
+            PostgresSessionRepository, PostgresStorageRegistry, PostgresWorkflowRepository, PostgresUnifiedRuntimeRepository, PostgresDomainIntelligenceRepository,
         )
         return {
             "sessions": PostgresSessionRepository(engine, BASELINE_METADATA),
@@ -161,10 +181,16 @@ class RepositoryContainer:
             "evidence_graph": PostgresEvidenceGraphRepository(engine),
             "workflows": PostgresWorkflowRepository(engine),
             "collaboration": PostgresCollaborationRepository(engine),
-            "knowledge": PostgresKnowledgeRepository(engine, embedding_gateway=embedding_gateway),
+            "knowledge": PostgresKnowledgeRepository(
+                engine,
+                embedding_gateway=embedding_gateway,
+                reranker_gateway=reranker_gateway,
+            ),
             "jobs": PostgresJobRepository(engine),
             "models": PostgresModelConfigRepository(engine, app_secret_key),
             "commercial": PostgresCommercialRepository(engine),
             "storage_registry": PostgresStorageRegistry(engine),
             "projects": ProjectRepository(engine),
+            "runtime_entities": PostgresUnifiedRuntimeRepository(engine),
+            "domain_intelligence": PostgresDomainIntelligenceRepository(engine),
         }

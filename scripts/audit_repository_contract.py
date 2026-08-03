@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import ast
 import json
 from pathlib import Path
@@ -19,6 +20,8 @@ PAIRS = [
     ("app/model_store.py", "ModelConfigStore", "app/repositories/postgres/model.py", "PostgresModelConfigRepository"),
     ("app/commercial_store.py", "CommercialStore", "app/repositories/postgres/commercial.py", "PostgresCommercialRepository"),
     ("app/storage.py", "StorageRegistry", "app/repositories/postgres/storage_registry.py", "PostgresStorageRegistry"),
+    ("app/unified_runtime_store.py", "UnifiedRuntimeStore", "app/repositories/postgres/unified_runtime.py", "PostgresUnifiedRuntimeRepository"),
+    ("app/domain_intelligence.py", "DomainIntelligenceStore", "app/repositories/postgres/domain_intelligence.py", "PostgresDomainIntelligenceRepository"),
     ("app/repositories/interfaces/core.py", "ProjectRepositoryProtocol", "app/project_repository.py", "ProjectRepository"),
 ]
 
@@ -54,6 +57,14 @@ def audit() -> dict:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Audit SQLite/PostgreSQL repository method parity.")
+    parser.add_argument("--json-out", default="", help="Optional output path for the JSON report.")
+    args = parser.parse_args()
     report = audit()
-    print(json.dumps(report, ensure_ascii=False, indent=2))
+    payload = json.dumps(report, ensure_ascii=False, indent=2)
+    print(payload)
+    if args.json_out:
+        output = Path(args.json_out)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(payload + "\n", encoding="utf-8")
     raise SystemExit(0 if report["ok"] else 2)

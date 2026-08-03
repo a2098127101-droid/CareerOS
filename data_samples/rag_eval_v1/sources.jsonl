@@ -1,0 +1,4 @@
+{"demo_data":true,"title":"示例：2026职规赛就业赛道官方规则","category":"competition_rule","authority":"official","effective_year":"2026","priority":100,"scope":"global","content":"【示例数据】2026届就业赛道材料应围绕目标岗位、个人经历证据、岗位能力要求和人岗匹配展开。所有个人成果必须来自可核验的学生材料，不得虚构奖项、证书或量化结果。"}
+{"demo_data":true,"title":"示例：2025职规赛历史规则","category":"competition_rule","authority":"official","effective_year":"2025","priority":70,"scope":"global","content":"【示例数据】2025届历史材料用于检索冲突测试。该材料不适用于2026届，回答时必须提示届次差异并优先采用当前赛届文件。"}
+{"demo_data":true,"title":"示例：用户研究员岗位要求","category":"job_data","authority":"public","effective_year":"2026","priority":75,"scope":"global","content":"【示例数据】用户研究员岗位通常要求用户访谈、需求分析、研究方案设计、数据分析与洞察表达。岗位要求不能自动证明学生已经具备相关技能，必须连接学生 Evidence。"}
+{"demo_data":true,"title":"示例：学校生涯辅导资源","category":"school_resource","authority":"school","effective_year":"2026","priority":85,"scope":"global","content":"【示例数据】学校提供简历门诊、职业测评解读、模拟答辩和岗位调研工作坊。学生应根据差距分析选择对应辅导资源。"}

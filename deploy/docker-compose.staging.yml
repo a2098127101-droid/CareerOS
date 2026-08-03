@@ -96,6 +96,10 @@ services:
       api:
         condition: service_healthy
     command: ["python", "scripts/run_worker.py"]
+    # The image-level HTTP healthcheck targets the API process. The worker has
+    # no HTTP listener; Redis lease/heartbeat health is certified separately.
+    healthcheck:
+      disable: true
     volumes:
       - careeros_runtime:/app/data
 
