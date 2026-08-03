@@ -1,19 +1,24 @@
 name: Reconcile v1.5 Production Integration
 
 on:
-  push:
+  pull_request:
     branches:
-      - codex/v1.5-production-integration
-    paths:
-      - .integration/reconcile-v15-production.trigger
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+  workflow_dispatch:
 
 permissions:
   contents: write
+  pull-requests: read
 
 jobs:
   reconcile:
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'codex/v1.5-production-integration'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -45,6 +50,7 @@ jobs:
       - name: Full regression suite
         run: pytest -q
       - name: Commit reconciled tree
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         run: |
           git config user.name "CareerOS Integration Bot"
           git config user.email "actions@users.noreply.github.com"
