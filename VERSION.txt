@@ -1,1 +1,1 @@
-1.5.0-domain-intelligence
+1.5.0-rc1

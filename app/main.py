@@ -226,7 +226,7 @@ elif settings.bootstrap_superadmin_email and settings.bootstrap_superadmin_passw
 
 app = FastAPI(
     title=f"{settings.product_name} · AI Career Development Platform",
-    version="1.5.1-release-hardening",
+    version="1.5.0-rc1",
     description=(
         "CareerOS Production API. Canonical new integrations should use `/api/v1`; "
         "unversioned `/api/*` endpoints remain compatibility aliases during migration."

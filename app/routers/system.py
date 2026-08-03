@@ -34,7 +34,7 @@ def build_system_router(
         sources = knowledge_store.list_sources()
         return {
             "ok": True,
-            "version": "1.5.1-release-hardening",
+            "version": "1.5.0-rc1",
             "mode": mode,
             "product": {
                 "name": settings.product_name,
@@ -75,7 +75,7 @@ def build_system_router(
         return {
             "ok": True,
             "service": settings.otel_service_name,
-            "version": "1.5.1-release-hardening",
+            "version": "1.5.0-rc1",
         }
 
     @router.get("/ready")

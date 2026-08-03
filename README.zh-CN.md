@@ -1,4 +1,4 @@
-# CareerOS v1.5 · Domain Intelligence
+# CareerOS v1.5.0-rc1 · Domain Intelligence
 
 CareerOS 是一套以证据链为基础的职业智能平台。v1.5 将核心链路 **Claim（主张）→ Capability（能力）→ Job Requirement（岗位要求）→ Gap（差距）** 升级为服务器端独立持久化、版本化、可解释、可审计的领域模型。
 
@@ -37,9 +37,9 @@ uvicorn app.main:app --reload
 ## 验证结果
 
 - 测试文件：36 个；
-- 自动化测试：**153/153 通过**；
+- 自动化测试：**184/184 通过**；
 - SQLite Migration：**21/21**；
-- Alembic Head：`0009_domain_intelligence_v15`；
+- Alembic Head：`0012_project_tenant_rls`；
 - 独立 H5 与服务器静态副本一致；
 - 所有内联 JavaScript 已通过语法检查。
 

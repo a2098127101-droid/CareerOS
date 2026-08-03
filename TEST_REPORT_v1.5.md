@@ -1,4 +1,4 @@
-# CareerOS v1.5.1 Release-Hardening Test Report
+# CareerOS v1.5.0-rc1 Test Report
 
 Test date: 2026-07-27
 Scope: local source regression plus disposable Docker staging infrastructure.
@@ -7,11 +7,11 @@ Scope: local source regression plus disposable Docker staging infrastructure.
 
 - Python compileall: passed.
 - Test files: 38.
-- Pytest: **161 passed**, 1 dependency deprecation warning, 0 failed.
-- Hashed-lock Docker image (`requirements.lock`): **161 passed**, 0 failed;
+- Pytest: **184 passed**, 1 dependency deprecation warning, 0 failed.
+- Hashed-lock Docker image (`requirements.lock`): **184 passed**, 0 failed;
   warnings were the same TestClient notice plus a non-writable pytest cache.
 - SQLite migration: **22/22**.
-- Alembic head: `0010_immutable_runtime_tenant_hardening`.
+- Alembic head: `0012_project_tenant_rls`.
 - Published migration `0007` immutable SHA-256 guard: passed.
 - Upgrade simulation from the original published `0007`: passed.
 - OpenAPI cookie authentication scheme and canonical `/api/v1` aliases: passed.

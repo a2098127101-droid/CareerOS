@@ -3,7 +3,7 @@
 ## Result
 
 - Test files: 36
-- Automated tests: **153/153 passed**
+- Automated tests: **184/184 passed**
 - CI Group 0: 16 passed
 - CI Group 1: 23 passed
 - CI Group 2: 21 passed

@@ -10,6 +10,8 @@
 - Canonical API and Unified H5 consumption.
 - Forward-only migration `0010` repairs the historical migration split without
   mutating the published `0007`.
+- Project MVP migration `0011` and project tenant RLS migration `0012` are the
+  current Alembic head.
 - Tenant-first indexes and forced PostgreSQL RLS policies on tenant-private tables.
 - Real disposable infrastructure probe for PostgreSQL/pgvector, Redis/worker and MinIO.
 - Chrome Student/Teacher/Super-Admin E2E and authenticated `/api/v1` model-admin API.

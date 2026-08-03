@@ -41,6 +41,10 @@ EXCLUDED_DIRS = {
     "build",
 }
 EXCLUDED_NAMES = {
+    # Release manifests are generated from the committed tree at build time.
+    # Keeping a checked-in manifest would make the archive contain stale,
+    # self-referential metadata from a previous build.
+    "RELEASE_MANIFEST.json",
     ".env",
     ".env.production",
     ".env.staging",

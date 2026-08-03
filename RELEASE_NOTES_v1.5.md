@@ -1,4 +1,4 @@
-# CareerOS v1.5 Domain Intelligence — Release Notes
+# CareerOS v1.5.0-rc1 Domain Intelligence — Release Notes
 
 ## Release focus
 
@@ -25,12 +25,12 @@ Every central object now has dedicated storage, version history, explainability 
 - contribution-level explanations and Domain Audit Events;
 - `/api/domain/v1` API and H5 API-mode integration;
 - SQLite and SQLAlchemy/PostgreSQL repository parity;
-- migration 21 and Alembic head `0009_domain_intelligence_v15`.
+- migrations 21/22 plus project migrations, with Alembic head `0012_project_tenant_rls`.
 
 ## Validation
 
 - 36 test files;
-- 153/153 automated tests passed in six deterministic CI groups;
+- 184/184 automated tests passed in six deterministic CI groups;
 - 14 SQLite/PostgreSQL repository contracts audited;
 - fresh SQLite and Alembic migrations passed;
 - H5 JavaScript syntax and static-copy equality passed;

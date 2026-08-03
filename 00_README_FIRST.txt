@@ -12,4 +12,4 @@ Start here:
 9. SOURCE_PROVENANCE_v1.5.md
 
 Windows local launcher: OPEN_CareerOS.cmd
-Version: 1.5.0-domain-intelligence
+Version: 1.5.0-rc1

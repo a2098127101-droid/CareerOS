@@ -1,4 +1,4 @@
-# CareerOS v1.5 · Domain Intelligence
+# CareerOS v1.5.0-rc1 · Domain Intelligence
 
 CareerOS is an evidence-grounded career intelligence platform. v1.5 promotes the core chain **Claim → Capability → Job Requirement → Gap** into persistent, versioned, explainable and auditable server-side domain entities.
 
@@ -75,9 +75,9 @@ GET   /api/domain/v1/audit
 
 ## Validation
 
-- Automated tests: **161/161 passed**
+- Automated tests: **184/184 passed**
 - SQLite migration: **22/22**
-- Alembic head: `0010_immutable_runtime_tenant_hardening`
+- Alembic head: `0012_project_tenant_rls`
 - Immutable published-migration guard and upgrade-from-original-0007 test.
 - Canonical `/api/v1` compatibility surface with OpenAPI cookie authentication.
 - Deterministic Demo retrieval evaluation and disposable staging infrastructure probe.
