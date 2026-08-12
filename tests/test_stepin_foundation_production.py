@@ -122,9 +122,11 @@ def test_foundation_creates_canonical_evidence_and_mini_project(tmp_path: Path):
 
 
 def test_beginner_page_uses_plain_language_and_single_step_flow():
-    page = (Path(__file__).parents[1] / "app" / "static" / "foundation.html").read_text(encoding="utf-8")
+    root = Path(__file__).parents[1]
+    page = (root / "app" / "static" / "foundation.html").read_text(encoding="utf-8")
+    gate = (root / "app" / "foundation_registration.py").read_text(encoding="utf-8")
     assert "今天先做这一小步" in page
-    assert "不需要先选岗位" in (Path(__file__).parents[1] / "app" / "foundation_production.py").read_text(encoding="utf-8")
+    assert "不需要先选岗位" in gate
     assert "Prioritization Board" not in page
     assert "Contextual Copilot" not in page
     assert "Evidence" not in page
@@ -133,10 +135,35 @@ def test_beginner_page_uses_plain_language_and_single_step_flow():
 def test_production_http_gate_and_unlock_flow(tmp_path: Path):
     code = r'''
 from fastapi.testclient import TestClient
-from app.main import app
+from app.main import app, auth_store, settings
+
+# Existing seeded demo accounts remain on the historical project path.
+legacy = TestClient(app)
+assert legacy.post('/api/auth/login', json={'email':'student@demo.local','password':'CareerOS-Demo-123!','role':'student'}).status_code == 200
+legacy_templates = legacy.get('/api/v1/project-templates')
+assert legacy_templates.status_code == 200, legacy_templates.text
+assert legacy_templates.json()['items'], legacy_templates.text
+
+# A real newly-created participant enters Foundation by default.
+user = auth_store.ensure_user(
+    email='foundation-student@local.test',
+    password='Foundation-Test-123!',
+    display_name='Foundation Student',
+    tenant_id=settings.bootstrap_tenant_id,
+    role='student',
+)
+try:
+    auth_store.add_class_member(
+        class_id='demo-default',
+        tenant_id=settings.bootstrap_tenant_id,
+        user_id=user['user_id'],
+        role='student',
+    )
+except Exception:
+    pass
 
 c = TestClient(app)
-r = c.post('/api/auth/login', json={'email':'student@demo.local','password':'CareerOS-Demo-123!','role':'student'})
+r = c.post('/api/auth/login', json={'email':'foundation-student@local.test','password':'Foundation-Test-123!','role':'student'})
 assert r.status_code == 200, r.text
 assert c.get('/projects', follow_redirects=False).status_code == 302
 assert c.get('/projects', follow_redirects=False).headers['location'] == '/static/foundation.html'
