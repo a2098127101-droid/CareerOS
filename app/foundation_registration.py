@@ -255,7 +255,7 @@ def register_foundation_production_routes(app) -> None:
         if not principal.authenticated:
             return RedirectResponse(url=f"/login?next=/app/{spa_path}" if spa_path else "/login?next=/app", status_code=302)
         if canonical_role(principal.role) != "participant":
-            return RedirectResponse(url=main.role_home(principal.role), status_code=302)
+            return RedirectResponse(url="/", status_code=302)
         index = main.STATIC_DIR / "app" / "index.html"
         if index.exists():
             return FileResponse(index)
