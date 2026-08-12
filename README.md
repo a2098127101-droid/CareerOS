@@ -46,7 +46,9 @@ Trajectory 不会直接让系统自我修改生产策略。StepIn 先根据真�
 
 ## Production validation
 
-上一版独立 Learner Agent 已在 PR #18 进入 production `main`，当时锁定回归为 197 tests。StepIn 2.2 将 CI 继续锁定到本版本实际测试总数，同时保留 Foundation contract、Learner Agent contract、database access audit、repository contract、dependency/security scan、container scan、SBOM 和 deterministic release package Gate。
+**StepIn 2.2 已通过 PR #19 合并进入 production `main`。** 合并前的最终 PR head 通过 **204 / 204** 锁定回归，同时通过 Learner Agent 13-route contract、Foundation 10-route contract、Project Library v2.2 audit、database access audit、repository contract、供应链安全扫描和 production release package。当前 `VERSION.txt` 为 `2.2.0-beta-agent-trajectory`。
+
+这些工程 Gate 证明当前代码和发布边界一致，但不等同于教育效果已经被真实用户研究验证。Policy Calibration 仍需要真实学生轨迹与人工标签持续校准。
 
 ## 当前边界
 
