@@ -10,6 +10,7 @@ import {
   Sparkles,
 } from '@react-three/drei'
 import { Canvas, useFrame } from '@react-three/fiber'
+import { Bloom, ChromaticAberration, EffectComposer, Vignette } from '@react-three/postprocessing'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import type { SpatialNode } from '../api/types'
@@ -640,12 +641,22 @@ function Scene({ nodes, focus, onFocus, onInspect }: Props) {
   )
 }
 
+function CinematicPostFX() {
+  return (
+    <EffectComposer multisampling={4}>
+      <Bloom intensity={0.92} luminanceThreshold={1} luminanceSmoothing={0.26} mipmapBlur />
+      <ChromaticAberration offset={[0.00035, 0.00055]} />
+      <Vignette eskil={false} offset={0.14} darkness={0.72} />
+    </EffectComposer>
+  )
+}
+
 export function WorkLab(props: Props) {
   return (
     <Canvas
       shadows
-      dpr={[1, 1.85]}
-      camera={{ position: [0, 4.9, 11.9], fov: 43, near: 0.1, far: 80 }}
+      dpr={[1, 2]}
+      camera={{ position: [0, 6.7, 15.8], fov: 43, near: 0.1, far: 80 }}
       gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
       onCreated={({ gl, scene }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping
@@ -657,6 +668,7 @@ export function WorkLab(props: Props) {
       frameloop="always"
     >
       <Scene {...props} />
+      <CinematicPostFX />
     </Canvas>
   )
 }
