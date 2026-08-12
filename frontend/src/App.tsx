@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-
 import type { SpatialNode } from './api/types'
 import { FoundationPanel } from './features/FoundationPanel'
 import { WorkSamplePanel } from './features/WorkSamplePanel'
-import { WorkLab } from './scene/WorkLab'
+import { PremiumWorkLab } from './scene/PremiumWorkLab'
 import { useSceneState } from './state/SceneStateProvider'
 
 function levelLabel(value: string) {
@@ -32,10 +32,10 @@ function Inspector({ node, onClose }: { node: SpatialNode; onClose: () => void }
         </div>
         {nextRequired.length > 0 && <div className="next-required"><small>离下一层还差什么</small>{nextRequired.map((item: string) => <p key={item}>{item}</p>)}</div>}
       </>}
-      {node.kind === 'evidence' && <p>验证状态：{String(data.verificationStatus || 'SELF_REPORTED')}。3D 只能显示该状态，不能把 Evidence 自行改成 Verified。</p>}
-      {node.kind === 'artifact' && <p>这是服务器保存的 {String(data.kind || 'artifact')} 版本 V{String(data.version || 1)}。历史版本不会因为场景动画被覆盖。</p>}
+      {node.kind === 'evidence' && <p>验证状态：{String(data.verificationStatus || 'SELF_REPORTED')}。3D 只读取该状态，不会自行升级 Evidence。</p>}
+      {node.kind === 'artifact' && <p>服务器保存的 {String(data.kind || 'artifact')} 版本 V{String(data.version || 1)}。历史版本不会被场景动画覆盖。</p>}
       {node.kind === 'trajectory_event' && <p>{String(data.taskId || '实践过程')} · {String(data.at || '')}</p>}
-      {node.kind === 'workstation' && node.state === 'locked' && <p>该工作站当前由服务器锁定。完成前置实践后 SceneState 会自动改变状态。</p>}
+      {node.kind === 'workstation' && node.state === 'locked' && <p>该工作站当前由服务器锁定。SceneState 变化后空间表现才会同步改变。</p>}
       <footer>authority=server · readOnly=true</footer>
     </section>
   )
@@ -69,7 +69,7 @@ function SpatialShell() {
   return (
     <main className="spatial-shell">
       <div className="scene-layer">
-        <WorkLab
+        <PremiumWorkLab
           nodes={nodes}
           connections={connections}
           focus={focus}
@@ -79,7 +79,7 @@ function SpatialShell() {
       </div>
 
       <header className="topbar glass">
-        <button className="brand-button" onClick={() => navigate('/')}><span>S</span><div><strong>StepIn</strong><small>Spatial Practice Alpha 2</small></div></button>
+        <button className="brand-button" onClick={() => navigate('/')}><span>S</span><div><strong>StepIn</strong><small>Spatial Practice Alpha 2 · Ultra</small></div></button>
         <div className="now-context"><span>现在只做这一件事</span><strong>{headline}</strong></div>
         <div className="sync-state"><span className={refreshing ? 'sync-dot active' : 'sync-dot'} />{refreshing ? '同步中' : '服务器已同步'}<small>{lastSyncedAt ? new Date(lastSyncedAt).toLocaleTimeString() : ''}</small></div>
       </header>
