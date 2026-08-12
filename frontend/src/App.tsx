@@ -49,6 +49,7 @@ function SpatialShell() {
 
   const focus = location.pathname.endsWith('/foundation') ? 'foundation' : location.pathname.endsWith('/work-sample') ? 'work-sample' : 'hub'
   const nodes = scene?.spatial?.nodes || []
+  const connections = scene?.spatial?.connections || []
   const verified = scene?.capabilities?.summary?.verified_evidence || 0
   const evidence = scene?.capabilities?.summary?.evidence || 0
   const signal = scene?.capabilities?.summary?.signal || 0
@@ -70,6 +71,7 @@ function SpatialShell() {
       <div className="scene-layer">
         <WorkLab
           nodes={nodes}
+          connections={connections}
           focus={focus}
           onFocus={(next) => navigate(next === 'hub' ? '/' : `/${next}`)}
           onInspect={setInspected}
@@ -77,7 +79,7 @@ function SpatialShell() {
       </div>
 
       <header className="topbar glass">
-        <button className="brand-button" onClick={() => navigate('/')}><span>S</span><div><strong>StepIn</strong><small>Spatial Practice Alpha</small></div></button>
+        <button className="brand-button" onClick={() => navigate('/')}><span>S</span><div><strong>StepIn</strong><small>Spatial Practice Alpha 2</small></div></button>
         <div className="now-context"><span>现在只做这一件事</span><strong>{headline}</strong></div>
         <div className="sync-state"><span className={refreshing ? 'sync-dot active' : 'sync-dot'} />{refreshing ? '同步中' : '服务器已同步'}<small>{lastSyncedAt ? new Date(lastSyncedAt).toLocaleTimeString() : ''}</small></div>
       </header>
