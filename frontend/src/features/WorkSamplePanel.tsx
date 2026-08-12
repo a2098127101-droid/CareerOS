@@ -16,6 +16,7 @@ export function WorkSamplePanel({ workSample, onClose, onChanged }: Props) {
   const [issues, setIssues] = useState<string[]>([])
   const status = workSample.status
   const transferMode = status === 'transfer_ready'
+  const v1SubmittedAt = String(workSample.v1?.submittedAt || '')
 
   useEffect(() => {
     if (status === 'revision_required') {
@@ -30,9 +31,11 @@ export function WorkSamplePanel({ workSample, onClose, onChanged }: Props) {
       setValue(EMPTY)
     }
     setIssues([])
-  }, [status, workSample.v1])
+    // Use stable phase markers rather than the whole polled SceneState object. Otherwise
+    // a 15-second server refresh would erase a learner's unsent V2/transfer draft.
+  }, [status, v1SubmittedAt])
 
-  const tickets = useMemo(() => transferMode ? workSample.definition.transfer.materials : workSample.definition.materials.tickets, [transferMode, workSample])
+  const tickets = useMemo(() => transferMode ? workSample.definition.transfer.materials : workSample.definition.materials.tickets, [transferMode, workSample.definition])
 
   function toggle(id: string) {
     const selected = new Set(value.priority_ticket_ids)
