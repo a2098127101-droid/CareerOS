@@ -41,7 +41,17 @@ def _api_routes(routes) -> list[APIRoute]:
 
 
 def register_v1_compatibility_aliases(app: FastAPI) -> int:
-    """Expose canonical `/api/v1` aliases without breaking published clients."""
+    """Register StepIn Foundation, then expose canonical `/api/v1` aliases.
+
+    Foundation is deliberately attached here because this hook runs once after
+    the production application has initialized repositories, authorization,
+    security middleware, legacy routes, and the project runtime. This keeps the
+    integration additive and avoids replacing the hardened production main.
+    """
+    from .foundation_registration import register_foundation_production_routes
+
+    register_foundation_production_routes(app)
+
     routes = _api_routes(app.router.routes)
     existing = {route.path for route in routes}
     created = 0
