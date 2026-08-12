@@ -1,46 +1,86 @@
-# CareerOS v1.5 · Domain Intelligence
+# StepIn / CareerOS
 
-CareerOS is an evidence-grounded career intelligence platform. v1.5 promotes the core chain **Claim → Capability → Job Requirement → Gap** into persistent, versioned, explainable and auditable server-side domain entities.
+**从一件简单真实的工作开始，在做、改、再做和项目积累中形成真正会做的能力。**
 
-> Release status: internal Beta / GitHub-ready source release. Domain Intelligence is implemented and regression-tested. Production infrastructure, calibrated assessment methodology and standard-browser staging certification remain separate release gates.
+**Start with one simple, real task. Build practical capability by doing, revising, transferring, and combining work into projects.**
 
-## 中文介绍：CareerOS Agent
+[中文说明](README.zh-CN.md) · [StepIn Foundation v1.9 Draft PR](../../pull/16) · [v1.9 integration branch](../../tree/agent/stepin-foundation-v1.9.0)
 
-CareerOS 是面向高校职规赛与学生职业发展的 AI-native Agent 操作系统。它不是单一聊天机器人，而是由工作流编排器协调多个专业 Agent，在持续保存学生画像、事实证据、任务进度和作品版本的基础上，完成职业探索、赛道建议、岗位匹配、能力差距分析、作品生成、严格评审、迭代修订和教师协同指导。
+> **当前仓库状态 / Repository status**  
+> `main` 仍然是经过生产化强化的 **CareerOS v1.5 production baseline**。StepIn Foundation v1.9 正在通过 [PR #16](../../pull/16) 安全集成，尚未直接覆盖主线。当前首页已经按照新的产品方向更新，但下文明确区分“产品方向”和“已合并主线代码”。
 
-核心 Agent 包括：
+## 为什么做 StepIn
 
-- **Profile Agent**：从学生主动提供的材料中提取结构化画像，不自动虚构个人经历。
-- **Coach Agent**：结合十阶段职业规划工作流，识别当前任务并驱动下一步行动。
-- **Writer Agent**：基于学生 Evidence、赛事规则和岗位要求生成简历、生涯发展报告等 Artifact。
-- **Reviewer Agent**：按照结构化 Rubric 提取证据、识别问题并给出可解释评分。
-- **Critic Agent**：独立质疑评分、论证与证据链，降低自评偏差。
-- **Revision Agent**：综合评审、教师反馈和新增证据生成新版本，保留历史版本而不覆盖旧稿。
+很多零基础、零实习经验的学生，并不是缺少更多课程，而是不知道真实工作每天到底在做什么，也不知道第一步该从哪里开始。
 
-系统通过 Multi-Model Gateway 为不同 Agent 独立配置 OpenAI、DeepSeek、Anthropic Claude、Google Gemini 或 OpenAI-Compatible 模型，并支持 Primary/Fallback 路由。知识层严格区分学生个人 Evidence、赛事与学校文档 RAG、结构化岗位数据，避免把外部岗位要求误写成学生已具备的能力。学生端采用 Chat-first Workspace，教师端采用 Attention-first AI Operations Workspace，管理端负责模型路由、知识投喂、调用统计和安全配置。
+StepIn 不把“选专业、选岗位、学课程、堆项目”作为起点。它先给学生一件**足够简单、但具有真实工作逻辑的小任务**，让学生先动手，再在实践中逐渐学会：看懂任务、找重点、整理信息、作出判断、说明理由、按要求交付、根据反馈修改、换一个场景再做，以及把自己做过的事情讲清楚。
 
-当前版本属于内部 Beta 与可验证源码版本。未提供真实模型凭据时使用明确标注的 Demo/降级能力；确定性评分是证据覆盖指标，不是心理测量、职业资格认证或岗位表现预测。
+核心路径：
 
-## What v1.5 adds
+**开始做 → 跟着做 → 自己做 → 根据反馈改 → 换场景再做 → 小任务组成项目 → 多任务叠加能力 → 把做过的事情讲出来。**
 
-- First-class persistent claims and claim versions.
-- Versioned capability definitions and capability assessment history.
-- Claim ↔ Evidence and Claim ↔ Capability relations.
-- Versioned job-requirement snapshots and Requirement ↔ Capability mappings.
-- Versioned career gaps with optimistic locking and lifecycle status.
-- Potential score versus verified score, with contribution-level explanations.
-- Domain audit events for create, update, recompute, mapping and status changes.
-- SQLite and SQLAlchemy/PostgreSQL repository parity.
-- Canonical `/api/domain/v1` API and Unified H5 consumption.
-- Evidence Trust lifecycle retained: self-reported evidence is not treated as verified evidence.
+专业、课程和知识不是产品本身，而是在学生真正需要时为当前任务提供帮助。职业方向也不要求学生一开始就选择，而是在完成多种真实任务以后逐渐出现。
 
-## Quick start
+## StepIn Foundation v1.9
+
+当前 v1.9 开发线重点实现：
+
+- **10 项跨专业公共实践能力**：看懂任务、找重点、整理信息、比较判断、发现问题、说明理由、清楚交付、根据反馈修改、换场景再做、把做过的事情讲出来；
+- **8 个连续零基础小任务**，从“4 件事先做哪件”开始，而不是从专业项目开始；
+- **逐步减少提示**：跟着做 → 少提示 → 自己做 → 修改 → 换场景做；
+- **Task → Mini Project**：分散的小任务会组合成第一份真实小项目；
+- **跨任务 Evidence 聚合**：不是做对一道题就宣布“掌握能力”，而是观察同一种能力是否在不同任务中重复出现；
+- **表达训练**：把真实做过的项目转成复盘、简历表达和面试表达；
+- **延迟专业分化**：完成基础阶段后先体验表格、访谈、排序等不同材料，再逐渐开放职业路径；
+- **服务器级 Gate**：学生不能通过直接调用专业 Practice API 绕过 Foundation；
+- **教师基础成长视图**：教师看到的是学生从“需要提示”到“能够独立完成”的变化，而不只是最终答案。
+
+完整 v1.9 代码目前位于：
+
+- [StepIn Foundation integration branch](../../tree/agent/stepin-foundation-v1.9.0)
+- [Draft PR #16](../../pull/16)
+- [中文项目介绍](../../blob/agent/stepin-foundation-v1.9.0/stepin-foundation-v1.9.0/PROJECT_DESCRIPTION.zh-CN.md)
+- [English project overview](../../blob/agent/stepin-foundation-v1.9.0/stepin-foundation-v1.9.0/PROJECT_DESCRIPTION.en.md)
+
+## 已形成的 Practice OS 能力
+
+StepIn 开发线已经形成一套以实践为中心的工作环境，而不是“AI 聊天 + 项目列表”：
+
+- Focus Workspace：打开后只看到今天真正要做的一件事；
+- Contextual Help：AI/规则提示附着在当前工作对象旁边，而不是占据独立聊天窗口；
+- Job-native Workbenches：Spreadsheet、ATS、CRM、访谈编码、Issue Tracker、Research Board、Prioritization Board；
+- Practice Runtime：做 → 改 → 再做一次 → 成果；
+- Evidence / Artifact：保存操作证据、版本历史、教师反馈和作品；
+- Simulation：换一批材料、减少提示，再验证一次；
+- Teacher Triage：教师只处理真正需要人工判断的事项；
+- Content Ops / Practice Studio：内容来源、审核、试跑、发布与受控无代码练习编辑；
+- Local-first / Offline：本机 FastAPI + SQLite，断互联网后核心练习仍可继续；
+- Desktop Workbench：Windows Portable / pywebview / WebView2 / Inno Setup 构建链；
+- Real Outputs：支持将成果导出为 DOCX、XLSX、PPTX、PDF 和 Markdown。
+
+> 上述 StepIn 能力来自持续开发线。v1.9 Foundation 尚在 PR #16 中与当前 production `main` 做受控集成，不能把未合并能力误认为已经全部进入主分支。
+
+## 当前 production `main`
+
+GitHub 主分支目前仍保留 CareerOS v1.5 production-final 的生产化能力，包括：
+
+- Domain Intelligence：Claim → Capability → Job Requirement → Gap；
+- Evidence Trust 与版本化能力评估；
+- Tenant / RLS / 权限与安全强化；
+- SQLite / PostgreSQL Repository；
+- Unified Runtime 与 Canonical API；
+- 多模型 Gateway；
+- 生产部署、发布包、安全扫描与锁定 CI。
+
+StepIn v1.9 不会用旧基线整仓覆盖这些能力。PR #16 的目标是把 Foundation、Practice-first 学习路径和学生/教师工作流逐步移植到当前 production 基座上。
+
+## Quick start — current `main`
 
 ### Windows
 
-1. Extract the repository.
-2. Double-click `OPEN_CareerOS.cmd`.
-3. Open the URL shown by the launcher.
+```text
+OPEN_CareerOS.cmd
+```
 
 ### Python
 
@@ -54,52 +94,43 @@ uvicorn app.main:app --reload
 
 Default local demo accounts are documented in `.env.example`. Never enable demo seeding in production.
 
-## Domain Intelligence API
+## English overview
 
-```text
-POST  /api/domain/v1/recompute
-GET   /api/domain/v1/snapshot
-GET   /api/domain/v1/claims
-PATCH /api/domain/v1/claims/{claim_id}
-GET   /api/domain/v1/claims/{claim_id}/versions
-GET   /api/domain/v1/capabilities
-GET   /api/domain/v1/capabilities/{capability_id}/explain
-GET   /api/domain/v1/capabilities/{capability_id}/versions
-GET   /api/domain/v1/requirements
-GET   /api/domain/v1/requirements/{requirement_id}/versions
-GET   /api/domain/v1/gaps
-PATCH /api/domain/v1/gaps/{gap_id}
-GET   /api/domain/v1/gaps/{gap_id}/versions
-GET   /api/domain/v1/audit
-```
+StepIn is a **practice-first capability development system** for students with little or no internship experience. Instead of beginning with courses, job labels, or career tests, it begins with one simple but realistic work task that a beginner can actually complete.
 
-## Validation
+The system gradually reduces support as the learner moves from following a scaffold to working independently, revising from feedback, transferring the skill to new situations, combining small tasks into projects, and explaining what they can actually do.
 
-- Automated tests: **161/161 passed**
-- SQLite migration: **22/22**
-- Alembic head: `0010_immutable_runtime_tenant_hardening`
-- Immutable published-migration guard and upgrade-from-original-0007 test.
-- Canonical `/api/v1` compatibility surface with OpenAPI cookie authentication.
-- Deterministic Demo retrieval evaluation and disposable staging infrastructure probe.
-- Chrome multi-role browser E2E.
+**Start doing → Follow a scaffold → Work independently → Revise from feedback → Try again in a new context → Build a project from small tasks → Accumulate capability across tasks → Explain what you can actually do.**
 
-Real generation-model, semantic Embedding and remote Reranker calls remain
-environment-dependent gates and were not tested without credentials.
+Specialization comes later. Courses and knowledge are support resources for the work in front of the learner, not the product itself.
 
-## Important boundaries
+### v1.9 integration status
 
-The deterministic v1.5 score is an explainable evidence-coverage indicator. It is **not** a psychometric test, professional certification or validated predictor of job performance. See `REMAINING_GAPS_v1.5.md` and `PRODUCTION_READINESS_v1.5.md`.
+The current GitHub `main` is still the CareerOS v1.5 production baseline. StepIn Foundation v1.9 is staged in [Draft PR #16](../../pull/16) because the Foundation development line evolved from an older source baseline. The integration intentionally preserves the existing Domain Intelligence, security, deployment, RLS, and CI capabilities on `main` instead of replacing them wholesale.
+
+## Validation notes
+
+The StepIn v1.9 development line reports the following targeted validation before production-main integration:
+
+- Foundation: **7/7 passed**
+- Key targeted regressions: **51/51 passed**
+- Foundation API contract: **8/8**
+- Practice contract: **19/19**
+- Interaction / Content contract: **18/18**
+- localhost four-role HTTP smoke: passed
+- Chromium DOM + FastAPI bridge: **0 pageerror / 0 console error**
+
+These are development-line results, **not yet the final production-main integration CI result**.
 
 ## Documentation
+
+For the current production baseline:
 
 - `ARCHITECTURE_v1.5.md`
 - `DOMAIN_INTELLIGENCE_MODEL.md`
 - `API_DOMAIN_INTELLIGENCE_GUIDE.md`
-- `MIGRATION_GUIDE_v1.5.md`
-- `TEST_REPORT_v1.5.md`
 - `PRODUCTION_READINESS_v1.5.md`
 - `REMAINING_GAPS_v1.5.md`
-- `GITHUB_UPLOAD_GUIDE.md`
-- `CHANGELOG_v1.5.md`
-- `RELEASE_NOTES_v1.5.md`
 - `SOURCE_PROVENANCE_v1.5.md`
+
+For StepIn Foundation v1.9, use [PR #16](../../pull/16) and the `stepin-foundation-v1.9.0/` integration directory on its branch.
