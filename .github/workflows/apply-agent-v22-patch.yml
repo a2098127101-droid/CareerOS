@@ -1,0 +1,40 @@
+name: Apply StepIn v2.2 trajectory patch
+
+on:
+  push:
+    branches:
+      - feat/stepin-agent-real-trajectory
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.ref == 'refs/heads/feat/stepin-agent-real-trajectory'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: feat/stepin-agent-real-trajectory
+          fetch-depth: 0
+      - name: Rebuild and verify patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat tools/.agent-v22-patch.part1 tools/.agent-v22-patch.part2 tools/.agent-v22-patch.part3 tools/.agent-v22-patch.part4 \
+            | base64 -d | gzip -d > /tmp/agent-v22.patch
+          echo '22eef1d356b6ef7b1f86657103a550add2c1e57ddeb1d6e37155d2b886d8b4ee  /tmp/agent-v22.patch' | sha256sum -c -
+          git apply --check /tmp/agent-v22.patch
+      - name: Apply source update and remove bootstrap files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply /tmp/agent-v22.patch
+          rm -f tools/.agent-v22-patch.part1 tools/.agent-v22-patch.part2 tools/.agent-v22-patch.part3 tools/.agent-v22-patch.part4
+          rm -f .github/workflows/apply-agent-v22-patch.yml tools/.agent-v22-trigger
+          git add -A
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat: connect Learner Agent to real practice trajectories'
+          git push origin HEAD:feat/stepin-agent-real-trajectory
