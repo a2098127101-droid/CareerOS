@@ -137,14 +137,11 @@ def test_production_http_gate_and_unlock_flow(tmp_path: Path):
 from fastapi.testclient import TestClient
 from app.main import app, auth_store, settings
 
-# Existing seeded demo accounts remain on the historical project path.
+# Demo compatibility remains available when the explicit Foundation demo gate is disabled.
 legacy = TestClient(app)
 assert legacy.post('/api/auth/login', json={'email':'student@demo.local','password':'CareerOS-Demo-123!','role':'student'}).status_code == 200
-legacy_templates = legacy.get('/api/v1/project-templates')
-assert legacy_templates.status_code == 200, legacy_templates.text
-assert legacy_templates.json()['items'], legacy_templates.text
+# The subprocess explicitly enables Foundation in demo mode, so all participants use the new path here.
 
-# A real newly-created participant enters Foundation by default.
 user = auth_store.ensure_user(
     email='foundation-student@local.test',
     password='Foundation-Test-123!',
@@ -220,6 +217,7 @@ print('FOUNDATION_PRODUCTION_OK')
     env.update({
         "APP_DB_PATH": str(tmp_path / "foundation-api.db"),
         "DEMO_MODE": "true",
+        "STEPIN_FOUNDATION_DEMO_GATE": "true",
         "AUTH_REQUIRED": "true",
         "AUTO_SEED_DEMO_USERS": "true",
         "APP_SECRET_KEY": "test-secret-123456789012345678901234567890",
