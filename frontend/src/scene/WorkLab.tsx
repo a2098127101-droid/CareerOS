@@ -13,12 +13,13 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { Bloom, ChromaticAberration, EffectComposer, Vignette } from '@react-three/postprocessing'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import type { SpatialNode } from '../api/types'
+import type { SpatialConnection, SpatialNode } from '../api/types'
 
 type Focus = 'hub' | 'foundation' | 'work-sample'
 
 type Props = {
   nodes: SpatialNode[]
+  connections: SpatialConnection[]
   focus: Focus
   onFocus: (focus: Focus) => void
   onInspect: (node: SpatialNode) => void
@@ -492,19 +493,21 @@ function CapabilityNode({ node, position, onInspect }: { node: SpatialNode; posi
   )
 }
 
+function capabilityLayout(index: number): Vec3 {
+  const ring = index < 5 ? 0 : 1
+  const local = index % 5
+  const angle = (local / 5) * Math.PI * 2 - Math.PI / 2 + ring * 0.22
+  const rx = ring === 0 ? 2.1 : 3.25
+  const ry = ring === 0 ? 1.05 : 1.55
+  return [Math.cos(angle) * rx, Math.sin(angle) * ry, 0]
+}
+
 function CapabilityConstellation({ nodes, onInspect }: { nodes: SpatialNode[]; onInspect: (node: SpatialNode) => void }) {
   const frameRef = useRef<THREE.Group>(null)
   useFrame((state) => {
     if (frameRef.current) frameRef.current.rotation.z = Math.sin(state.clock.elapsedTime * 0.14) * 0.012
   })
-  const points = nodes.slice(0, 10).map((_, index) => {
-    const ring = index < 5 ? 0 : 1
-    const local = index % 5
-    const angle = (local / 5) * Math.PI * 2 - Math.PI / 2 + ring * 0.22
-    const rx = ring === 0 ? 2.1 : 3.25
-    const ry = ring === 0 ? 1.05 : 1.55
-    return [Math.cos(angle) * rx, Math.sin(angle) * ry, 0] as Vec3
-  })
+  const points = nodes.slice(0, 10).map((_, index) => capabilityLayout(index))
   return (
     <group ref={frameRef} position={[0, 3.25, -6.37]}>
       <mesh position={[0, 0, -0.08]}>
@@ -560,6 +563,80 @@ function TrajectoryRibbon({ nodes }: { nodes: SpatialNode[] }) {
   )
 }
 
+function semanticNodePositions(nodes: SpatialNode[]) {
+  const map = new Map<string, Vec3>()
+  const evidence = nodes.filter((node) => node.kind === 'evidence').slice(0, 15)
+  evidence.forEach((node, index) => {
+    const column = index % 3
+    const row = Math.floor(index / 3)
+    map.set(node.id, [-5.85 - 0.83 + column * 0.83, 0.92 + row * 0.72, -2.0 + 0.61])
+  })
+
+  const forge = nodes.filter((node) => node.kind === 'project' || node.kind === 'artifact').slice(0, 10)
+  forge.forEach((node, index) => {
+    const angle = (index / Math.max(1, forge.length)) * Math.PI * 2
+    const radius = 0.7 + (index % 2) * 0.28
+    const y = 1.12 + (index % 3) * 0.12
+    map.set(node.id, [5.65 + Math.cos(angle) * radius, y, -2.15 + Math.sin(angle) * radius])
+  })
+
+  const capabilities = nodes.filter((node) => node.kind === 'capability').slice(0, 10)
+  capabilities.forEach((node, index) => {
+    const local = capabilityLayout(index)
+    map.set(node.id, [local[0], 3.25 + local[1], -6.37 + local[2]])
+  })
+  return map
+}
+
+function SemanticBeam({ from, to, relation, phase }: { from: Vec3; to: Vec3; relation: string; phase: number }) {
+  const pulse = useRef<THREE.Mesh>(null)
+  const color = relation === 'supports' ? palette.amber : palette.cyan
+  const curve = useMemo(() => {
+    const start = new THREE.Vector3(...from)
+    const end = new THREE.Vector3(...to)
+    const midpoint = start.clone().lerp(end, 0.5)
+    midpoint.y = Math.max(start.y, end.y) + 0.68 + Math.abs(end.x - start.x) * 0.035
+    midpoint.z += relation === 'supports' ? 0.18 : -0.12
+    return new THREE.QuadraticBezierCurve3(start, midpoint, end)
+  }, [from, to, relation])
+  const points = useMemo(() => curve.getPoints(28), [curve])
+  useFrame((state) => {
+    if (!pulse.current) return
+    const progress = (state.clock.elapsedTime * 0.115 + phase) % 1
+    pulse.current.position.copy(curve.getPoint(progress))
+  })
+  return (
+    <group>
+      <Line points={points} color={color} lineWidth={2.4} transparent opacity={0.055} />
+      <Line points={points} color={color} lineWidth={0.62} transparent opacity={0.24} />
+      <mesh ref={pulse}>
+        <sphereGeometry args={[0.032, 18, 18]} />
+        <meshBasicMaterial color={color} toneMapped={false} />
+      </mesh>
+    </group>
+  )
+}
+
+function SemanticLinkLayer({ nodes, connections }: { nodes: SpatialNode[]; connections: SpatialConnection[] }) {
+  const positions = useMemo(() => semanticNodePositions(nodes), [nodes])
+  const visible = useMemo(() => connections
+    .filter((link) => positions.has(link.from) && positions.has(link.to))
+    .slice(0, 22), [connections, positions])
+  return (
+    <group>
+      {visible.map((link, index) => (
+        <SemanticBeam
+          key={link.id}
+          from={positions.get(link.from)!}
+          to={positions.get(link.to)!}
+          relation={link.relation}
+          phase={(index * 0.137) % 1}
+        />
+      ))}
+    </group>
+  )
+}
+
 function DataMonolith() {
   const outer = useRef<THREE.Group>(null)
   const inner = useRef<THREE.Group>(null)
@@ -600,7 +677,7 @@ function AmbientAtmosphere() {
   )
 }
 
-function Scene({ nodes, focus, onFocus, onInspect }: Props) {
+function Scene({ nodes, connections, focus, onFocus, onInspect }: Props) {
   const controls = useRef<CameraControls>(null)
   const textures = useProceduralTextures()
   useEffect(() => {
@@ -636,6 +713,7 @@ function Scene({ nodes, focus, onFocus, onInspect }: Props) {
       <ProjectForge nodes={projects} onInspect={onInspect} />
       <CapabilityConstellation nodes={capabilities} onInspect={onInspect} />
       <TrajectoryRibbon nodes={trajectory} />
+      <SemanticLinkLayer nodes={nodes} connections={connections} />
       <CameraControls ref={controls} enabled={false} smoothTime={0.72} />
     </>
   )
