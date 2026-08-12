@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { SceneStateProvider } from './state/SceneStateProvider'
 import './styles.css'
+import './scene/scene.css'
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: string }> {
   state = { error: '' }
