@@ -111,7 +111,7 @@ class LearnerAgentPolicy:
                 return PolicyDecision(AgentAction.EXPLAIN, diagnosis, "连续失败后解释当前缺失的方法，而不是代做")
             if streak == 4:
                 return PolicyDecision(AgentAction.REQUEST_EVIDENCE, diagnosis, "要求展示中间判断过程，以区分理解问题和执行问题")
-            return PolicyDecision(AgentAction.ESCALATE, DiagnosisCode.HUMAN_REVIEW, "连续失败达到人工介入阈值")
+            return PolicyDecision(AgentAction.ESCALATE, diagnosis, "连续失败达到人工介入阈值")
         if any(token in message for token in ("提示", "提醒一下")) and self._hint_available(task, hints_used):
             return PolicyDecision(AgentAction.HINT, diagnosis, "学生主动请求提示且仍有提示预算")
         if any(token in message for token in ("解释", "方法", "怎么判断", "怎么想")):
