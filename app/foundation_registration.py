@@ -17,9 +17,10 @@ def register_foundation_production_routes(app) -> None:
     """Attach StepIn Foundation to the repositories already selected by production.
 
     The production RepositoryContainer decides SQLite vs PostgreSQL. Foundation
-    must consume that selection rather than instantiating a PostgreSQL repository
-    directly; otherwise local/offline SQLite runs would execute PostgreSQL-only
-    locking syntax.
+    consumes that selection rather than instantiating a database-specific
+    repository. Existing seeded ``@demo.local`` accounts remain on the legacy
+    project flow so production compatibility fixtures keep their historical
+    behavior; real participant accounts enter Foundation by default.
     """
     if getattr(app.state, "stepin_foundation_registered", False):
         return
@@ -98,6 +99,9 @@ def register_foundation_production_routes(app) -> None:
         token = request.cookies.get(main.AUTH_COOKIE)
         return main.auth_store.resolve_session(token)
 
+    def is_legacy_demo(principal) -> bool:
+        return str(getattr(principal, "email", "") or "").lower().endswith("@demo.local")
+
     def foundation_summary_for(principal):
         rows = main.store.list(limit=1, tenant_id=principal.tenant_id, student_user_id=principal.user_id)
         state = rows[0][0] if rows else main._create_session_for_principal(principal)
@@ -120,7 +124,11 @@ def register_foundation_production_routes(app) -> None:
     async def foundation_beginner_gate(request: Request, call_next):
         path = request.url.path.rstrip("/") or "/"
         principal = principal_from_request(request)
-        if principal and canonical_role(principal.role) == "participant":
+        if (
+            principal
+            and canonical_role(principal.role) == "participant"
+            and not is_legacy_demo(principal)
+        ):
             # Existing professional work remains available to protect backwards compatibility.
             if not existing_projects(principal):
                 summary = foundation_summary_for(principal)
