@@ -90,6 +90,27 @@ def build_work_sample_router(
 
     def submit(req: WorkSampleSubmission, principal, session_id: str, method: str):
         uid, sid = context(principal, session_id)
+        current = service.public_state(
+            tenant_id=principal.tenant_id,
+            owner_user_id=uid,
+            session_id=sid,
+        )
+        expected_status = {
+            "submit_v1": "working_v1",
+            "submit_v2": "revision_required",
+            "submit_transfer": "transfer_ready",
+        }[method]
+        actual_status = str(current.get("status") or "")
+        if actual_status != expected_status:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "work_sample_phase_conflict",
+                    "message": "当前工作样本阶段不接受这次提交，请先同步服务器状态后继续。",
+                    "expected": expected_status,
+                    "actual": actual_status,
+                },
+            )
         fn = getattr(service, method)
         return invoke(
             lambda: fn(
