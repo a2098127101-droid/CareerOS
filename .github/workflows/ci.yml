@@ -1,4 +1,4 @@
-name: CareerOS CI (locked 189-test matrix)
+name: CareerOS CI (locked 197-test matrix)
 
 on:
   push:
@@ -38,10 +38,12 @@ jobs:
         run: python scripts/audit_repository_contract.py --json-out docs/CI_REPOSITORY_CONTRACT_AUDIT.json
       - name: Audit StepIn Foundation production contract
         run: python scripts/audit_foundation_production.py
+      - name: Audit StepIn Learner Agent contract
+        run: python scripts/audit_learner_agent.py
       - name: Run isolated regression matrix
         run: python scripts/run_test_matrix.py --timeout 180 --json-out docs/CI_TEST_MATRIX.json
       - name: Enforce locked test count
-        run: python -c "import json; report=json.load(open('docs/CI_TEST_MATRIX.json', encoding='utf-8')); assert report['ok'] and report['passed_tests'] == 189, report"
+        run: python -c "import json; report=json.load(open('docs/CI_TEST_MATRIX.json', encoding='utf-8')); assert report['ok'] and report['passed_tests'] == 197, report"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
