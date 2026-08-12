@@ -152,14 +152,19 @@ class CapabilityVerificationService:
             combined = int(foundation.get("combined") or 0)
             later_practice = int(foundation.get("laterPracticeCount") or 0)
 
-            # Foundation attempts correspond to completed immutable Foundation tasks.
-            # Later evidence rows may be multiple versions of one task, so they are only
-            # allowed to establish observation here; they cannot inflate task contexts.
-            distinct_task_count = max(
-                len(success_tasks[capability_id]),
-                attempts,
-                1 if later_practice > 0 else 0,
-            )
+            event_task_ids = success_tasks[capability_id]
+            foundation_event_count = sum(1 for task_id in event_task_ids if task_id in TASK_BY_ID)
+            external_task_count = sum(1 for task_id in event_task_ids if task_id not in TASK_BY_ID)
+            # Foundation attempts are immutable completed Foundation tasks. When trajectory
+            # contains those same tasks, take the larger count rather than double counting;
+            # then add unique non-Foundation task contexts such as work samples/projects.
+            foundation_contexts = max(attempts, foundation_event_count)
+            distinct_task_count = foundation_contexts + external_task_count
+            if distinct_task_count == 0 and later_practice > 0:
+                # Legacy professional evidence without task-scoped trajectory establishes
+                # observation only; multiple versions are not treated as multiple contexts.
+                distinct_task_count = 1
+
             independent_count = max(len(independent_tasks[capability_id]), independent)
             transfer_count = max(len(transfer_tasks[capability_id]), transfer)
             revision_count = len(revision_tasks[capability_id])
