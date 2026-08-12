@@ -1,4 +1,4 @@
-name: StepIn CI (temporary compatibility fix)
+name: StepIn CI (locked 204-test matrix)
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   sqlite-regression:
@@ -14,29 +14,6 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          fetch-depth: 0
-      - name: Preserve latest visible wording while keeping legacy DOM contract
-        if: github.ref == 'refs/heads/feat/stepin-agent-real-trajectory'
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          p=Path('app/static/projects.html')
-          s=p.read_text(encoding='utf-8')
-          old='<button class="btn primary" id="saveProject" type="submit">保存并判断下一步</button>'
-          new='<button class="btn primary" id="saveProject" type="submit" data-legacy-label="继续填写">保存并判断下一步</button>'
-          if old in s:
-              p.write_text(s.replace(old,new),encoding='utf-8')
-          PY
-          if ! git diff --quiet -- app/static/projects.html; then
-            git add app/static/projects.html
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'fix: preserve project form compatibility without old visible wording'
-            git push origin HEAD:feat/stepin-agent-real-trajectory
-          fi
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.11.9'
