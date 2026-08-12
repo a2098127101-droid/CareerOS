@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   sqlite-regression:
@@ -14,26 +14,11 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: integration/stepin-foundation-production
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.11.9'
-      - name: Generate candidate hash lock for patched dependencies
-        run: |
-          python -m pip install 'pip-tools>=7.4,<8'
-          pip-compile --generate-hashes --output-file=requirements.lock --strip-extras requirements.txt
-          grep '^cryptography==50.0.0' requirements.lock
-          grep '^pypdf==6.15.0' requirements.lock
-      - name: Commit refreshed lock once
-        run: |
-          if ! git diff --quiet -- requirements.lock; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add requirements.lock
-            git commit -m "security: refresh hash-locked dependencies"
-            git push origin HEAD:integration/stepin-foundation-production
-          fi
+          cache: pip
+          cache-dependency-path: requirements.lock
       - name: Install hash-locked dependencies
         run: pip install --require-hashes -r requirements.lock
       - name: Validate dependency consistency
