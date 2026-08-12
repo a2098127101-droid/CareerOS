@@ -5,6 +5,7 @@ import App from './App'
 import { SceneStateProvider } from './state/SceneStateProvider'
 import './styles.css'
 import './scene/scene.css'
+import './scene/premium.css'
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: string }> {
   state = { error: '' }
