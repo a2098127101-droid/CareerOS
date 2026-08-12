@@ -1,4 +1,4 @@
-name: CareerOS Production Release Package
+name: StepIn Production Release Package
 
 on:
   pull_request:
@@ -64,14 +64,14 @@ jobs:
       - name: Verify checksum and archive boundaries
         shell: bash
         run: |
-          (cd dist && sha256sum --check CareerOS-*.zip.sha256)
+          (cd dist && sha256sum --check StepIn-*.zip.sha256)
           python - <<'PY'
           import json
           import zipfile
           from pathlib import Path
 
-          manifests = list(Path('dist').glob('CareerOS-*.manifest.json'))
-          archives = list(Path('dist').glob('CareerOS-*.zip'))
+          manifests = list(Path('dist').glob('StepIn-*.manifest.json'))
+          archives = list(Path('dist').glob('StepIn-*.zip'))
           assert len(manifests) == 1 and len(archives) == 1
           manifest = json.loads(manifests[0].read_text(encoding='utf-8'))
           boundary = manifest['release_boundary']
@@ -90,10 +90,10 @@ jobs:
           PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: careeros-production-${{ steps.version.outputs.value }}
+          name: stepin-production-${{ steps.version.outputs.value }}
           path: |
-            dist/CareerOS-*.zip
-            dist/CareerOS-*.zip.sha256
-            dist/CareerOS-*.manifest.json
+            dist/StepIn-*.zip
+            dist/StepIn-*.zip.sha256
+            dist/StepIn-*.manifest.json
           if-no-files-found: error
           retention-days: 30

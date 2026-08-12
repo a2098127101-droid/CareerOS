@@ -59,8 +59,8 @@ SENSITIVE_FRAGMENTS = (
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build a sanitized CareerOS production release ZIP.")
-    parser.add_argument("--version", default="v1.0.0-rc1")
+    parser = argparse.ArgumentParser(description="Build a sanitized StepIn production release ZIP.")
+    parser.add_argument("--version", default="v2.2.0-rc1")
     parser.add_argument("--out-dir", default="dist")
     return parser.parse_args()
 
@@ -111,7 +111,7 @@ def build(version: str, out_dir: Path) -> tuple[Path, Path]:
     paths = sorted((path for path in ROOT.rglob("*") if should_include(path)), key=lambda item: item.as_posix())
     validate_no_runtime_secrets(paths)
 
-    package_name = f"CareerOS-{version}"
+    package_name = f"StepIn-{version}"
     out_dir.mkdir(parents=True, exist_ok=True)
     zip_path = out_dir / f"{package_name}.zip"
     manifest_path = out_dir / f"{package_name}.manifest.json"

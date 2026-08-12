@@ -1,38 +1,28 @@
-# Web Deployment
+# StepIn 2.2 Web Deployment
 
 ## Current supported deployment shape
 
-v1.0-alpha1 can run as a single FastAPI instance for controlled evaluation using Docker or a Python environment.
-
-Do not scale it horizontally yet: the active repositories use SQLite and the rate-limit/circuit state is process-local.
-
-## Target production stack
+The current StepIn production architecture supports FastAPI behind TLS with PostgreSQL/pgvector, authenticated Redis and an independent worker, private S3-compatible object storage, and production observability. SQLite remains a local compatibility backend rather than the target multi-instance production repository.
 
 ```text
 Domain / HTTPS
       ↓
-Reverse proxy / CDN
+Caddy / reverse proxy
       ↓
-Frontend + FastAPI
+StepIn Web + FastAPI
       ↓
 PostgreSQL + pgvector
-Redis / background worker
+Redis + independent worker
 Private object storage
 Observability
 ```
 
-## Production environment requirements
+## Production requirements
 
-At minimum configure:
+At minimum configure `APP_ENV=production`, `DEMO_MODE=false`, `AUTH_REQUIRED=true`, strong externally managed secrets, secure cookies, explicit origins, reviewed model-provider routes, semantic retrieval and private object storage. The application database role must be non-owner, non-superuser and `NOBYPASSRLS`.
 
-- `APP_ENV=production`
-- `DEMO_MODE=false`
-- `AUTH_REQUIRED=true`
-- strong `APP_SECRET_KEY`
-- `COOKIE_SECURE=true`
-- explicit `ALLOWED_ORIGINS`
-- real LLM provider routes
-- semantic embedding provider
-- private object storage
+The current production flow must verify more than infrastructure health: Foundation, bounded Learner Agent intervention, revision, transfer, Evidence/Artifact persistence, Project Library v2.2, teacher/human review and tenant isolation should all pass in the target environment.
 
-The readiness endpoint will continue to report SQLite as a blocker until the repository migration is implemented.
+## Go-live boundary
+
+Use `deploy/README_PRODUCTION.md` and `deploy/PRODUCTION_CHECKLIST.md` as the current authoritative deployment documents. Do not infer production readiness from container startup or source-code CI alone.

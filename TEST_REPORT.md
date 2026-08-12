@@ -1,42 +1,29 @@
-# CareerOS v1.5 Test Report
+# StepIn 2.2 Test Report
 
-## Result
+## Current locked baseline
 
-- Test files: 36
-- Automated tests: **153/153 passed**
-- CI Group 0: 16 passed
-- CI Group 1: 23 passed
-- CI Group 2: 21 passed
-- CI Group 3: 18 passed
-- CI Group 4: 37 passed
-- CI Group 5: 38 passed
+The current production line is `2.2.0-beta-agent-trajectory`. The StepIn CI contract enforces **204 / 204 automated tests** and fails if the locked count or any regression batch does not pass.
 
-Warnings: Python 3.13 SQLite datetime-adapter deprecation warnings only; no functional failures.
+The latest StepIn 2.2 production baseline before this documentation cleanup passed the locked matrix on `main`. This cleanup does not reduce the test contract; the same 204-test gate remains authoritative for subsequent commits.
 
-## v1.5-specific coverage
+## StepIn-specific production gates
 
-- fresh SQLite schema and global capability seed;
-- fresh Alembic upgrade to `0009_domain_intelligence_v15`;
-- Claim extraction from Evidence and Artifact Versions;
-- persistent Claim–Evidence and Claim–Capability relations;
-- persistent Requirement snapshots and Requirement–Capability mappings;
-- Potential versus Verified Assessment values;
-- Evidence verification changes Verified Assessment results;
-- capability explanation chain;
-- Claim, Requirement, Assessment and Gap version histories;
-- Claim and Gap optimistic-lock conflicts;
-- domain audit events;
-- SQLAlchemy/PostgreSQL repository contract exercised on SQLAlchemy SQLite;
-- existing Evidence, Artifact, Workflow, RAG, Provider, tenancy and runtime regressions.
+- Learner Agent contract audit: 13 API routes, fixed action/tool boundaries, trajectory enabled and human-activated calibration.
+- Foundation production contract: 10 routes and beginner-gate behavior.
+- Project Library v2.2 audit: current immutable library version, practice-first structure and agent-observable metadata.
+- Real Trajectory integration: learner practice events, revision, transfer, teacher feedback, Evidence decisions, project milestones and Agent interventions.
+- Policy Calibration boundary: candidate profiles are range-limited and require explicit administrator activation.
 
-## Additional checks
+## Retained platform regression gates
 
-- Python compileall: passed.
-- H5 inline JavaScript syntax: passed.
-- H5 standalone/static copy equality: passed.
-- Repository contract audit: passed for 14 SQLite/PostgreSQL pairs.
-- Database-access/DDL ownership audit: passed with no unexpected modules or split DDL.
-- Fresh SQLite migration: 21/21.
-- Fresh Alembic upgrade: `0009_domain_intelligence_v15`.
-- FastAPI health/live/ready: HTTP 200; 201 registered routes.
-- ZIP integrity and SHA-256: verified at release packaging.
+- Python application, migration and test compilation.
+- Deployment shell syntax and production Compose validation.
+- Database-access boundary audit.
+- Repository-contract audit across supported repository implementations.
+- Tenant and authorization regressions.
+- Evidence, Artifact, project, worker, storage, RAG/provider and production-runtime regressions retained by the current test matrix.
+- Dependency consistency, supply-chain scanning and release-package boundary checks.
+
+## Release boundary
+
+Passing CI establishes source-code and engineering-contract consistency. It does not by itself certify educational effectiveness, a specific external model provider, a target cloud environment, Windows x64 installation/offline behavior, or institutional privacy/operational readiness. Those remain separate validation gates.

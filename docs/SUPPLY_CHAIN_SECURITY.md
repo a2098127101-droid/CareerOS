@@ -1,35 +1,24 @@
-# Supply-chain security
+# StepIn Supply-chain Security
 
-CareerOS treats dependency, container, secret, and release provenance evidence as
-separate gates. A successful unit-test workflow is not a substitute for these
-checks.
+StepIn treats dependency, container, secret and release-provenance evidence as separate production gates. A successful application test run is not a substitute for these checks.
 
 ## Automated checks
 
-The supply-chain workflow:
+The current supply-chain workflow:
 
 - audits the hash-locked Python dependency graph with `pip-audit`;
-- emits JSON vulnerability evidence and a CycloneDX SBOM;
-- scans the repository for high/critical vulnerabilities, secrets, and
-  misconfiguration with Trivy;
-- builds the release container from the pinned base image and scans that image;
-- emits an image CycloneDX SBOM;
-- attests a source archive with GitHub artifact attestation on `main` and manual
-  runs.
+- emits vulnerability evidence and a CycloneDX Python SBOM;
+- scans repository source for high/critical vulnerabilities, secrets and misconfiguration with Trivy;
+- builds and scans the current `stepin:<commit>` release container;
+- emits a StepIn container CycloneDX SBOM;
+- creates and attests a `stepin-source-<commit>.tar.gz` source archive on non-PR runs.
 
-All third-party workflow actions are pinned to immutable commit SHAs. Dependabot
-is configured for Python, GitHub Actions, and Docker dependency updates.
+Third-party workflow actions are pinned to immutable commit SHAs. Dependabot remains responsible for proposing current Python, GitHub Actions and Docker dependency updates.
 
 ## GitHub-native controls
 
-Secret scanning, push protection, Dependabot alerts, and Dependabot security
-updates should remain enabled in repository settings. A clean scan means that no
-supported pattern was detected at scan time; it is not proof that no secret can
-exist.
+Secret scanning, push protection, Dependabot alerts and Dependabot security updates should remain enabled in repository settings. A clean automated scan means no supported pattern was detected at scan time; it is not proof that a secret or vulnerability cannot exist.
 
 ## Scope boundary
 
-SBOM and vulnerability output describe the scanned source and image at a
-specific commit. They do not certify the configuration, runtime environment,
-model provider, data handling, or business workflow. Runtime and Business E2E
-certificates remain separate, signed, environment-bound artifacts.
+SBOM and vulnerability evidence describe a specific source commit and container image. They do not certify the target deployment configuration, external model provider, learner-data governance, pedagogical validity, Windows x64 installation or business workflow. Those remain separate current release gates.

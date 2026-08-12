@@ -1,34 +1,29 @@
-# Commercial Deployment Readiness
+# StepIn 2.2 Deployment Readiness
 
-## Implemented foundations
+StepIn 2.2 has a production-oriented engineering baseline, but public or institutional deployment still requires environment-specific evidence. This document replaces the obsolete pre-PostgreSQL readiness assumptions from earlier CareerOS builds.
 
-- Authentication / RBAC / tenant foundation.
-- Multi-model routing and fallback.
-- Retry/backoff/circuit-breaker foundation.
-- Evidence Graph and artifact traceability.
-- Persistent workflow.
-- Hybrid retrieval architecture.
-- Pluggable semantic embedding interface.
-- Local/S3-compatible storage adapter foundation.
-- Plans, entitlements, quotas and analytics event foundation.
-- Production Readiness diagnostics.
+## Implemented production foundations
 
-## P0 before public multi-instance SaaS
+- authentication, role and tenant isolation foundations;
+- PostgreSQL/SQLAlchemy repository path with migration and RLS certification requirements;
+- Redis-backed worker/runtime foundations;
+- private S3-compatible object-storage path;
+- model routing, fallback and usage/cost governance foundations;
+- semantic retrieval infrastructure;
+- Evidence/Artifact traceability and immutable project-template versions;
+- StepIn Foundation, Learner Agent, Learner Trajectory and bounded Policy Calibration;
+- production readiness endpoints, audits, supply-chain scanning and deterministic release packaging.
 
-1. Migrate the operational repository layer from SQLite to PostgreSQL.
-2. Use pgvector or another production vector backend for semantic embeddings.
-3. Complete private object download / signed URL authorization and malware scanning hooks.
-4. Add Redis-backed distributed rate limiting and background jobs for indexing/batch review.
-5. Add error monitoring, metrics and tracing.
-6. Configure real production secrets and provider credentials.
-7. Add backups, restore drills and migration rollback procedures.
+## P0 before public pilot traffic
 
-## Billing status
+The remaining P0 work is verification rather than a claim that infrastructure is absent: certify the actual PostgreSQL/RLS role, Redis persistence and recovery, private object delivery, real model/retrieval routes, student/teacher StepIn E2E, cross-tenant negative access, monitoring, load smoke, backup/restore and rollback on the target environment. Institution-approved privacy, consent/authorization, retention and support ownership must also be in place.
 
-Plans and entitlements exist, but billing is `foundation/mock`. Do not market the release as having live payment processing until a real BillingProvider, webhook verification and order/subscription records are implemented and tested.
+Windows x64 install/offline/upgrade/backup-restore remains a separate release gate until tested on real Windows hardware.
 
-## Production Readiness API
+## Product-validity boundary
 
-`GET /api/admin/system/readiness`
+Engineering readiness does not prove educational effectiveness. Capability Verification 2.0, real-work-sample quality and policy calibration still require real learner trajectories, repeated cross-task evidence and human labels. Do not market completion, capability confidence or Agent diagnosis as independently validated educational certification without that evidence.
 
-This endpoint intentionally reports unresolved blockers instead of presenting configuration placeholders as completed infrastructure.
+## Current authoritative checks
+
+Use `TEST_REPORT.md`, `SECURITY.md`, `deploy/README_PRODUCTION.md` and `deploy/PRODUCTION_CHECKLIST.md`. `GET /api/admin/system/readiness`, `/live` and `/ready` are runtime signals, not substitutes for the full go-live checklist.

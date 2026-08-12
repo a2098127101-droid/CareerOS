@@ -1,4 +1,4 @@
-name: CareerOS supply-chain security
+name: StepIn supply-chain security
 
 on:
   push:
@@ -30,14 +30,14 @@ jobs:
         run: >-
           pip-audit --requirement requirements.lock --require-hashes
           --disable-pip --strict --format cyclonedx-json
-          --output careeros-python.cdx.json
+          --output stepin-python.cdx.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: python-audit-and-sbom
           path: |
             pip-audit.json
-            careeros-python.cdx.json
+            stepin-python.cdx.json
           if-no-files-found: warn
 
   repository-and-container-scan:
@@ -58,12 +58,12 @@ jobs:
           ignore-unfixed: true
           exit-code: '1'
       - name: Build release container
-        run: docker build --tag "careeros:${GITHUB_SHA}" .
+        run: docker build --tag "stepin:${GITHUB_SHA}" .
       - name: Scan release container
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: image
-          image-ref: careeros:${{ github.sha }}
+          image-ref: stepin:${{ github.sha }}
           format: sarif
           output: trivy-container.sarif
           severity: HIGH,CRITICAL
@@ -74,9 +74,9 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: image
-          image-ref: careeros:${{ github.sha }}
+          image-ref: stepin:${{ github.sha }}
           format: cyclonedx
-          output: careeros-container.cdx.json
+          output: stepin-container.cdx.json
           exit-code: '0'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
@@ -85,7 +85,7 @@ jobs:
           path: |
             trivy-filesystem.sarif
             trivy-container.sarif
-            careeros-container.cdx.json
+            stepin-container.cdx.json
           if-no-files-found: warn
 
   source-provenance:
@@ -99,12 +99,12 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Create source archive
-        run: git archive --format=tar.gz --output="careeros-source-${GITHUB_SHA}.tar.gz" HEAD
+        run: git archive --format=tar.gz --output="stepin-source-${GITHUB_SHA}.tar.gz" HEAD
       - name: Attest source archive
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
-          subject-path: careeros-source-${{ github.sha }}.tar.gz
+          subject-path: stepin-source-${{ github.sha }}.tar.gz
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: attested-source-archive
-          path: careeros-source-${{ github.sha }}.tar.gz
+          path: stepin-source-${{ github.sha }}.tar.gz
