@@ -53,8 +53,8 @@ def _next_action(project: dict[str, Any] | None) -> dict[str, Any]:
     if not project:
         return {
             "action": "create_project",
-            "title": "建立第一个职业项目",
-            "description": "从职业方向、真实经历和目标岗位开始，形成可持续修改的项目档案。",
+            "title": "建立第一个实践项目",
+            "description": "从一组真实材料和明确交付开始，把小任务连成可以修改、验证和复盘的实践项目。",
             "href": "/projects/new",
             "cta": "开始项目",
         }
@@ -64,8 +64,8 @@ def _next_action(project: dict[str, Any] | None) -> dict[str, Any]:
     if missing:
         return {
             "action": "complete_project_profile",
-            "title": f"补充 {len(missing)} 项关键信息",
-            "description": "先完成职业方向、真实经历和能力证据，再进入成果生成。",
+            "title": f"补充 {len(missing)} 项任务材料",
+            "description": "先把任务要求、材料处理、判断过程和交付证据补齐，再形成第一版成果。",
             "href": f"/projects/{project_id}#projectFormSection",
             "cta": "继续填写",
             "missing_question_ids": [str(item.get("question_id")) for item in missing],
@@ -74,12 +74,12 @@ def _next_action(project: dict[str, Any] | None) -> dict[str, Any]:
     workspace = f"/student?session_id={session_id}&project_id={project_id}"
     mapping = {
         "draft": ("complete_project_profile", "检查项目材料", "确认信息完整后进入成果工作台。", f"/projects/{project_id}", "检查材料"),
-        "collecting": ("prepare_evidence", "整理项目证据", "上传简历、项目成果或岗位描述，避免无证据生成。", workspace, "整理证据"),
-        "ready_to_generate": ("generate_artifact", "生成第一版成果", "基于项目材料生成职业方案或基础简历。", workspace, "生成成果"),
+        "collecting": ("prepare_evidence", "整理任务材料", "整理原始材料、过程判断和已有结果，保留可以回看的真实证据。", workspace, "整理材料"),
+        "ready_to_generate": ("generate_artifact", "形成第一版成果", "基于已经整理的真实材料形成第一版交付，后面还需要评审和修改。", workspace, "形成第一版"),
         "solution_generated": ("review_artifact", "评审当前成果", "检查岗位匹配、事实支撑和表达质量。", workspace, "开始评审"),
         "reviewed": ("revise_artifact", "根据评审完成修改", "处理高优先级问题，保留修改前后版本。", workspace, "继续修改"),
         "revision_required": ("revise_artifact", "完成必要修改", "当前版本仍存在关键缺口，完成修改后再提交。", workspace, "立即修改"),
-        "completed": ("export_artifact", "导出并使用成果", "当前项目已完成，可导出简历或继续创建岗位定制版本。", workspace, "查看成果"),
+        "completed": ("export_artifact", "整理这次实践成果", "当前项目已完成，可以导出作品、回看过程证据，并把做过的事情讲清楚。", workspace, "查看成果"),
     }
     action, title, description, href, cta = mapping.get(status, mapping["collecting"])
     return {"action": action, "title": title, "description": description, "href": href, "cta": cta}
@@ -138,9 +138,19 @@ def build_projects_router(
     create_project_session: Callable[[Principal], object],
     cleanup_project_session: Callable[[str, str], None],
     allow_anonymous_demo: bool = False,
+    observation_sink: Callable[..., Any] | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="/api/v1", tags=["projects"])
     engine = project_repository.engine
+
+    def emit_observation(**event: Any) -> None:
+        if observation_sink is None:
+            return
+        try:
+            observation_sink(**event)
+        except Exception:
+            # Project transactions remain authoritative if observation capture is unavailable.
+            return
 
     def participant_identity(principal: Principal) -> tuple[str, str]:
         if not principal.authenticated:
@@ -312,6 +322,12 @@ def build_projects_router(
                 resource_id=project["project_id"],
                 details={"template_version_id": req.template_version_id},
             )
+            emit_observation(
+                event_type="project_started", source="project_runtime", tenant_id=tenant_id,
+                owner_user_id=owner, session_id=state.session_id, actor_user_id=owner,
+                project_id=project["project_id"], outcome="neutral",
+                payload={"templateVersionId": req.template_version_id, "projectName": project.get("name") or ""},
+            )
             return project
         except ProjectVersionConflict as exc:
             cleanup_project_session(state.session_id, tenant_id)
@@ -397,6 +413,12 @@ def build_projects_router(
             resource_id=project_id,
             details={"question_count": len(req.answers), "status": updated.get("status")},
         )
+        emit_observation(
+            event_type="project_updated", source="project_runtime", tenant_id=tenant_id,
+            owner_user_id=owner, session_id=str(updated.get("session_id") or ""), actor_user_id=owner,
+            project_id=project_id, outcome="neutral",
+            payload={"questionCount": len(req.answers), "status": updated.get("status"), "questionIds": [item.question_id for item in req.answers]},
+        )
         return {
             "project_id": project_id,
             "answers": updated.get("answers", {}),
@@ -444,6 +466,17 @@ def build_projects_router(
             resource_type="project",
             resource_id=project_id,
             details={"from": current_status, "to": target_status, "milestone": milestone},
+        )
+        event_type = "project_completed" if target_status == "completed" else "project_milestone"
+        if target_status == "revision_required":
+            event_type = "revision_requested"
+        elif current_status == "revision_required" and target_status == "reviewed":
+            event_type = "revision_submitted"
+        emit_observation(
+            event_type=event_type, source="project_runtime", tenant_id=tenant_id,
+            owner_user_id=owner, session_id=str(updated.get("session_id") or ""), actor_user_id=owner,
+            project_id=project_id, outcome=("success" if target_status == "completed" else "neutral"),
+            payload={"fromStatus": current_status, "toStatus": target_status, "milestone": milestone},
         )
         return {"project": updated, "next_action": _next_action(updated)}
 

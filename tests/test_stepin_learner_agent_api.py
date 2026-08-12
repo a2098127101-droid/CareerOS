@@ -24,6 +24,8 @@ assert manifest.status_code == 200, manifest.text
 body = manifest.json()
 assert body['agentId'] == 'stepin-learner'
 assert body['stateful'] is True
+assert body['version'] == '2.2.0'
+assert 'Trajectory' in body['components'] and 'Calibration' in body['components']
 assert len(body['tools']) == 8
 assert not any('generate' in x['name'] for x in body['tools'])
 
@@ -50,6 +52,10 @@ memory = client.get('/api/learner-agent/v1/memory')
 assert memory.status_code == 200, memory.text
 assert len(memory.json()['memory']['events']) >= 2
 
+trajectory = client.get('/api/learner-agent/v1/trajectory')
+assert trajectory.status_code == 200, trajectory.text
+assert len(trajectory.json()['items']) >= 2
+
 decisions = client.get('/api/learner-agent/v1/decisions')
 assert decisions.status_code == 200, decisions.text
 assert decisions.json()['items'][-1]['action'] == 'ASK'
@@ -58,6 +64,7 @@ evaluation = client.post('/api/learner-agent/v1/evaluate', json={})
 assert evaluation.status_code == 200, evaluation.text
 assert evaluation.json()['aggregate']['decisions'] >= 1
 assert evaluation.json()['aggregate']['directAnswerLeakageRate'] == 0.0
+assert evaluation.json()['aggregate']['trajectoryEventCount'] >= 2
 print('LEARNER_AGENT_HTTP_OK')
 '''
     env = os.environ.copy()

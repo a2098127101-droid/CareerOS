@@ -158,14 +158,14 @@ def test_project_repository_enforces_tenant_owner_and_snapshot_binding(tmp_path:
 
     repos.projects.save_answer(
         project["project_id"],
-        "Q-001",
-        "大二",
+        "P-001",
+        "整理一份可以直接交接的任务结果",
         tenant_id="school-a",
         owner_user_id="student-a",
     )
     assert repos.projects.get_project(
         project["project_id"], tenant_id="school-a", owner_user_id="student-a"
-    )["answers"] == {"Q-001": "大二"}
+    )["answers"] == {"P-001": "整理一份可以直接交接的任务结果"}
     with sqlite3.connect(repos.projects.engine.url.database) as conn:
         insert_sql = """INSERT INTO project_instances(
             project_id,tenant_id,owner_user_id,template_id,template_version_id,session_id,name
@@ -256,10 +256,13 @@ assert project['owner_user_id']
 assert student.get('/api/v1/projects').json()['items'][0]['project_id'] == project['project_id']
 detail = student.get('/api/v1/projects/'+project['project_id'])
 assert detail.status_code == 200 and detail.json()['template_version_id'] == template['current_version_id']
+trajectory = student.get('/api/learner-agent/v1/trajectory', params={'session_id':project['session_id']})
+assert trajectory.status_code == 200, trajectory.text
+assert 'project_started' in [row['event_type'] for row in trajectory.json()['items']]
 form = student.get('/api/v1/projects/'+project['project_id']+'/form')
-assert len(form.json()['questions']) == 16
-saved = student.put('/api/v1/projects/'+project['project_id']+'/answers',json={'answers':[{'question_id':'Q-001','answer':'大二'}]})
-assert saved.status_code == 200 and saved.json()['answers']['Q-001'] == '大二'
+assert len(form.json()['questions']) == 13
+saved = student.put('/api/v1/projects/'+project['project_id']+'/answers',json={'answers':[{'question_id':'P-001','answer':'整理一份可以直接交接的任务结果'}]})
+assert saved.status_code == 200 and saved.json()['answers']['P-001'] == '整理一份可以直接交接的任务结果'
 
 second_user = auth_store.ensure_user(email='student2@test.local',password='CareerOS-Test-Second-123!',display_name='Student 2',tenant_id=project['tenant_id'],role='student')
 other = TestClient(app)
@@ -564,3 +567,56 @@ def test_project_migration_installs_immutable_and_tenant_guard_triggers():
     assert 'for table in ("project_template_versions", "project_instances", "project_answers")' in migration
     assert 'f"CREATE TRIGGER {trigger} BEFORE INSERT OR UPDATE ON {table} "' in migration
     assert "student_user_id=NEW.owner_user_id" in migration
+
+
+def test_stepin_project_library_auto_upgrades_stale_current_version_without_rewriting_history(tmp_path: Path):
+    db_path, repos = build_repositories(tmp_path)
+    repos.identity.ensure_tenant("stepin-library", "StepIn Library", product_preset="career_development")
+    template_id, old_version_id = repos.projects._default_ids("stepin-library")
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """INSERT INTO project_templates(
+            template_id,tenant_id,name,category,status,current_version_id,created_by
+            ) VALUES(?,?,?,'职业发展规划','published',?,'legacy')""",
+            (template_id, "stepin-library", "个人职业发展规划", old_version_id),
+        )
+        conn.execute(
+            """INSERT INTO project_template_versions(
+            template_version_id,template_id,tenant_id,version,name,category,description,background,
+            objective,applicable_users,estimated_time_minutes,output_type,questions_json,
+            material_requirements_json,artifact_structure_json,rubric_json,workflow_template_id,
+            artifact_template_id,status,published_at
+            ) VALUES(?,?,?,1,?,?,'旧版职业入口','','','',60,'career_report','[]','[]','[]','{}',
+            'career_development_v1','career_report_v1','published',CURRENT_TIMESTAMP)""",
+            (old_version_id, template_id, "stepin-library", "个人职业发展规划", "职业发展规划"),
+        )
+        conn.commit()
+
+    session = repos.sessions.create(
+        tenant_id="stepin-library", student_user_id="student-legacy", class_id="default", student_id="student-legacy"
+    )
+    repos.workflows.ensure(session, preset_id="career_development")
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """INSERT INTO project_instances(
+            project_id,tenant_id,owner_user_id,template_id,template_version_id,session_id,name,status,current_step
+            ) VALUES('PRJ-LEGACY-LIBRARY','stepin-library','student-legacy',?,?,?,'历史职业项目','draft','overview')""",
+            (template_id, old_version_id, session.session_id),
+        )
+        conn.commit()
+
+    latest = repos.projects.ensure_default_template(tenant_id="stepin-library")
+    assert latest["template_version_id"] != old_version_id
+    assert latest["name"] == "真实任务综合实践"
+    assert latest["category"] == "实践项目"
+    assert latest["artifact_template_id"] == "portfolio_v1"
+    assert latest["rubric"]["_stepin_library"]["version"] == "2.2.0"
+    assert latest["rubric"]["_stepin_library"]["agent_observable"] is True
+    assert latest["questions"][0]["question_id"] == "P-001"
+    assert "目标岗位" not in " ".join(q["question_text"] for q in latest["questions"])
+
+    historical = repos.projects.get_project(
+        "PRJ-LEGACY-LIBRARY", tenant_id="stepin-library", owner_user_id="student-legacy"
+    )
+    assert historical["template_version_id"] == old_version_id
+    assert historical["template"]["name"] == "个人职业发展规划"

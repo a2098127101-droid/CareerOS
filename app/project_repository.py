@@ -28,52 +28,52 @@ class ProjectVersionConflict(ValueError):
     """The selected immutable template version is no longer current for new projects."""
 
 
+PROJECT_LIBRARY_VERSION = "2.2.0"
+
 DEFAULT_QUESTIONS = [
-    {"question_id": "Q-001", "group_id": "basic", "question_text": "你的当前身份或学习阶段是什么？", "question_type": "single_select", "required": True, "options": ["大一", "大二", "大三", "大四", "研究生", "应届毕业", "其他"], "display_order": 1, "artifact_sections": ["个人现状"]},
-    {"question_id": "Q-002", "group_id": "basic", "question_text": "你的专业或主要背景是什么？", "question_type": "short_text", "required": True, "display_order": 2, "artifact_sections": ["个人现状"]},
-    {"question_id": "Q-003", "group_id": "basic", "question_text": "你希望发展的职业方向是什么？", "question_type": "short_text", "required": True, "display_order": 3, "artifact_sections": ["职业目标"]},
-    {"question_id": "Q-004", "group_id": "basic", "question_text": "你是否已经确定具体目标岗位？", "question_type": "single_select", "required": True, "options": ["是", "否", "正在探索"], "display_order": 4, "artifact_sections": ["职业目标"]},
-    {"question_id": "Q-005", "group_id": "experience", "question_text": "请填写 1—3 段与你目标方向相关的真实经历。", "question_type": "long_text", "required": True, "display_order": 5, "artifact_sections": ["个人能力与证据"]},
-    {"question_id": "Q-006", "group_id": "experience", "question_text": "在这些经历中，你具体完成了什么工作？", "question_type": "long_text", "required": True, "display_order": 6, "artifact_sections": ["个人能力与证据"]},
-    {"question_id": "Q-007", "group_id": "experience", "question_text": "这些经历产生了什么可以验证的结果？", "question_type": "long_text", "required": False, "display_order": 7, "artifact_sections": ["个人能力与证据"]},
-    {"question_id": "Q-008", "group_id": "experience", "question_text": "你目前已经具备哪些能力或技能？", "question_type": "multi_select", "required": True, "display_order": 8, "artifact_sections": ["个人能力与证据"]},
-    {"question_id": "Q-009", "group_id": "gap", "question_text": "你选择该职业方向的主要原因是什么？", "question_type": "long_text", "required": True, "display_order": 9, "artifact_sections": ["职业目标"]},
-    {"question_id": "Q-010", "group_id": "gap", "question_text": "你认为该职业最重要的要求是什么？", "question_type": "long_text", "required": True, "display_order": 10, "artifact_sections": ["职业要求分析"]},
-    {"question_id": "Q-011", "group_id": "gap", "question_text": "你目前最明显的能力差距是什么？", "question_type": "long_text", "required": True, "display_order": 11, "artifact_sections": ["差距分析"]},
-    {"question_id": "Q-012", "group_id": "gap", "question_text": "你当前面临的主要困难是什么？", "question_type": "long_text", "required": True, "display_order": 12, "artifact_sections": ["差距分析"]},
-    {"question_id": "Q-013", "group_id": "action", "question_text": "未来三个月你准备完成哪些行动？", "question_type": "long_text", "required": True, "display_order": 13, "artifact_sections": ["行动计划"]},
-    {"question_id": "Q-014", "group_id": "action", "question_text": "未来一年你希望达到什么结果？", "question_type": "long_text", "required": True, "display_order": 14, "artifact_sections": ["行动计划"]},
-    {"question_id": "Q-015", "group_id": "action", "question_text": "你希望 AI 重点帮助你解决什么问题？", "question_type": "long_text", "required": False, "display_order": 15, "artifact_sections": ["动态调整"]},
-    {"question_id": "Q-016", "group_id": "materials", "question_text": "上传个人简历、岗位描述或项目材料。", "question_type": "file_upload", "required": False, "display_order": 16, "artifact_sections": ["Evidence 附件"]},
+    {"question_id": "P-001", "group_id": "task", "question_text": "这次任务最后需要交出什么？", "question_type": "long_text", "required": True, "display_order": 1, "artifact_sections": ["任务与要求"]},
+    {"question_id": "P-002", "group_id": "task", "question_text": "有哪些时间、格式、对象或其他限制不能漏掉？", "question_type": "long_text", "required": True, "display_order": 2, "artifact_sections": ["任务与要求"]},
+    {"question_id": "P-003", "group_id": "material", "question_text": "从原始材料里找出真正影响下一步的关键信息。", "question_type": "long_text", "required": True, "display_order": 3, "artifact_sections": ["材料处理"]},
+    {"question_id": "P-004", "group_id": "material", "question_text": "这些信息可以怎样分类、整理或清洗？", "question_type": "long_text", "required": True, "display_order": 4, "artifact_sections": ["材料处理"]},
+    {"question_id": "P-005", "group_id": "judgment", "question_text": "你发现了哪些问题、冲突或不确定信息？", "question_type": "long_text", "required": True, "display_order": 5, "artifact_sections": ["判断过程"]},
+    {"question_id": "P-006", "group_id": "judgment", "question_text": "你准备先处理什么？说明你使用的判断标准。", "question_type": "long_text", "required": True, "display_order": 6, "artifact_sections": ["判断过程"]},
+    {"question_id": "P-007", "group_id": "deliver", "question_text": "提交你的第一版结果。", "question_type": "long_text", "required": True, "display_order": 7, "artifact_sections": ["第一版交付"]},
+    {"question_id": "P-008", "group_id": "revision", "question_text": "你收到了什么反馈？如果暂时没有，请写明需要谁来检查什么。", "question_type": "long_text", "required": False, "display_order": 8, "artifact_sections": ["反馈与修改"]},
+    {"question_id": "P-009", "group_id": "revision", "question_text": "根据反馈提交第二版，并说明这次真正改了什么。", "question_type": "long_text", "required": True, "display_order": 9, "artifact_sections": ["反馈与修改"]},
+    {"question_id": "P-010", "group_id": "transfer", "question_text": "换一份材料或一个相近场景后，同一个方法还能怎样使用？", "question_type": "long_text", "required": True, "display_order": 10, "artifact_sections": ["换场景再做"]},
+    {"question_id": "P-011", "group_id": "evidence", "question_text": "哪些过程记录、版本或结果可以证明这件事确实是你做的？", "question_type": "long_text", "required": True, "display_order": 11, "artifact_sections": ["过程证据"]},
+    {"question_id": "P-012", "group_id": "reflection", "question_text": "用自己的话说清楚：你做了什么、怎么判断、哪里改过、下次会怎样做。", "question_type": "long_text", "required": True, "display_order": 12, "artifact_sections": ["实践复盘"]},
+    {"question_id": "P-013", "group_id": "materials", "question_text": "上传任务材料、过程文件、版本或截图等可核验附件。", "question_type": "file_upload", "required": False, "display_order": 13, "artifact_sections": ["过程证据"]},
 ]
 
 DEFAULT_RUBRIC = {
-    "rubric_id": "RUB-CAREER-PLAN",
-    "version": 1,
+    "rubric_id": "RUB-STEPIN-PRACTICE",
+    "version": 2,
     "dimensions": [
-        {"dimension_id": "goal_fit", "name": "项目目标与内容匹配度", "weight": 20},
-        {"dimension_id": "evidence", "name": "个人事实与证据支撑", "weight": 25},
-        {"dimension_id": "logic", "name": "分析逻辑与结构完整性", "weight": 20},
-        {"dimension_id": "actionability", "name": "行动方案的可执行性", "weight": 20},
-        {"dimension_id": "expression", "name": "表达质量与规范性", "weight": 15},
+        {"dimension_id": "task_model", "name": "是否真正看懂任务与限制", "weight": 15},
+        {"dimension_id": "information", "name": "信息整理与问题发现", "weight": 20},
+        {"dimension_id": "judgment", "name": "判断标准与理由", "weight": 20},
+        {"dimension_id": "delivery", "name": "结果是否清楚、可继续使用", "weight": 15},
+        {"dimension_id": "revision", "name": "是否根据反馈发生实质修改", "weight": 15},
+        {"dimension_id": "transfer", "name": "换材料后能否继续使用同一方法", "weight": 15},
     ],
     "fatal_score_cap": 59,
 }
 
 DEFAULT_TEMPLATE = {
-    "name": "个人职业发展规划",
-    "category": "职业发展规划",
-    "description": "根据个人经历、能力和职业目标，形成一份结构完整、证据充分、可执行的职业发展方案。",
-    "background": "职业发展不是抽象愿望，而是个人证据、岗位要求、能力差距和行动安排之间的持续匹配。",
-    "objective": "明确目标方向，识别能力差距，形成未来三个月和一年的行动计划。",
-    "applicable_users": "高校学生、应届毕业生、职业探索阶段青年",
-    "estimated_time_minutes": 60,
-    "output_type": "career_report",
+    "name": "真实任务综合实践",
+    "category": "实践项目",
+    "description": "从一组真实或高保真工作材料开始，完成信息处理、判断、第一版交付、反馈修改、换场景验证和实践复盘。",
+    "background": "项目不是先选择岗位再填写职业画像，而是把已经做过的小任务连成一个可回看、可修改、可验证的工作过程。",
+    "objective": "完成一轮任务理解—材料处理—判断—交付—修改—迁移，并留下可以验证能力变化的过程证据。",
+    "applicable_users": "零基础、缺少实习经历或正在探索方向的学生",
+    "estimated_time_minutes": 90,
+    "output_type": "portfolio",
     "questions": DEFAULT_QUESTIONS,
-    "material_requirements": ["个人简历", "目标岗位描述", "实习或项目材料", "获奖证明", "原有规划方案"],
-    "artifact_structure": ["个人现状", "职业目标", "职业要求分析", "个人能力与证据", "差距分析", "行动计划", "动态调整"],
+    "material_requirements": ["任务说明", "原始工作材料", "验收标准或检查清单", "第一版结果", "反馈记录", "换场景材料"],
+    "artifact_structure": ["任务与要求", "材料处理", "判断过程", "第一版交付", "反馈与修改", "换场景再做", "过程证据", "实践复盘"],
     "rubric": DEFAULT_RUBRIC,
-    "artifact_template_id": "career_report_v1",
+    "artifact_template_id": "portfolio_v1",
 }
 
 
@@ -102,6 +102,22 @@ class ProjectRepository:
         suffix = hashlib.sha256(tenant_id.encode("utf-8")).hexdigest()[:12].upper()
         return f"PT-CAREER-{suffix}", f"PTV-CAREER-{suffix}-1"
 
+    @staticmethod
+    def _default_content_hash() -> str:
+        payload = json.dumps(DEFAULT_TEMPLATE, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    @classmethod
+    def _latest_rubric(cls) -> dict[str, Any]:
+        rubric = json.loads(json.dumps(DEFAULT_TEMPLATE["rubric"], ensure_ascii=False))
+        rubric["_stepin_library"] = {
+            "version": PROJECT_LIBRARY_VERSION,
+            "content_hash": cls._default_content_hash(),
+            "mode": "practice_first",
+            "agent_observable": True,
+        }
+        return rubric
+
     def _tenant_workflow_template_id(self, tenant_id: str) -> str:
         with self.engine.connect() as conn:
             row = conn.execute(
@@ -115,6 +131,7 @@ class ProjectRepository:
     def ensure_default_template(self, *, tenant_id: str, created_by: str = "system") -> dict[str, Any]:
         template_id, first_version_id = self._default_ids(tenant_id)
         workflow_template_id = self._tenant_workflow_template_id(tenant_id)
+        latest_rubric = self._latest_rubric()
         try:
             with self.engine.begin() as conn:
                 template = conn.execute(
@@ -128,7 +145,7 @@ class ProjectRepository:
                 if template and template["current_version_id"]:
                     current = conn.execute(
                         text(
-                            """SELECT template_version_id,workflow_template_id FROM project_template_versions
+                            """SELECT template_version_id,workflow_template_id,rubric_json FROM project_template_versions
                             WHERE template_version_id=:version_id AND template_id=:template_id
                               AND tenant_id=:tenant_id"""
                         ),
@@ -138,7 +155,20 @@ class ProjectRepository:
                             "tenant_id": tenant_id,
                         },
                     ).mappings().first()
-                if current and current["workflow_template_id"] == workflow_template_id:
+                current_meta: dict[str, Any] = {}
+                if current:
+                    try:
+                        current_rubric = json.loads(current.get("rubric_json") or "{}")
+                        current_meta = dict(current_rubric.get("_stepin_library") or {})
+                    except (TypeError, json.JSONDecodeError):
+                        current_meta = {}
+                expected_hash = self._default_content_hash()
+                if (
+                    current
+                    and current["workflow_template_id"] == workflow_template_id
+                    and current_meta.get("version") == PROJECT_LIBRARY_VERSION
+                    and current_meta.get("content_hash") == expected_hash
+                ):
                     return self._get_template_with_connection(
                         conn, template_id=template_id, tenant_id=tenant_id
                     )
@@ -195,7 +225,7 @@ class ProjectRepository:
                         "questions": _json(DEFAULT_TEMPLATE["questions"]),
                         "materials": _json(DEFAULT_TEMPLATE["material_requirements"]),
                         "structure": _json(DEFAULT_TEMPLATE["artifact_structure"]),
-                        "rubric": _json(DEFAULT_TEMPLATE["rubric"]),
+                        "rubric": _json(latest_rubric),
                         "workflow_template": workflow_template_id,
                         "artifact_template": DEFAULT_TEMPLATE["artifact_template_id"],
                     },
@@ -203,13 +233,15 @@ class ProjectRepository:
                 conn.execute(
                     text(
                         """UPDATE project_templates
-                        SET current_version_id=:version_id,status='published',updated_at=CURRENT_TIMESTAMP
+                        SET name=:name,category=:category,current_version_id=:version_id,status='published',updated_at=CURRENT_TIMESTAMP
                         WHERE template_id=:template_id AND tenant_id=:tenant_id"""
                     ),
                     {
                         "version_id": version_id,
                         "template_id": template_id,
                         "tenant_id": tenant_id,
+                        "name": DEFAULT_TEMPLATE["name"],
+                        "category": DEFAULT_TEMPLATE["category"],
                     },
                 )
         except IntegrityError:
@@ -224,7 +256,7 @@ class ProjectRepository:
     def list_templates(self, *, tenant_id: str, published_only: bool = True) -> list[dict[str, Any]]:
         self.ensure_default_template(tenant_id=tenant_id)
         sql = """SELECT t.*,v.version AS current_version,v.description,v.objective,
-                 v.estimated_time_minutes,v.output_type
+                 v.estimated_time_minutes,v.output_type,v.rubric_json
                  FROM project_templates t
                  JOIN project_template_versions v
                    ON v.template_version_id=t.current_version_id AND v.tenant_id=t.tenant_id
@@ -234,7 +266,18 @@ class ProjectRepository:
         sql += " ORDER BY t.updated_at DESC,t.name"
         with self.engine.connect() as conn:
             rows = conn.execute(text(sql), {"tenant": tenant_id}).mappings().all()
-        return [self._clean_row(dict(row)) for row in rows]
+        items = []
+        for raw in rows:
+            row = dict(raw)
+            try:
+                rubric = json.loads(row.pop("rubric_json") or "{}")
+            except (TypeError, json.JSONDecodeError):
+                rubric = {}
+            library = dict(rubric.get("_stepin_library") or {})
+            row["library_version"] = str(library.get("version") or "custom")
+            row["agent_observable"] = bool(library.get("agent_observable"))
+            items.append(self._clean_row(row))
+        return items
 
     def get_template(self, template_id: str, *, tenant_id: str) -> dict[str, Any]:
         with self.engine.connect() as conn:
@@ -468,6 +511,9 @@ class ProjectRepository:
                     row[target] = json.loads(row.pop(source) or _json(fallback))
                 except Exception:
                     row[target] = fallback
+        library = dict((row.get("rubric") or {}).get("_stepin_library") or {})
+        row["library_version"] = str(library.get("version") or "custom")
+        row["agent_observable"] = bool(library.get("agent_observable"))
         return cls._clean_row(row)
 
     @classmethod
@@ -482,7 +528,7 @@ class ProjectRepository:
             "revision_required": 3,
             "completed": 4,
         }.get(status, 0)
-        labels = ["了解项目", "填写信息", "生成方案", "评分与修改", "完成项目"]
+        labels = ["看懂任务", "处理材料", "形成第一版", "反馈与修改", "完成复盘"]
         row["progress"] = {
             "current": active_index + 1,
             "total": 5,

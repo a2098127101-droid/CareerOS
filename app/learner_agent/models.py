@@ -67,7 +67,7 @@ class CapabilityState(BaseModel):
 class LearnerAgentState(BaseModel):
     id: str = "stepin-learner"
     agent_id: str = "stepin-learner"
-    protocol_version: str = "2.1"
+    protocol_version: str = "2.2"
     owner_user_id: str = ""
     session_id: str = ""
     stage: str = "beginner"
@@ -81,6 +81,10 @@ class LearnerAgentState(BaseModel):
     last_observation: dict[str, Any] = Field(default_factory=dict)
     last_decision: dict[str, Any] = Field(default_factory=dict)
     last_evaluation: dict[str, Any] = Field(default_factory=dict)
+    trajectory_event_count: int = 0
+    last_trajectory_event_id: str = ""
+    challenge_state: str = "unknown"
+    policy_profile_version: str = "2.2-default"
     updated_at: str = ""
 
 
@@ -94,3 +98,20 @@ class AgentDecision(BaseModel):
     tool_result: dict[str, Any] = Field(default_factory=dict)
     model: dict[str, Any] = Field(default_factory=dict)
     evaluation: dict[str, Any] = Field(default_factory=dict)
+
+
+
+
+class TrajectoryLabelRequest(BaseModel):
+    diagnosis_correct: bool | None = None
+    observed_diagnosis: str = ""
+    outcome: str = ""
+    notes: str = ""
+
+
+class CalibrationRefreshRequest(BaseModel):
+    min_samples: int = Field(default=30, ge=10, le=5000)
+
+
+class CalibrationActivateRequest(BaseModel):
+    candidate_id: str

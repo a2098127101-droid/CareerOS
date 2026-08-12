@@ -5,17 +5,19 @@ from typing import Any
 from uuid import uuid4
 
 from ..unified_runtime_store import RuntimeVersionConflict
+from .calibration import LearnerAgentCalibrationService
 from .evaluation import LearnerAgentEvaluator
 from .memory import LearnerAgentMemory
 from .models import AgentAction, AgentDecision, AgentObservationRequest, AgentStepRequest, DiagnosisCode, LearnerAgentState
 from .policy import LearnerAgentPolicy, PolicyDecision
 from .state import LearnerAgentStateStore
 from .tools import LearnerAgentTools
+from .trajectory import LearnerTrajectoryStore
 
 
 class LearnerAgentRuntime:
     AGENT_ID = "stepin-learner"
-    VERSION = "2.1.0"
+    VERSION = "2.2.0"
 
     def __init__(
         self,
@@ -30,6 +32,8 @@ class LearnerAgentRuntime:
         self.policy = LearnerAgentPolicy()
         self.tools = LearnerAgentTools(foundation=foundation, collaboration=collaboration)
         self.evaluator = LearnerAgentEvaluator()
+        self.trajectory = LearnerTrajectoryStore(repository)
+        self.calibration = LearnerAgentCalibrationService(repository, self.trajectory)
         self.career_agents = career_agents
 
     @classmethod
@@ -39,7 +43,7 @@ class LearnerAgentRuntime:
             "version": cls.VERSION,
             "protocol": "StepIn Learner Agent HTTP/1",
             "stateful": True,
-            "components": ["State", "Policy", "Tools", "Memory", "ExecutionLoop", "Evaluation"],
+            "components": ["State", "Policy", "Tools", "Memory", "Trajectory", "ExecutionLoop", "Evaluation", "Calibration"],
             "actions": [action.value for action in AgentAction],
             "guarantees": [
                 "model_cannot_choose_tools",
@@ -47,6 +51,8 @@ class LearnerAgentRuntime:
                 "no_final_deliverable_generation",
                 "server_authoritative_state",
                 "human_escalation_after_repeated_failure",
+                "real_task_events_become_agent_observations",
+                "policy_calibration_requires_human_activation",
             ],
         }
 
@@ -104,10 +110,149 @@ class LearnerAgentRuntime:
             "openRevisionTasks": open_revision_tasks,
         }
 
+    def _record_observation_trajectory(
+        self,
+        *,
+        observation: dict[str, Any],
+        context: dict[str, Any],
+        tenant_id: str,
+        owner_user_id: str,
+        session_id: str,
+        updated_by: str,
+    ) -> dict[str, Any] | None:
+        client_context = observation.get("client_context") or {}
+        if client_context.get("_trajectory_recorded"):
+            return None
+        event_type = str(observation.get("event_type") or "user_message")
+        result = observation.get("task_result") or {}
+        if result.get("ok") is True:
+            outcome = "success"
+        elif result.get("ok") is False:
+            outcome = "failure"
+        else:
+            outcome = "neutral"
+        return self.trajectory.record(
+            event_type=event_type,
+            source=str(client_context.get("surface") or client_context.get("source") or "client"),
+            tenant_id=tenant_id,
+            owner_user_id=owner_user_id,
+            session_id=session_id,
+            actor_user_id=updated_by,
+            task_id=str(context.get("taskId") or observation.get("task_id") or ""),
+            project_id=str(client_context.get("project_id") or client_context.get("projectId") or ""),
+            evidence_id=str(client_context.get("evidence_id") or client_context.get("evidenceId") or ""),
+            claim_id=str(client_context.get("claim_id") or client_context.get("claimId") or ""),
+            outcome=outcome,
+            correlation_id=str(client_context.get("correlation_id") or client_context.get("correlationId") or ""),
+            payload={
+                "message": observation.get("message") or "",
+                "answer": observation.get("answer") or {},
+                "task_result": result,
+                "client_context": {k: v for k, v in client_context.items() if not str(k).startswith("_")},
+            },
+            updated_by=updated_by,
+        )
+
+    def _sync_trajectory_state(
+        self,
+        state: LearnerAgentState,
+        *,
+        tenant_id: str,
+        owner_user_id: str,
+        session_id: str,
+    ) -> dict[str, Any]:
+        metrics = self.calibration.analyze(
+            tenant_id=tenant_id, owner_user_id=owner_user_id, session_id=session_id, limit=1000
+        )
+        state.trajectory_event_count = int(metrics.get("eventCount") or 0)
+        rows = self.trajectory.list_events(
+            tenant_id=tenant_id, owner_user_id=owner_user_id, session_id=session_id, limit=1
+        )
+        state.last_trajectory_event_id = str((rows[-1] if rows else {}).get("event_id") or "")
+        distribution = metrics.get("challengeDistribution") or {}
+        if distribution:
+            state.challenge_state = max(distribution, key=lambda key: int(distribution.get(key) or 0))
+        else:
+            state.challenge_state = "unknown"
+        profile = self.calibration.active_profile(tenant_id=tenant_id)
+        state.policy_profile_version = profile.version
+        return {"metrics": metrics, "profile": profile.model_dump(mode="json")}
+
+    def ingest_server_event(
+        self,
+        *,
+        event_type: str,
+        source: str,
+        tenant_id: str,
+        owner_user_id: str,
+        session_id: str,
+        actor_user_id: str = "",
+        task_id: str = "",
+        project_id: str = "",
+        evidence_id: str = "",
+        claim_id: str = "",
+        outcome: str = "neutral",
+        payload: dict[str, Any] | None = None,
+        idempotency_key: str = "",
+        correlation_id: str = "",
+    ) -> dict[str, Any]:
+        body = dict(payload or {})
+        profile = self.calibration.active_profile(tenant_id=tenant_id)
+        event = self.trajectory.record(
+            event_type=event_type,
+            source=source,
+            tenant_id=tenant_id,
+            owner_user_id=owner_user_id,
+            session_id=session_id,
+            actor_user_id=actor_user_id,
+            task_id=task_id,
+            project_id=project_id,
+            evidence_id=evidence_id,
+            claim_id=claim_id,
+            outcome=outcome,
+            correlation_id=correlation_id,
+            policy_version=profile.version,
+            payload=body,
+            idempotency_key=idempotency_key,
+            updated_by=actor_user_id or owner_user_id,
+        )
+        task_result = dict(body.get("task_result") or {})
+        if "ok" not in task_result and outcome in {"success", "failure"}:
+            task_result["ok"] = outcome == "success"
+        if body.get("issues") and not task_result.get("issues"):
+            task_result["issues"] = body.get("issues")
+        req = AgentObservationRequest(
+            event_type=event_type,
+            task_id=task_id,
+            message=str(body.get("message") or ""),
+            answer=dict(body.get("answer") or {}),
+            task_result=task_result,
+            client_context={
+                "source": source,
+                "server_event": True,
+                "_trajectory_recorded": True,
+                "trajectoryEventId": event.get("event_id") or event.get("id"),
+                "projectId": project_id,
+                "evidenceId": evidence_id,
+                "claimId": claim_id,
+            },
+        )
+        observation = self.observe(
+            req,
+            tenant_id=tenant_id,
+            owner_user_id=owner_user_id,
+            session_id=session_id,
+            updated_by=actor_user_id or owner_user_id,
+        )
+        return {"event": event, "observation": observation}
+
     def get_state(self, *, tenant_id: str, owner_user_id: str, session_id: str) -> LearnerAgentState:
         state, version = self.state_store.load(tenant_id=tenant_id, owner_user_id=owner_user_id, session_id=session_id)
         summary = self.tools.summary(tenant_id=tenant_id, owner_user_id=owner_user_id, session_id=session_id)
         self.state_store.sync_from_foundation(state, summary)
+        self._sync_trajectory_state(
+            state, tenant_id=tenant_id, owner_user_id=owner_user_id, session_id=session_id
+        )
         state, _ = self.state_store.save(
             state,
             tenant_id=tenant_id,
@@ -135,6 +280,13 @@ class LearnerAgentRuntime:
             observation=observation,
         )
         self.state_store.sync_from_foundation(state, context["summary"])
+        self._record_observation_trajectory(
+            observation=observation, context=context, tenant_id=tenant_id, owner_user_id=owner_user_id,
+            session_id=session_id, updated_by=updated_by,
+        )
+        self._sync_trajectory_state(
+            state, tenant_id=tenant_id, owner_user_id=owner_user_id, session_id=session_id
+        )
         diagnosis = self.policy.diagnose(
             state,
             observation,
@@ -303,6 +455,14 @@ class LearnerAgentRuntime:
             observation=observation,
         )
         self.state_store.sync_from_foundation(state, context["summary"])
+        self._record_observation_trajectory(
+            observation=observation, context=context, tenant_id=tenant_id, owner_user_id=owner_user_id,
+            session_id=session_id, updated_by=updated_by,
+        )
+        trajectory_context = self._sync_trajectory_state(
+            state, tenant_id=tenant_id, owner_user_id=owner_user_id, session_id=session_id
+        )
+        policy_profile = trajectory_context["profile"]
         raw_decision = self.policy.choose(
             state,
             observation,
@@ -311,6 +471,7 @@ class LearnerAgentRuntime:
             hints_used=context["hintsUsed"],
             open_feedback=context["openFeedback"],
             open_revision_tasks=context["openRevisionTasks"],
+            policy_profile=policy_profile,
         )
         state.failure_streak = self.policy.next_failure_streak(state, raw_decision.diagnosis, observation)
         state.diagnosis = raw_decision.diagnosis
@@ -321,6 +482,7 @@ class LearnerAgentRuntime:
             task=context["task"],
             hints_used=context["hintsUsed"],
             open_feedback=context["openFeedback"],
+            policy_profile=policy_profile,
         )
         state.pending_action = guarded.action
         state.last_observation = observation
@@ -386,6 +548,29 @@ class LearnerAgentRuntime:
             evaluation=evaluation,
         )
         decision_payload = decision.model_dump(mode="json")
+        intervention_event = self.trajectory.record(
+            event_type="agent_intervention",
+            source="learner_agent",
+            tenant_id=tenant_id,
+            owner_user_id=owner_user_id,
+            session_id=session_id,
+            actor_user_id=updated_by,
+            task_id=context["taskId"],
+            outcome="neutral",
+            intervention_id=decision.decision_id,
+            policy_version=str(policy_profile.get("version") or ""),
+            payload={
+                "decisionId": decision.decision_id,
+                "action": guarded.action.value,
+                "diagnosis": guarded.diagnosis.value,
+                "failureStreak": state.failure_streak,
+                "model": model_meta,
+                "toolName": tool_name,
+            },
+            updated_by=updated_by,
+        )
+        state.last_trajectory_event_id = str(intervention_event.get("event_id") or intervention_event.get("id") or "")
+        state.trajectory_event_count += 1
         state.pending_action = AgentAction.WAIT
         state.last_decision = decision_payload
         state.last_evaluation = evaluation
@@ -462,7 +647,12 @@ class LearnerAgentRuntime:
                 "toolName": tool_name,
             },
         )
-        aggregate_eval = self.evaluator.summarize(list(memory.get("events") or []), state)
+        trajectory_metrics = self.calibration.analyze(
+            tenant_id=tenant_id, owner_user_id=owner_user_id, session_id=session_id, limit=1000
+        )
+        aggregate_eval = self.evaluator.summarize(
+            list(memory.get("events") or []), state, policy_profile=policy_profile, trajectory_metrics=trajectory_metrics
+        )
         return {
             "ok": True,
             "agent": self.manifest(),
@@ -470,6 +660,57 @@ class LearnerAgentRuntime:
             "state": state.model_dump(mode="json"),
             "context": self._public_context(context),
             "evaluation": aggregate_eval,
+        }
+
+    def label_trajectory_event(
+        self,
+        event_id: str,
+        *,
+        tenant_id: str,
+        owner_user_id: str,
+        session_id: str,
+        actor_user_id: str,
+        diagnosis_correct: bool | None = None,
+        observed_diagnosis: str = "",
+        outcome: str = "",
+        notes: str = "",
+    ) -> dict[str, Any]:
+        rows = self.trajectory.list_events(
+            tenant_id=tenant_id, owner_user_id=owner_user_id, session_id=session_id, limit=LearnerTrajectoryStore.MAX_QUERY_EVENTS
+        )
+        target = next((row for row in rows if str(row.get("event_id") or row.get("id") or "") == event_id), None)
+        if target is None:
+            raise KeyError(event_id)
+        profile = self.calibration.active_profile(tenant_id=tenant_id)
+        label = self.trajectory.record(
+            event_type="human_review_resolved",
+            source="human_label",
+            tenant_id=tenant_id,
+            owner_user_id=owner_user_id,
+            session_id=session_id,
+            actor_user_id=actor_user_id,
+            task_id=str(target.get("task_id") or ""),
+            project_id=str(target.get("project_id") or ""),
+            evidence_id=str(target.get("evidence_id") or ""),
+            claim_id=str(target.get("claim_id") or ""),
+            outcome=(outcome if outcome in {"success", "failure", "neutral"} else "neutral"),
+            correlation_id=event_id,
+            policy_version=profile.version,
+            payload={
+                "targetEventId": event_id,
+                "targetEventType": target.get("event_type") or "",
+                "targetDiagnosis": ((target.get("payload") or {}).get("diagnosis") or ""),
+                "diagnosisCorrect": diagnosis_correct,
+                "observedDiagnosis": str(observed_diagnosis or "")[:80],
+                "notes": str(notes or "")[:1200],
+            },
+            idempotency_key=f"human-label:{tenant_id}:{owner_user_id}:{event_id}:{actor_user_id}",
+            updated_by=actor_user_id,
+        )
+        return {
+            "ok": True,
+            "label": label,
+            "calibration": self.calibration.analyze(tenant_id=tenant_id, owner_user_id=owner_user_id, session_id=session_id),
         }
 
     def evaluation_report(self, *, tenant_id: str, owner_user_id: str, session_id: str) -> dict[str, Any]:
@@ -480,4 +721,13 @@ class LearnerAgentRuntime:
             session_id=session_id,
             limit=LearnerAgentMemory.MAX_EVENTS,
         )
-        return self.evaluator.summarize(events, state)
+        profile = self.calibration.active_profile(tenant_id=tenant_id)
+        trajectory_metrics = self.calibration.analyze(
+            tenant_id=tenant_id, owner_user_id=owner_user_id, session_id=session_id, limit=2000
+        )
+        report = self.evaluator.summarize(
+            events, state, policy_profile=profile.model_dump(mode="json"), trajectory_metrics=trajectory_metrics
+        )
+        report["trajectory"] = trajectory_metrics
+        report["activePolicyProfile"] = profile.model_dump(mode="json")
+        return report

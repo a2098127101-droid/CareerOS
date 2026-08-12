@@ -5,20 +5,14 @@ from typing import Any
 
 from ..foundation_abilities import TASK_BY_ID
 from .models import AgentAction, LearnerAgentState
+from .policy import LearnerAgentPolicy
 
 
 class LearnerAgentEvaluator:
-    """Runtime evaluation for policy compliance and pedagogical failure modes."""
+    """Runtime evaluation for safety, policy compliance and learning-process quality."""
 
     LEAK_PHRASES = (
-        "正确答案是",
-        "答案是",
-        "答案为",
-        "直接选择",
-        "你应该选择",
-        "你应该填",
-        "照着写",
-        "最终答案",
+        "正确答案是", "答案是", "答案为", "直接选择", "你应该选择", "你应该填", "照着写", "最终答案",
     )
 
     @staticmethod
@@ -41,10 +35,8 @@ class LearnerAgentEvaluator:
             expected.append(item_text.get(raw, raw))
         elif isinstance(raw, list):
             expected.extend(item_text.get(str(x), str(x)) for x in raw)
-        raw_top = data.get("expectedTop") or []
-        expected.extend(item_text.get(str(x), str(x)) for x in raw_top)
-        raw_key = data.get("expectedKey") or []
-        expected.extend(item_text.get(str(x), str(x)) for x in raw_key)
+        expected.extend(item_text.get(str(x), str(x)) for x in (data.get("expectedTop") or []))
+        expected.extend(item_text.get(str(x), str(x)) for x in (data.get("expectedKey") or []))
         return [x.strip() for x in expected if len(x.strip()) >= 4]
 
     def evaluate_output(self, *, action: AgentAction, output_text: str, task_id: str = "") -> dict[str, Any]:
@@ -61,7 +53,14 @@ class LearnerAgentEvaluator:
             "safe": not direct_answer_leak,
         }
 
-    def summarize(self, events: list[dict[str, Any]], state: LearnerAgentState) -> dict[str, Any]:
+    def summarize(
+        self,
+        events: list[dict[str, Any]],
+        state: LearnerAgentState,
+        *,
+        policy_profile: dict[str, Any] | None = None,
+        trajectory_metrics: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         decisions = [row for row in events if str(row.get("kind") or "") == "decision"]
         total = len(decisions)
         actions = Counter(str(row.get("action") or "") for row in decisions)
@@ -80,17 +79,19 @@ class LearnerAgentEvaluator:
             and not bool(row.get("professionalUnlocked"))
             and str(row.get("diagnosis") or "") != "SUCCESS"
         )
+        t = LearnerAgentPolicy.thresholds(policy_profile)
         ladder_violations = 0
         for row in decisions:
             streak = int(row.get("failureStreak") or 0)
             action = str(row.get("action") or "")
-            if streak == 1 and action not in {AgentAction.ASK.value, AgentAction.HINT.value}:
+            if streak and streak <= t["ask_until_failure"] and action not in {AgentAction.ASK.value, AgentAction.HINT.value}:
                 ladder_violations += 1
-            elif streak == 4 and action not in {AgentAction.REQUEST_EVIDENCE.value, AgentAction.ESCALATE.value}:
+            elif streak == t["request_evidence_at_failure"] and action not in {AgentAction.REQUEST_EVIDENCE.value, AgentAction.ESCALATE.value}:
                 ladder_violations += 1
-            elif streak >= 5 and action != AgentAction.ESCALATE.value:
+            elif streak >= t["escalate_at_failure"] and action != AgentAction.ESCALATE.value:
                 ladder_violations += 1
         verified_capabilities = sum(1 for row in state.capability_states.values() if row.stage == "verified")
+        trajectory = dict(trajectory_metrics or {})
         return {
             "decisions": total,
             "actionDistribution": dict(actions),
@@ -102,5 +103,12 @@ class LearnerAgentEvaluator:
             "humanEscalationRate": round(actions.get(AgentAction.ESCALATE.value, 0) / total, 4) if total else 0.0,
             "modelUseRate": round(model_used / total, 4) if total else 0.0,
             "verifiedCapabilities": verified_capabilities,
+            "trajectoryEventCount": int(trajectory.get("eventCount") or state.trajectory_event_count or 0),
+            "optimalChallengeRate": float(trajectory.get("optimalChallengeRate") or 0.0),
+            "overChallengeRate": float(trajectory.get("overChallengeRate") or 0.0),
+            "transferSuccessRate": float(trajectory.get("transferSuccessRate") or 0.0),
+            "evidenceVerifiedRate": float(trajectory.get("evidenceVerifiedRate") or 0.0),
+            "feedbackResolutionRate": float(trajectory.get("feedbackResolutionRate") or 0.0),
+            "policyProfileVersion": state.policy_profile_version,
             "agentHealthy": leaks == 0 and advance_without_unlock == 0 and ladder_violations == 0,
         }

@@ -1,116 +1,135 @@
-# StepIn 2.0 Development Roadmap
+# StepIn 2.2 Development Roadmap
 
-## 最终目标
+## 当前主线
 
-StepIn 面向零基础、零实习经验、甚至不知道真实工作每天具体在做什么的学生。
+StepIn 当前不是课程平台或普通 Career Coach，而是以 **Learner Agent + Practice Runtime + Evidence/Artifact + Human Review** 为核心的实践能力系统。产品从简单真实任务开始，通过失败、修改、反馈、迁移和项目积累判断学生下一步需要什么支持。
 
-产品不从课程、岗位标签或职业测评开始，而从一件真实、简单、可以马上动手的小任务开始。学生通过反复做、修改、换场景再做、组合任务和表达成果，逐渐形成能够独立完成、能够迁移、能够说清楚的实践能力。
+主链：
 
-目标主链：
-
-**开始做 → 跟着做 → 自己做 → 根据反馈改 → 换场景再做 → 小任务组成项目 → 多任务叠加能力 → 把做过的事情讲出来 → 后续专业分化。**
+**开始做 → 跟着做 → 自己做 → 失败时诊断 → 根据反馈改 → 换场景再做 → 小任务组成项目 → 多任务叠加能力 → 把做过的事情讲出来。**
 
 ---
 
-# 已完成：Production Integration
+## 已完成 P0：Production Foundation
 
-原来的 P0“production 主线与 StepIn Foundation 分叉”已经解决。
+- Foundation 已进入 production `main`；
+- 10 项公共实践能力和 8 个基础任务；
+- Beginner Gate；
+- 信息 / 判断 / 表达三类跨材料探索；
+- Teacher Growth；
+- SQLite / PostgreSQL Repository Container 兼容；
+- Evidence / Artifact 继续作为 canonical business objects。
 
-正式 production integration 由 [PR #17](../../pull/17) 完成并进入 `main`：
+## 已完成 P0：Standalone Learner Agent Runtime
 
-- Foundation domain / service / router 已进入 production `app/`；
-- 新手 Beginner Gate 已进入 production；
-- 10 项公共实践能力与 8 个连续基础任务已进入同一 Runtime；
-- 表达训练与信息 / 判断 / 表达三种跨材料探索已接入；
-- Foundation 使用 production Repository Container，保持 SQLite / PostgreSQL 双后端；
-- 教师基础成长视图已接入；
-- 旧职业项目与 Demo 历史路径保持兼容；
-- 锁定 CI 从 184 扩展到 **189/189 passed**；
-- Foundation API contract **10/10**；
-- dependency / repository / container security scan 全部通过；
-- production deterministic ZIP + checksum 通过；
-- `cryptography` 与 `pypdf` 已升级到修复版本并重新生成 hash-lock。
+Learner Agent 已拥有独立：
 
-旧 PR #16 仅保留为历史 staging 资料，不再作为运行源码。
+```text
+State
+Policy
+Tools
+Memory
+Execution Loop
+Evaluation
+```
+
+固定 Action Space：
+
+```text
+ASK
+HINT
+EXPLAIN
+SHOW_RESOURCE
+REQUEST_EVIDENCE
+CREATE_REVISION_TASK
+VERIFY
+ASSIGN_TRANSFER
+ADVANCE
+ESCALATE
+WAIT
+```
+
+LLM 只作为语言层，不能选择 Tool、生成最终交付物、直接标记掌握或绕过 Gate。
+
+## 本版本完成 P0：Real Trajectory + Calibration
+
+真实业务事件现在直接进入 Learner Trajectory：
+
+```text
+answer_saved
+hint_requested
+task_failed
+task_completed
+revision_requested
+revision_submitted
+transfer_failed
+transfer_completed
+teacher_feedback
+teacher_feedback_resolved
+evidence_verified
+evidence_partial
+evidence_rejected
+project_started
+project_updated
+project_milestone
+project_completed
+agent_intervention
+human_review_resolved
+```
+
+Trajectory 与短期 Memory 分离，并成为 Evaluation 和 Policy Calibration 的长期数据面。
+
+Policy Calibration 当前只允许调整：
+
+```text
+第几次失败继续 ASK
+第几次失败出现 HINT
+什么时候切换 EXPLAIN
+什么时候请求过程 Evidence
+什么时候升级 Human Review
+```
+
+候选 Policy 需要最小真实样本量，并且必须由组织管理员显式激活。安全边界不参与学习。
+
+## 本版本完成 P0：Project Library v2.2
+
+旧默认“个人职业发展规划”升级为 **真实任务综合实践**。默认项目不再先问目标岗位，而是围绕：
+
+```text
+任务与限制
+→ 原始材料
+→ 信息整理
+→ 问题发现
+→ 判断与理由
+→ 第一版交付
+→ 反馈
+→ 第二版
+→ 换场景再做
+→ 过程证据
+→ 实践复盘
+```
+
+项目模板使用 immutable version。系统通过 `library_version` + content hash 自动识别旧默认模板并创建最新版本；旧项目继续绑定历史版本。
 
 ---
 
-# 当前 P0 — Foundation 2.0
+# 下一 P0：Capability Verification 2.0
 
-现有 Foundation 已能真实运行，但任务、能力和脚手架仍有较多内置定义。下一阶段目标是把“怎么从不会到会做”正式做成可配置 Runtime，而不是继续靠增加 Python 常量扩内容。
+当前轨迹已经能说明“学生发生了什么”，下一步要进一步提高“已经会做什么”的可信度。
 
-## P0.1 正式领域模型
+重点：
 
-新增或固化：
+- Signal / Evidence / Verified Evidence 分级；
+- 同一能力至少来自多个不同任务与材料；
+- 独立完成比例；
+- 提示依赖变化；
+- revision quality；
+- transfer success；
+- teacher verification；
+- 时间跨度；
+- capability confidence calibration。
 
-```text
-FoundationAbility
-FoundationTask
-ScaffoldLevel
-TaskAttempt
-TaskChain
-MiniProject
-AbilityEvidenceLink
-AbilityProgress
-ExpressionPractice
-ExplorationExperience
-```
-
-这些对象必须成为服务器权威状态，并继续复用现有 Evidence / Artifact，而不是复制第二套业务数据库。
-
-## P0.2 统一脚手架等级
-
-```text
-L0 看一次
-L1 跟着做
-L2 少提示做
-L3 自己做
-L4 换场景做
-L5 连起来做
-```
-
-Today Next、提示系统、Foundation Runtime 和后续 Practice Runtime 都只读取这一套等级。
-
-## P0.3 Task Chain Runtime
-
-任务链至少支持：
-
-- 前置任务；
-- 顺序与依赖；
-- 可选分支；
-- 重做；
-- 提示上限；
-- Done-when；
-- 独立版本；
-- 迁移版本；
-- 材料继承；
-- 多个任务如何进入 Mini Project；
-- Mini Project 如何生成真实作品。
-
-目标不是“做 8 道题”，而是让几个简单动作自然长成一件完整的工作。
-
----
-
-# P0 — Capability Accumulation
-
-当前 Evidence 能记录过程，但下一步必须真正回答：
-
-> **这个学生现在已经会做什么？**
-
-同一种能力不能因为一道任务做对就判定掌握。至少综合：
-
-```text
-不同任务数量
-不同材料类型
-独立完成比例
-提示依赖
-修改质量
-迁移任务结果
-教师验证
-时间跨度
-```
-
-学生端仍用普通语言表达：
+最终学生只看到普通语言：
 
 ```text
 刚开始
@@ -120,190 +139,82 @@ Today Next、提示系统、Foundation Runtime 和后续 Practice Runtime 都只
 已经比较稳定
 ```
 
-复杂评分和内部 Evidence 结构留在系统内部。
+# 下一 P0：Real Work Sample Runtime
 
----
+减少“答题感”，让项目材料更像真实工作输入：表格、聊天记录、访谈材料、需求、工单、候选人材料、Issue、反馈等。
 
-# P1 — Beginner Mode 继续收紧
+Agent 观察重点从“最终答案对不对”转为：
 
-Foundation production 首页已经做到“一次只做当前一步”，下一阶段继续保证复杂工作台不会过早出现。
+- 是否看懂任务；
+- 是否找到关键限制；
+- 如何整理材料；
+- 如何形成判断；
+- 是否留下中间过程；
+- 收到反馈后到底改了什么；
+- 换材料后是否还能做。
 
-基础阶段默认只显示：
+# P1：Practice Studio 2.0
 
-```text
-现在要做什么
-材料
-当前一步
-提交 / 下一步
-需要时的一点提示
-```
+内容人员无需修改 Python 即可配置：
 
-随着 Scaffold Level 和任务经验增长，再逐步开放：
-
-- 搜索；
-- 附件；
-- 多选；
-- 对比；
-- 高级筛选；
-- 快捷键；
-- 完整专业 Workbench。
-
-产品应该跟学生一起“长出来”。
-
----
-
-# P1 — Practice Studio 2.0
-
-Practice Studio 需要正式增加两种创建模式。
-
-## 基础练习
-
-先选：
-
-```text
-这次想练什么基础能力？
-```
-
-再配置：
-
-- 材料；
-- 示例；
-- 当前一步；
+- Foundation Ability；
+- Work Sample；
 - Scaffold Level；
-- 提示预算；
 - Done-when；
-- 独立版本；
-- 迁移版本；
-- 可以和哪些任务组成 Mini Project。
+- Hint Budget；
+- Revision；
+- Transfer Variant；
+- Task Chain；
+- Mini Project；
+- Agent-observable event mapping。
 
-## 专业练习
+# P1：Trajectory Analytics / Experimentation
 
-继续保留 Spreadsheet、ATS、CRM、Interview Coding、Issue Tracker、Research Board、Prioritization Board，并让它们复用相同 Task Chain / Evidence / Artifact 底层。
+增加 tenant 内的可审计实验能力：
 
----
+- Policy profile 版本比较；
+- intervention recovery A/B；
+- optimal challenge distribution；
+- diagnosis agreement；
+- hint dependency decline；
+- transfer success；
+- human escalation precision。
 
-# P1 — 表达与作品闭环
+默认不跨租户汇总原始学生轨迹；研究或模型训练必须另行处理授权、去标识与数据治理。
 
-每个 Mini Project 结束后继续强化三种出口：
+# P1：Teacher Growth 3.0
 
-1. **自己复盘**：我做了什么、哪里改过、学会了什么；
-2. **简历表达**：2–3 行，只引用真实 Practice / Evidence；
-3. **面试表达**：60–90 秒，能讲清任务、行动、修改和结果。
-
-AI 只能整理真实过程，不允许补写不存在的经历和成果。
-
----
-
-# P1 — Teacher Growth 2.0
-
-教师核心不是“谁没交”，而是：
+教师端从“批改”继续转向成长观察：
 
 ```text
-谁还需要很多提示
-谁开始能独立做
-谁收到反馈以后不会改
-谁换材料以后仍然会做
-谁已经能把几个任务连起来
+这个学生在哪里连续失败
+哪种提示有效
+反馈后有没有真实修改
+换材料后是否仍然会做
+Agent 哪些诊断被老师否定
+什么时候应该人工介入
 ```
 
-继续增加：
+# P1：Independent Agent Deployment
 
-- 尝试次数；
-- 提示使用；
-- V1 / V2 修改前后；
-- 迁移结果；
-- Mini Project；
-- 表达版本；
-- 需要教师介入的真正原因。
+当前 Learner Agent 已经做到行为独立、API 独立和依赖注入。只有在 LMS / 第三方产品 / 多客户端跨系统调用规模明显增大后，再物理拆成独立服务。拆分时保持 `/api/learner-agent/v1` 客户端协议稳定。
 
----
+# P1：Windows x64 Release Gate
 
-# P1 — Windows x64 真机发行 Gate
-
-这一项仍未由当前 Linux GitHub Actions 代替完成。
-
-必须在真实 Windows x64 完整验证：
+仍需真实 Windows 机器完成：
 
 ```text
 安装
-首次启动
-学生 / 教师登录
-Foundation
-完全断网
-继续练习
-附件
-DOCX / XLSX / PPTX / PDF 导出
-退出重启
-数据仍在
-备份
-升级安装
-恢复
-卸载 / 重装
-WebView2 Evergreen
-Fixed WebView2
-本机 Ollama
-低配置电脑
+→ 首次启动
+→ Foundation / Agent 实践
+→ 完全断网
+→ 保存与重启
+→ 导出
+→ 备份
+→ 升级
+→ 数据迁移
+→ 恢复
+→ 卸载 / 重装
 ```
 
-只有这组通过后，Desktop / Offline 才从“架构与构建链完成”升级为“正式发行认证完成”。
-
----
-
-# P2 — 后续再做
-
-在 Foundation 2.0、能力叠加和 Windows 发行稳定以前，不优先：
-
-- 大量新增岗位；
-- 复杂职业测评；
-- 更多 AI Agent 名称；
-- Dashboard 堆叠；
-- 大规模课程库；
-- 社交社区；
-- 排行榜；
-- 过度游戏化。
-
-后续可考虑：
-
-- Local AI Manager；
-- 可选 Cloud Sync；
-- 学校多租户运营；
-- 内容质量遥测；
-- 能力覆盖矩阵；
-- Portfolio public page；
-- 企业合作 Practice Package。
-
----
-
-# 推荐版本节奏
-
-## StepIn 2.0 Beta — 当前
-
-目标：production Foundation 主线统一。**已完成。**
-
-## 2.1 — Foundation 2.0
-
-目标：可配置基础任务、脚手架、Task Chain、Mini Project。
-
-## 2.2 — Capability Accumulation
-
-目标：多任务能力聚合与长期能力档案。
-
-## 2.3 — Expression & Portfolio
-
-目标：复盘、简历、面试表达、真实作品输出。
-
-## 2.4 — Practice Studio 2.0
-
-目标：老师不用改源码即可创建 Foundation + Professional Practice。
-
-## 2.5 — Windows Offline Release
-
-目标：正式 Windows 安装包、升级、备份恢复、完全断网发行认证。
-
----
-
-## 当前原则
-
-**不要先教很多，再让学生找机会练。**
-
-**先给一件足够简单但真实的事情，让学生做起来；知识、课程、专业和 AI 都只在这个过程中提供帮助。**
+Linux GitHub Actions 通过不能替代 Windows 真机认证。

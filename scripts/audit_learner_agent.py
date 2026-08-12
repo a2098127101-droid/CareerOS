@@ -19,6 +19,11 @@ REQUIRED = {
     ("GET", "/api/learner-agent/v1/state"),
     ("GET", "/api/learner-agent/v1/memory"),
     ("GET", "/api/learner-agent/v1/decisions"),
+    ("GET", "/api/learner-agent/v1/trajectory"),
+    ("POST", "/api/learner-agent/v1/trajectory/{event_id}/label"),
+    ("GET", "/api/learner-agent/v1/calibration"),
+    ("POST", "/api/learner-agent/v1/calibration/refresh"),
+    ("POST", "/api/learner-agent/v1/calibration/activate"),
     ("POST", "/api/learner-agent/v1/observe"),
     ("POST", "/api/learner-agent/v1/step"),
     ("POST", "/api/learner-agent/v1/evaluate"),
@@ -40,7 +45,10 @@ def main() -> int:
         for method, path in missing:
             print(f"- {method} {path}")
         return 1
-    required_components = {"state.py", "policy.py", "tools.py", "memory.py", "runtime.py", "evaluation.py", "registration.py"}
+    required_components = {
+        "state.py", "policy.py", "tools.py", "memory.py", "runtime.py", "evaluation.py", "registration.py",
+        "trajectory.py", "calibration.py", "bridge.py",
+    }
     existing = {p.name for p in (ROOT / "app" / "learner_agent").glob("*.py")}
     missing_components = required_components - existing
     if missing_components:
@@ -52,12 +60,19 @@ def main() -> int:
     if len(LearnerAgentTools.CONTRACT) != 8:
         print("LEARNER_AGENT_TOOL_CONTRACT_CHANGED", len(LearnerAgentTools.CONTRACT))
         return 1
-    runtime_text = (ROOT / "app" / "learner_agent" / "runtime.py").read_text(encoding="utf-8")
+    for path in ["runtime.py", "trajectory.py", "calibration.py", "bridge.py"]:
+        text = (ROOT / "app" / "learner_agent" / path).read_text(encoding="utf-8")
+        if "sys.modules" in text or "app.main" in text or "sqlite3" in text:
+            print("LEARNER_AGENT_COUPLING_VIOLATION", path)
+            return 1
     tools_text = (ROOT / "app" / "learner_agent" / "tools.py").read_text(encoding="utf-8")
-    if "sys.modules" in runtime_text or "app.main" in runtime_text or "sqlite3" in tools_text:
-        print("LEARNER_AGENT_COUPLING_VIOLATION")
+    if "sqlite3" in tools_text or "mark_capability_mastered" in tools_text or "generate_final_answer" in tools_text:
+        print("LEARNER_AGENT_TOOL_BOUNDARY_VIOLATION")
         return 1
-    print(f"LEARNER_AGENT_CONTRACT_OK routes={len(REQUIRED)} actions={len(AgentAction)} tools={len(LearnerAgentTools.CONTRACT)}")
+    print(
+        f"LEARNER_AGENT_CONTRACT_OK routes={len(REQUIRED)} actions={len(AgentAction)} "
+        f"tools={len(LearnerAgentTools.CONTRACT)} trajectory=on calibration=human-activated"
+    )
     return 0
 
 
