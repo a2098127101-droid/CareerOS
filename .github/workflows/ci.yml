@@ -28,8 +28,12 @@ jobs:
           echo '22eef1d356b6ef7b1f86657103a550add2c1e57ddeb1d6e37155d2b886d8b4ee  /tmp/agent-v22.patch' | sha256sum -c -
           git apply --check /tmp/agent-v22.patch
           git apply /tmp/agent-v22.patch
+          # The Actions token deliberately cannot change workflow files. Keep the
+          # branch's current workflows untouched; an authorized maintainer updates
+          # them separately after the application source commit lands.
+          git restore --source=HEAD --staged --worktree .github/workflows
           rm -f tools/.agent-v22-patch.part1 tools/.agent-v22-patch.part2 tools/.agent-v22-patch.part3 tools/.agent-v22-patch.part3a tools/.agent-v22-patch.part3b tools/.agent-v22-patch.part4
-          rm -f tools/.agent-v22-trigger .github/workflows/apply-agent-v22-patch.yml
+          rm -f tools/.agent-v22-trigger
           git add -A
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
