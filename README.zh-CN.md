@@ -44,6 +44,12 @@ LLM 只是语言层。它可以把已经选定的 ASK、EXPLAIN 等动作说得�
 
 项目模板继续采用不可变版本。新项目只能绑定当前最新版本；已有历史项目仍读取创建时的旧模板快照，不会因为项目库升级而被改写。
 
+## 当前生产状态
+
+**StepIn 2.2 已通过 PR #19 合并进入 production `main`。** 最终 PR head 通过 **204 / 204** 锁定回归，并通过 Learner Agent 13-route contract、Foundation 10-route contract、Project Library v2.2 audit、数据库访问审计、Repository contract、供应链安全扫描与 production release package。当前 `VERSION.txt` 为 `2.2.0-beta-agent-trajectory`。
+
+这表示当前工程闭环、接口契约与发布边界已经对齐，但不代表教育效果已经完成真实用户验证。Policy Calibration 仍需真实学生会话与人工标注持续校准。
+
 ## 当前工程边界
 
 Learner Trajectory 与 Policy Calibration 已经进入生产代码，但教育学阈值仍需要真实用户会话和人工标注继续验证。当前不自动跨租户汇总原始轨迹训练模型，也不允许候选 Policy 自动激活。Windows x64 真机安装、完全断网、升级与备份恢复仍然是独立发行 Gate。
