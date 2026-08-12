@@ -1,4 +1,4 @@
-import { CameraControls, Environment, Text } from '@react-three/drei'
+import { CameraControls, Html } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
 import type { SpatialNode } from '../api/types'
@@ -19,6 +19,10 @@ const capabilityColors: Record<string, string> = {
   verified_evidence: '#78d7b1',
 }
 
+function Label({ children, className = '' }: { children: string; className?: string }) {
+  return <Html center transform distanceFactor={9}><div className={`scene-label ${className}`}>{children}</div></Html>
+}
+
 function Workstation({ node, position, onClick }: { node?: SpatialNode; position: [number, number, number]; onClick: () => void }) {
   const locked = node?.state === 'locked'
   return (
@@ -35,9 +39,7 @@ function Workstation({ node, position, onClick }: { node?: SpatialNode; position
         <planeGeometry args={[1.32, 0.78]} />
         <meshStandardMaterial emissive={locked ? '#24282e' : '#5ea4a4'} emissiveIntensity={locked ? 0.08 : 0.5} color="#101418" />
       </mesh>
-      <Text position={[0, 0.9, 0.76]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.16} color="#f1eee8" anchorX="center">
-        {node?.label || 'Workstation'}
-      </Text>
+      <group position={[0, 0.96, 0.83]}><Label className={locked ? 'muted' : ''}>{node?.label || 'Workstation'}</Label></group>
     </group>
   )
 }
@@ -64,7 +66,7 @@ function EvidenceShelf({ nodes, onInspect }: { nodes: SpatialNode[]; onInspect: 
           </mesh>
         )
       })}
-      <Text position={[0, 3.78, 0.25]} fontSize={0.18} color="#c9d0d8">Evidence</Text>
+      <group position={[0, 3.78, 0.25]}><Label>Evidence</Label></group>
     </group>
   )
 }
@@ -82,7 +84,7 @@ function ProjectTable({ nodes, onInspect }: { nodes: SpatialNode[]; onInspect: (
           <meshStandardMaterial color={node.kind === 'artifact' ? '#b7a07d' : '#718aa0'} roughness={0.72} />
         </mesh>
       ))}
-      <Text position={[0, 1.28, -0.72]} rotation={[-Math.PI / 2, 0, 0]} fontSize={0.17} color="#e4ded5">Projects · Versions</Text>
+      <group position={[0, 1.32, -0.65]}><Label>Projects · Versions</Label></group>
     </group>
   )
 }
@@ -106,13 +108,11 @@ function CapabilityField({ nodes, onInspect }: { nodes: SpatialNode[]; onInspect
                 roughness={0.4}
               />
             </mesh>
-            <Text position={[0, -0.38, 0]} fontSize={0.11} color="#bec7cf" maxWidth={1.05} textAlign="center">
-              {node.label}
-            </Text>
+            <group position={[0, -0.38, 0]}><Label className="capability-label">{node.label}</Label></group>
           </group>
         )
       })}
-      <Text position={[0, 2.0, 0]} fontSize={0.18} color="#c9d0d8">Capability · server verified only</Text>
+      <group position={[0, 2.0, 0]}><Label>Capability · server verified only</Label></group>
     </group>
   )
 }
@@ -150,7 +150,8 @@ function Scene({ nodes, focus, onFocus, onInspect }: Props) {
     <>
       <color attach="background" args={['#0d1117']} />
       <fog attach="fog" args={['#0d1117', 10, 22]} />
-      <ambientLight intensity={0.65} />
+      <ambientLight intensity={0.82} />
+      <hemisphereLight args={['#9db3c3', '#2a221d', 0.65]} />
       <directionalLight position={[4, 9, 5]} intensity={2.0} castShadow shadow-mapSize={[1024, 1024]} />
       <spotLight position={[-4, 6, 3]} intensity={1.2} angle={0.45} penumbra={0.7} />
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
@@ -164,7 +165,6 @@ function Scene({ nodes, focus, onFocus, onInspect }: Props) {
       <CapabilityField nodes={capabilities} onInspect={onInspect} />
       <TrajectoryLine nodes={trajectory} />
       <CameraControls ref={controls} enabled={false} smoothTime={0.55} />
-      <Environment preset="warehouse" environmentIntensity={0.25} />
     </>
   )
 }
