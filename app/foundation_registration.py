@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from typing import Any
 
@@ -13,14 +14,18 @@ from .routers.foundation import build_foundation_router
 from .unified_runtime_store import RuntimeVersionConflict
 
 
+def _truthy(value: str | None) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def register_foundation_production_routes(app) -> None:
     """Attach StepIn Foundation to the repositories already selected by production.
 
-    The production RepositoryContainer decides SQLite vs PostgreSQL. Foundation
-    consumes that selection rather than instantiating a database-specific
-    repository. Existing seeded ``@demo.local`` accounts remain on the legacy
-    project flow so production compatibility fixtures keep their historical
-    behavior; real participant accounts enter Foundation by default.
+    Foundation is enabled for real production participants by default. Historical
+    demo/compatibility environments keep the existing project flow unless
+    ``STEPIN_FOUNDATION_DEMO_GATE=true`` is explicitly set. This gives production
+    a practice-first beginner path without rewriting long-standing demo/API
+    fixtures or existing professional projects.
     """
     if getattr(app.state, "stepin_foundation_registered", False):
         return
@@ -99,8 +104,12 @@ def register_foundation_production_routes(app) -> None:
         token = request.cookies.get(main.AUTH_COOKIE)
         return main.auth_store.resolve_session(token)
 
-    def is_legacy_demo(principal) -> bool:
-        return str(getattr(principal, "email", "") or "").lower().endswith("@demo.local")
+    def gate_enabled() -> bool:
+        if _truthy(os.getenv("STEPIN_FOUNDATION_DISABLED")):
+            return False
+        if bool(main.settings.demo_mode):
+            return _truthy(os.getenv("STEPIN_FOUNDATION_DEMO_GATE"))
+        return True
 
     def foundation_summary_for(principal):
         rows = main.store.list(limit=1, tenant_id=principal.tenant_id, student_user_id=principal.user_id)
@@ -124,11 +133,7 @@ def register_foundation_production_routes(app) -> None:
     async def foundation_beginner_gate(request: Request, call_next):
         path = request.url.path.rstrip("/") or "/"
         principal = principal_from_request(request)
-        if (
-            principal
-            and canonical_role(principal.role) == "participant"
-            and not is_legacy_demo(principal)
-        ):
+        if gate_enabled() and principal and canonical_role(principal.role) == "participant":
             # Existing professional work remains available to protect backwards compatibility.
             if not existing_projects(principal):
                 summary = foundation_summary_for(principal)
