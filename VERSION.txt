@@ -1,1 +1,1 @@
-2.0.0-beta-foundation-production
+2.2.0-beta-agent-trajectory

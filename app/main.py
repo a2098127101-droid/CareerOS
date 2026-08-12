@@ -226,7 +226,7 @@ elif settings.bootstrap_superadmin_email and settings.bootstrap_superadmin_passw
 
 app = FastAPI(
     title=f"{settings.product_name} · AI Career Development Platform",
-    version="1.5.1-release-hardening",
+    version="2.2.0-beta-agent-trajectory",
     description=(
         "CareerOS Production API. Canonical new integrations should use `/api/v1`; "
         "unversioned `/api/*` endpoints remain compatibility aliases during migration."
@@ -1417,6 +1417,23 @@ def verify_session_evidence_claims(session_id: str, req: EvidenceVerificationReq
             "risk_level": verification.risk_level, "requires_human_review": verification.requires_human_review,
             "candidates": verification.candidates or [], "persisted": updated,
         })
+        event_type = (
+            "evidence_verified" if verification.status == "SUPPORTED"
+            else "evidence_rejected" if verification.status in {"CONTRADICTED", "UNSUPPORTED"}
+            else "evidence_partial"
+        )
+        _learner_agent_event(
+            event_type=event_type, source="evidence_verifier", tenant_id=state.tenant_id,
+            owner_user_id=state.student_user_id, session_id=session_id,
+            actor_user_id=(principal.user_id if principal.authenticated else "system"),
+            evidence_id=verification.best_evidence_id, claim_id=claim["claim_id"],
+            outcome=("success" if verification.status == "SUPPORTED" else "failure" if verification.status in {"CONTRADICTED", "UNSUPPORTED"} else "neutral"),
+            payload={
+                "verificationStatus": verification.status, "confidence": round(verification.confidence, 4),
+                "reason": verification.reason, "requiresHumanReview": verification.requires_human_review,
+                "verifierType": "ai",
+            },
+        )
     return {"session_id": session_id, "verified": len(results), "results": results}
 
 
@@ -1441,6 +1458,13 @@ def manual_claim_verification(session_id: str, claim_id: str, req: ManualClaimVe
         risk_level=str(claims[0].get("risk_level") or "normal"), requires_human_review=False,
     )
     auth_store.audit(tenant_id=state.tenant_id, user_id=principal.user_id, action="claim_verification_override", resource_type="claim", resource_id=claim_id, details={"status": req.status})
+    event_type = "evidence_verified" if req.status == "SUPPORTED" else ("evidence_rejected" if req.status in {"CONTRADICTED", "UNSUPPORTED"} else "evidence_partial")
+    _learner_agent_event(
+        event_type=event_type, source="human_evidence_review", tenant_id=state.tenant_id,
+        owner_user_id=state.student_user_id, session_id=session_id, actor_user_id=principal.user_id,
+        claim_id=claim_id, outcome=("success" if req.status == "SUPPORTED" else "failure" if req.status in {"CONTRADICTED", "UNSUPPORTED"} else "neutral"),
+        payload={"verificationStatus": req.status, "confidence": req.confidence, "reason": req.reason, "verifierType": "human"},
+    )
     return {"ok": True, "claim": updated, "history": evidence_graph.verification_history(claim_id, tenant_id=state.tenant_id)}
 
 
@@ -1677,12 +1701,25 @@ app.include_router(build_template_admin_router(
     admin_dependency=require_roles("school_admin"),
 ))
 
+def _learner_agent_event(**event: Any) -> dict[str, Any]:
+    """Best-effort server event capture for the StepIn Learner Agent trajectory."""
+    runtime = getattr(app.state, "stepin_learner_agent", None)
+    if runtime is None:
+        return {"accepted": False, "reason": "learner_agent_runtime_unavailable"}
+    try:
+        return {"accepted": True, "result": runtime.ingest_server_event(**event)}
+    except Exception as exc:
+        logger.warning("learner_agent_event_capture_failed", extra={"event_type": event.get("event_type"), "error": str(exc)[:240]})
+        return {"accepted": False, "reason": "capture_failed"}
+
+
 app.include_router(build_projects_router(
     current_principal=current_principal,
     project_repository=project_repository,
     create_project_session=_create_session_for_principal,
     cleanup_project_session=_cleanup_project_session,
     allow_anonymous_demo=settings.demo_mode and not settings.auth_required,
+    observation_sink=_learner_agent_event,
 ))
 
 
@@ -2113,6 +2150,12 @@ def create_teacher_feedback(session_id: str, req: TeacherFeedbackRequest, princi
         artifact_id=(current_artifact or {}).get("artifact_id", ""), version_id=(current_artifact or {}).get("version_id", ""),
     )
     commercial_store.track(tenant_id=state.tenant_id, user_id=(principal.user_id if principal.authenticated else ""), session_id=session_id, event_name="advisor_feedback_created", properties={"priority": req.priority})
+    _learner_agent_event(
+        event_type="teacher_feedback", source="teacher_feedback", tenant_id=state.tenant_id,
+        owner_user_id=state.student_user_id, session_id=session_id, actor_user_id=(principal.user_id if principal.authenticated else ""),
+        outcome="neutral", correlation_id=feedback["feedback_id"],
+        payload={"feedbackId": feedback["feedback_id"], "priority": req.priority, "message": req.content},
+    )
     return {"ok": True, "feedback": feedback, "task": task, "trace": trace}
 
 
@@ -2126,6 +2169,11 @@ def resolve_teacher_feedback(feedback_id: str, principal: Principal = Depends(re
     state = get_authorized_state(feedback["session_id"], principal, write=True)
     collaboration_store.resolve_feedback(feedback_id, tenant_id=state.tenant_id)
     collaboration_store.complete_matching(feedback["session_id"], "teacher_feedback", tenant_id=state.tenant_id)
+    _learner_agent_event(
+        event_type="teacher_feedback_resolved", source="teacher_feedback", tenant_id=state.tenant_id,
+        owner_user_id=state.student_user_id, session_id=feedback["session_id"], actor_user_id=principal.user_id,
+        outcome="success", correlation_id=feedback_id, payload={"feedbackId": feedback_id},
+    )
     return {"ok": True}
 
 

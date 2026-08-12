@@ -25,6 +25,11 @@
     state(params=''){return this.request('/state'+(params?('?'+params):''));}
     memory(params=''){return this.request('/memory'+(params?('?'+params):''));}
     decisions(params=''){return this.request('/decisions'+(params?('?'+params):''));}
+    trajectory(params=''){return this.request('/trajectory'+(params?('?'+params):''));}
+    labelTrajectory(eventId,input,params=''){return this.request('/trajectory/'+encodeURIComponent(eventId)+'/label'+(params?('?'+params):''),{method:'POST',body:JSON.stringify(input||{})});}
+    calibration(){return this.request('/calibration');}
+    refreshCalibration(input){return this.request('/calibration/refresh',{method:'POST',body:JSON.stringify(input||{})});}
+    activateCalibration(input){return this.request('/calibration/activate',{method:'POST',body:JSON.stringify(input||{})});}
     observe(observation){return this.request('/observe',{method:'POST',body:JSON.stringify(observation||{})});}
     step(input){return this.request('/step',{method:'POST',body:JSON.stringify(input||{})});}
     evaluate(input){return this.request('/evaluate',{method:'POST',body:JSON.stringify(input||{})});}

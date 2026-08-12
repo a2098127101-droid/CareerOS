@@ -16,7 +16,10 @@ class ExpressionRequest(BaseModel):
     reflection: str = ""
 
 
-def build_foundation_router(*, service: Any, sessions: Any, identity: Any, current_principal: Callable, canonical_role: Callable) -> APIRouter:
+def build_foundation_router(
+    *, service: Any, sessions: Any, identity: Any, current_principal: Callable,
+    canonical_role: Callable, observation_sink: Callable[..., Any] | None = None,
+) -> APIRouter:
     router = APIRouter(prefix="/api/foundation/v1", tags=["foundation-practice"])
 
     def role(p) -> str:
@@ -53,6 +56,15 @@ def build_foundation_router(*, service: Any, sessions: Any, identity: Any, curre
         groups = sorted(identity.user_class_ids(uid, p.tenant_id, role="student")) if uid else []
         return sessions.create(tenant_id=p.tenant_id, student_user_id=uid, class_id=(groups[0] if groups else "default"), student_id=uid)
 
+    def emit(**event: Any) -> None:
+        if observation_sink is None:
+            return
+        try:
+            observation_sink(**event)
+        except Exception:
+            # Observation capture must not roll back the domain action that already succeeded.
+            return
+
     def invoke(fn):
         try:
             return fn()
@@ -77,22 +89,54 @@ def build_foundation_router(*, service: Any, sessions: Any, identity: Any, curre
     @router.put("/tasks/{task_id}/answer")
     def save(task_id: str, req: FoundationAnswerRequest, subject_user_id: str = Query(default=""), session_id: str = Query(default=""), principal=Depends(current_principal)):
         uid = owner(principal, subject_user_id); session = ensure_session(principal, uid, session_id)
-        return invoke(lambda: {"ok": True, "state": service.save_answer(task_id, req.answer, tenant_id=principal.tenant_id, owner_user_id=uid, session_id=session.session_id, updated_by=principal.user_id or uid)})
+        state = invoke(lambda: service.save_answer(task_id, req.answer, tenant_id=principal.tenant_id, owner_user_id=uid, session_id=session.session_id, updated_by=principal.user_id or uid))
+        emit(
+            event_type="answer_saved", source="foundation", tenant_id=principal.tenant_id, owner_user_id=uid,
+            session_id=session.session_id, actor_user_id=principal.user_id or uid, task_id=task_id, outcome="neutral",
+            payload={"answer": req.answer},
+        )
+        return {"ok": True, "state": state}
 
     @router.post("/tasks/{task_id}/hint")
     def hint(task_id: str, subject_user_id: str = Query(default=""), session_id: str = Query(default=""), principal=Depends(current_principal)):
         uid = owner(principal, subject_user_id); session = ensure_session(principal, uid, session_id)
-        return invoke(lambda: service.hint(task_id, tenant_id=principal.tenant_id, owner_user_id=uid, session_id=session.session_id, updated_by=principal.user_id or uid))
+        result = invoke(lambda: service.hint(task_id, tenant_id=principal.tenant_id, owner_user_id=uid, session_id=session.session_id, updated_by=principal.user_id or uid))
+        emit(
+            event_type="hint_requested", source="foundation", tenant_id=principal.tenant_id, owner_user_id=uid,
+            session_id=session.session_id, actor_user_id=principal.user_id or uid, task_id=task_id, outcome="neutral",
+            payload={"hintNumber": result.get("hintNumber"), "hintBudget": result.get("hintBudget")},
+        )
+        return result
 
     @router.post("/tasks/{task_id}/complete")
     def complete(task_id: str, req: FoundationAnswerRequest, subject_user_id: str = Query(default=""), session_id: str = Query(default=""), principal=Depends(current_principal)):
         uid = owner(principal, subject_user_id); session = ensure_session(principal, uid, session_id)
-        return invoke(lambda: service.complete_task(task_id, req.answer, tenant_id=principal.tenant_id, owner_user_id=uid, session_id=session.session_id, updated_by=principal.user_id or uid))
+        result = invoke(lambda: service.complete_task(task_id, req.answer, tenant_id=principal.tenant_id, owner_user_id=uid, session_id=session.session_id, updated_by=principal.user_id or uid))
+        ok = bool(result.get("ok"))
+        if ok and "revise" in task_id:
+            event_type = "revision_submitted"
+        elif ok and "transfer" in task_id:
+            event_type = "transfer_completed"
+        else:
+            event_type = "task_completed" if ok else "task_failed"
+        emit(
+            event_type=event_type, source="foundation",
+            tenant_id=principal.tenant_id, owner_user_id=uid, session_id=session.session_id,
+            actor_user_id=principal.user_id or uid, task_id=task_id, outcome=("success" if ok else "failure"),
+            payload={"answer": req.answer, "task_result": {"ok": ok, "issues": result.get("issues") or []}, "issues": result.get("issues") or []},
+        )
+        return result
 
     @router.post("/expression")
     def expression(req: ExpressionRequest, subject_user_id: str = Query(default=""), session_id: str = Query(default=""), principal=Depends(current_principal)):
         uid = owner(principal, subject_user_id); session = ensure_session(principal, uid, session_id)
-        return invoke(lambda: service.expression(req.reflection, tenant_id=principal.tenant_id, owner_user_id=uid, session_id=session.session_id, updated_by=principal.user_id or uid))
+        result = invoke(lambda: service.expression(req.reflection, tenant_id=principal.tenant_id, owner_user_id=uid, session_id=session.session_id, updated_by=principal.user_id or uid))
+        emit(
+            event_type="expression_submitted", source="foundation", tenant_id=principal.tenant_id, owner_user_id=uid,
+            session_id=session.session_id, actor_user_id=principal.user_id or uid, outcome="success",
+            payload={"message": req.reflection, "reflectionLength": len(req.reflection.strip())},
+        )
+        return result
 
     @router.get("/growth/{subject_user_id}")
     def growth(subject_user_id: str, session_id: str = Query(default=""), principal=Depends(current_principal)):

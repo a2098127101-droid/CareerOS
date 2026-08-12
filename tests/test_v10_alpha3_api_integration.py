@@ -18,6 +18,11 @@ assert r.status_code==200,r.text
 v=student.post('/api/sessions/'+sid+'/evidence-verify',json={'claim_ids':[]})
 assert v.status_code==200,v.text
 assert 'results' in v.json()
+assert v.json()['results'], v.text
+tr=student.get('/api/learner-agent/v1/trajectory',params={'session_id':sid})
+assert tr.status_code==200,tr.text
+types=[row['event_type'] for row in tr.json()['items']]
+assert any(x in {'evidence_verified','evidence_partial','evidence_rejected'} for x in types),types
 
 a=TestClient(app)
 assert a.post('/api/auth/login',json={'email':'super@demo.local','password':'CareerOS-Demo-123!','role':'super_admin'}).status_code==200

@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from .domain.roles import canonical_role
 from .foundation_progress import FoundationError, FoundationProgressService
 from .foundation_production import ExplorationRequest, ProductionFoundationFacade
+from .learner_agent.bridge import LearnerAgentEventBridge
 from .learner_agent.registration import register_learner_agent_routes
 from .routers.foundation import build_foundation_router
 from .unified_runtime_store import RuntimeVersionConflict
@@ -40,6 +41,7 @@ def register_foundation_production_routes(app) -> None:
         artifacts=main.artifact_store,
     )
     service = ProductionFoundationFacade(base_service)
+    agent_bridge = LearnerAgentEventBridge(lambda: getattr(app.state, "stepin_learner_agent", None))
 
     app.include_router(
         build_foundation_router(
@@ -48,6 +50,7 @@ def register_foundation_production_routes(app) -> None:
             identity=main.auth_store,
             current_principal=main.current_principal,
             canonical_role=main.canonical_role,
+            observation_sink=agent_bridge.emit,
         )
     )
 
@@ -88,7 +91,7 @@ def register_foundation_production_routes(app) -> None:
     @exploration_router.post("/explorations/{kind}/complete")
     def exploration_complete(kind: str, req: ExplorationRequest, principal=Depends(main.current_principal)):
         uid, session_id = participant_context(principal)
-        return invoke(
+        result = invoke(
             lambda: service.complete_exploration(
                 kind,
                 req.answer,
@@ -98,6 +101,14 @@ def register_foundation_production_routes(app) -> None:
                 updated_by=uid,
             )
         )
+        ok = bool(result.get("ok"))
+        agent_bridge.emit(
+            event_type=("transfer_completed" if ok else "transfer_failed"), source="foundation_exploration",
+            tenant_id=principal.tenant_id, owner_user_id=uid, session_id=session_id, actor_user_id=uid,
+            task_id=kind, outcome=("success" if ok else "failure"),
+            payload={"answer": req.answer, "task_result": {"ok": ok, "issues": result.get("issues") or []}, "issues": result.get("issues") or []},
+        )
+        return result
 
     app.include_router(exploration_router)
 
@@ -135,7 +146,7 @@ def register_foundation_production_routes(app) -> None:
         path = request.url.path.rstrip("/") or "/"
         principal = principal_from_request(request)
         if gate_enabled() and principal and canonical_role(principal.role) == "participant":
-            # Existing professional work remains available to protect backwards compatibility.
+            # Existing project work remains available to protect backwards compatibility.
             if not existing_projects(principal):
                 summary = foundation_summary_for(principal)
                 unlocked = bool(summary.get("professionalUnlocked"))
@@ -177,7 +188,7 @@ def register_foundation_production_routes(app) -> None:
                         content={
                             "detail": {
                                 "code": "foundation_locked",
-                                "message": "先完成基础练习，再进入职业项目。",
+                                "message": "先完成基础练习，再进入实践项目。",
                                 "href": "/static/foundation.html",
                                 "foundation": summary,
                             }
@@ -198,4 +209,5 @@ def register_foundation_production_routes(app) -> None:
     )
 
     app.state.stepin_foundation_service = service
+    app.state.stepin_learner_agent_event_bridge = agent_bridge
     app.state.stepin_foundation_registered = True
