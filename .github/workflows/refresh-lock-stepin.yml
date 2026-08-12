@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
 jobs:
   generate-lock:
     runs-on: ubuntu-24.04
