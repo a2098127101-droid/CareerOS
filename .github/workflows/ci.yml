@@ -22,14 +22,13 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin main
-          # Restore the canonical CI file so the source patch applies against the exact main baseline.
           git checkout origin/main -- .github/workflows/ci.yml
-          cat tools/.agent-v22-patch.part1 tools/.agent-v22-patch.part2 tools/.agent-v22-patch.part3 tools/.agent-v22-patch.part4 \
+          cat tools/.agent-v22-patch.part1 tools/.agent-v22-patch.part2 tools/.agent-v22-patch.part3a tools/.agent-v22-patch.part3b tools/.agent-v22-patch.part4 \
             | base64 -d | gzip -d > /tmp/agent-v22.patch
           echo '22eef1d356b6ef7b1f86657103a550add2c1e57ddeb1d6e37155d2b886d8b4ee  /tmp/agent-v22.patch' | sha256sum -c -
           git apply --check /tmp/agent-v22.patch
           git apply /tmp/agent-v22.patch
-          rm -f tools/.agent-v22-patch.part1 tools/.agent-v22-patch.part2 tools/.agent-v22-patch.part3 tools/.agent-v22-patch.part4
+          rm -f tools/.agent-v22-patch.part1 tools/.agent-v22-patch.part2 tools/.agent-v22-patch.part3 tools/.agent-v22-patch.part3a tools/.agent-v22-patch.part3b tools/.agent-v22-patch.part4
           rm -f tools/.agent-v22-trigger .github/workflows/apply-agent-v22-patch.yml
           git add -A
           git config user.name 'github-actions[bot]'
