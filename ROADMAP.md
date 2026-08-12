@@ -1,10 +1,10 @@
-# StepIn Development Roadmap
+# StepIn 2.0 Development Roadmap
 
 ## 最终目标
 
 StepIn 面向零基础、零实习经验、甚至不知道真实工作每天具体在做什么的学生。
 
-产品不从课程、岗位标签或职业测评开始，而从一件真实、简单、可以马上动手的小任务开始。学生通过反复做、修改、换场景再做、组合任务和表达成果，逐渐形成真正能够独立完成、能够迁移、能够说清楚的实践能力。
+产品不从课程、岗位标签或职业测评开始，而从一件真实、简单、可以马上动手的小任务开始。学生通过反复做、修改、换场景再做、组合任务和表达成果，逐渐形成能够独立完成、能够迁移、能够说清楚的实践能力。
 
 目标主链：
 
@@ -12,86 +12,36 @@ StepIn 面向零基础、零实习经验、甚至不知道真实工作每天具�
 
 ---
 
-## 当前最主要的问题
+# 已完成：Production Integration
 
-### 1. Production 主线与 StepIn 开发线仍然分开
+原来的 P0“production 主线与 StepIn Foundation 分叉”已经解决。
 
-当前 `main` 保留 CareerOS 的生产化技术基座，StepIn Foundation v1.9 以 PR #16 的 staging 形式存在。两条线长期并行会带来版本、README、CI、数据模型和发布认知混乱。
+正式 production integration 由 [PR #17](../../pull/17) 完成并进入 `main`：
 
-**这是当前 P0。**
+- Foundation domain / service / router 已进入 production `app/`；
+- 新手 Beginner Gate 已进入 production；
+- 10 项公共实践能力与 8 个连续基础任务已进入同一 Runtime；
+- 表达训练与信息 / 判断 / 表达三种跨材料探索已接入；
+- Foundation 使用 production Repository Container，保持 SQLite / PostgreSQL 双后端；
+- 教师基础成长视图已接入；
+- 旧职业项目与 Demo 历史路径保持兼容；
+- 锁定 CI 从 184 扩展到 **189/189 passed**；
+- Foundation API contract **10/10**；
+- dependency / repository / container security scan 全部通过；
+- production deterministic ZIP + checksum 通过；
+- `cryptography` 与 `pypdf` 已升级到修复版本并重新生成 hash-lock。
 
-### 2. Foundation 已能运行，但仍偏“内置流程”
-
-当前 10 项公共能力、8 个基础任务、脚手架渐退、小项目和表达链已经建立，但仍缺完整可配置层。内容人员还不能自由组合 Foundation Task、Scaffold Level、Task Chain 和 Mini Project。
-
-### 3. Beginner Mode 还没有成为完整产品模式
-
-专业 Workbench 已经很强，但零基础用户仍可能过早接触复杂工具。Foundation 阶段应该一次只显示当前动作，高级搜索、快捷键、复杂工作台、附件等能力应逐步解锁。
-
-### 4. Evidence 已记录过程，但跨任务能力聚合还不够强
-
-“做完一个任务”不能直接等于“掌握能力”。同一种能力应该在不同任务、不同材料、较少提示条件下重复出现，才逐渐提升可信度。
-
-### 5. 小任务 → 项目仍需升级为正式 Runtime
-
-目前可以组合第一份 Mini Project，但未来应该支持可配置 Task Chain、依赖关系、分支、重做、跨任务素材继承和项目输出模板。
-
-### 6. Practice Studio 仍偏专业 Workbench Builder
-
-下一步需要同时支持 Foundation Builder：先选基础能力，再配置材料、步骤、提示、完成条件、独立阶段、迁移任务和项目组合。
-
-### 7. Windows 桌面 / 离线仍缺真实发行认证
-
-构建链、WebView2、Portable、Installer、备份恢复已经准备，但仍需 Windows x64 真机构建与完整离线 E2E。
+旧 PR #16 仅保留为历史 staging 资料，不再作为运行源码。
 
 ---
 
-# P0 — 先统一代码主线
+# 当前 P0 — Foundation 2.0
 
-## P0.1 建立新的 production integration 分支
+现有 Foundation 已能真实运行，但任务、能力和脚手架仍有较多内置定义。下一阶段目标是把“怎么从不会到会做”正式做成可配置 Runtime，而不是继续靠增加 Python 常量扩内容。
 
-不要继续在旧基线 Foundation 分支上堆产品功能。
+## P0.1 正式领域模型
 
-建议：
-
-```text
-main
-  └─ integration/stepin-foundation-production
-```
-
-从最新 `main` 创建，再把 Foundation 功能逐段移植进去。
-
-### 移植顺序
-
-1. Foundation domain models；
-2. Foundation Progress service；
-3. Foundation router；
-4. Today Next Foundation priority；
-5. Practice Gate；
-6. Student Foundation UI；
-7. Teacher Foundation Growth；
-8. Foundation contract / regression tests；
-9. production CI / security / release gates。
-
-### 禁止做法
-
-不要用旧开发线的 `app/main.py`、安全配置、部署配置或 CI 文件整仓覆盖 production `main`。
-
-### 完成标准
-
-- `main` 只有一套运行时；
-- Foundation API 在 production app 中直接注册；
-- 原 Domain Intelligence / RLS / security / deployment 保持；
-- Foundation + Practice + production tests 全部在同一 CI 中通过；
-- PR #16 从 staging 任务转为已完成历史记录或被新的 production integration PR 取代。
-
----
-
-# P0 — Foundation 2.0
-
-## P0.2 正式领域模型
-
-建议新增或固化：
+新增或固化：
 
 ```text
 FoundationAbility
@@ -106,9 +56,9 @@ ExpressionPractice
 ExplorationExperience
 ```
 
-## P0.3 脚手架等级
+这些对象必须成为服务器权威状态，并继续复用现有 Evidence / Artifact，而不是复制第二套业务数据库。
 
-统一为：
+## P0.2 统一脚手架等级
 
 ```text
 L0 看一次
@@ -119,53 +69,35 @@ L4 换场景做
 L5 连起来做
 ```
 
-Today Next、提示系统和 Practice Runtime 都只读取这一套级别，不再各自判断。
+Today Next、提示系统、Foundation Runtime 和后续 Practice Runtime 都只读取这一套等级。
 
-## P0.4 Task Chain
+## P0.3 Task Chain Runtime
 
-任务链必须支持：
+任务链至少支持：
 
 - 前置任务；
-- 顺序；
+- 顺序与依赖；
 - 可选分支；
 - 重做；
 - 提示上限；
-- 通过条件；
-- 迁移任务；
-- 输出如何进入 Mini Project。
+- Done-when；
+- 独立版本；
+- 迁移版本；
+- 材料继承；
+- 多个任务如何进入 Mini Project；
+- Mini Project 如何生成真实作品。
+
+目标不是“做 8 道题”，而是让几个简单动作自然长成一件完整的工作。
 
 ---
 
-# P1 — Beginner Mode
+# P0 — Capability Accumulation
 
-Foundation 阶段默认只显示：
+当前 Evidence 能记录过程，但下一步必须真正回答：
 
-```text
-现在要做什么
-材料
-当前一步
-提交 / 下一步
-需要时的一点提示
-```
+> **这个学生现在已经会做什么？**
 
-隐藏：
-
-- 专业路径；
-- 复杂 Workbench 设置；
-- Ctrl+K 高级命令；
-- 高级筛选；
-- 能力术语；
-- 复杂 Evidence 技术状态。
-
-随着 Scaffold Level 和任务经验增长，再逐步展开 Workspace Mode。
-
----
-
-# P1 — 多任务能力叠加
-
-## 能力不按单题判定
-
-建议能力可信度至少综合：
+同一种能力不能因为一道任务做对就判定掌握。至少综合：
 
 ```text
 不同任务数量
@@ -178,7 +110,7 @@ Foundation 阶段默认只显示：
 时间跨度
 ```
 
-输出面向学生时仍使用普通语言：
+学生端仍用普通语言表达：
 
 ```text
 刚开始
@@ -188,88 +120,121 @@ Foundation 阶段默认只显示：
 已经比较稳定
 ```
 
-不要直接暴露复杂评分模型。
+复杂评分和内部 Evidence 结构留在系统内部。
 
 ---
 
-# P1 — 表达训练
+# P1 — Beginner Mode 继续收紧
 
-每个 Mini Project 结束后生成三种训练：
+Foundation production 首页已经做到“一次只做当前一步”，下一阶段继续保证复杂工作台不会过早出现。
 
-1. **自己复盘**：我做了什么、哪里改过、学会了什么；
-2. **简历表达**：2–3 行，不虚构结果；
-3. **面试表达**：60–90 秒，能讲清任务、行动、修改和结果。
+基础阶段默认只显示：
 
-表达必须引用真实 Practice / Evidence / Artifact，不允许 AI 编造经历。
+```text
+现在要做什么
+材料
+当前一步
+提交 / 下一步
+需要时的一点提示
+```
+
+随着 Scaffold Level 和任务经验增长，再逐步开放：
+
+- 搜索；
+- 附件；
+- 多选；
+- 对比；
+- 高级筛选；
+- 快捷键；
+- 完整专业 Workbench。
+
+产品应该跟学生一起“长出来”。
 
 ---
 
 # P1 — Practice Studio 2.0
 
-新增两种创建模式：
+Practice Studio 需要正式增加两种创建模式。
 
 ## 基础练习
 
 先选：
 
 ```text
-练什么基础能力
+这次想练什么基础能力？
 ```
 
 再配置：
 
 - 材料；
-- 当前一步；
 - 示例；
-- 提示；
+- 当前一步；
 - Scaffold Level；
+- 提示预算；
 - Done-when；
 - 独立版本；
 - 迁移版本；
-- 可组合进哪个 Mini Project。
+- 可以和哪些任务组成 Mini Project。
 
 ## 专业练习
 
-继续保留 Spreadsheet、ATS、CRM、Interview Coding、Issue Tracker、Research Board、Prioritization Board。
+继续保留 Spreadsheet、ATS、CRM、Interview Coding、Issue Tracker、Research Board、Prioritization Board，并让它们复用相同 Task Chain / Evidence / Artifact 底层。
 
 ---
 
-# P1 — Teacher Growth View
+# P1 — 表达与作品闭环
 
-教师核心不再是“谁没交作业”，而是：
+每个 Mini Project 结束后继续强化三种出口：
+
+1. **自己复盘**：我做了什么、哪里改过、学会了什么；
+2. **简历表达**：2–3 行，只引用真实 Practice / Evidence；
+3. **面试表达**：60–90 秒，能讲清任务、行动、修改和结果。
+
+AI 只能整理真实过程，不允许补写不存在的经历和成果。
+
+---
+
+# P1 — Teacher Growth 2.0
+
+教师核心不是“谁没交”，而是：
 
 ```text
 谁还需要很多提示
 谁开始能独立做
-谁在反馈后不会改
-谁能换场景继续做
+谁收到反馈以后不会改
+谁换材料以后仍然会做
 谁已经能把几个任务连起来
 ```
 
-教师能够进入学生过程轨迹：
+继续增加：
 
 - 尝试次数；
 - 提示使用；
-- 修改前后；
+- V1 / V2 修改前后；
 - 迁移结果；
 - Mini Project；
-- 表达版本。
+- 表达版本；
+- 需要教师介入的真正原因。
 
 ---
 
-# P1 — Windows 真机发行 Gate
+# P1 — Windows x64 真机发行 Gate
 
-必须在 Windows x64 真机完成：
+这一项仍未由当前 Linux GitHub Actions 代替完成。
+
+必须在真实 Windows x64 完整验证：
 
 ```text
 安装
 首次启动
 学生 / 教师登录
+Foundation
 完全断网
-练习
+继续练习
 附件
-导出
+DOCX / XLSX / PPTX / PDF 导出
 退出重启
+数据仍在
 备份
 升级安装
 恢复
@@ -280,18 +245,18 @@ Fixed WebView2
 低配置电脑
 ```
 
-只有这组通过后，才能把 Desktop / Offline 从“构建链完成”升级为“发行完成”。
+只有这组通过后，Desktop / Offline 才从“架构与构建链完成”升级为“正式发行认证完成”。
 
 ---
 
 # P2 — 后续再做
 
-在上述底层稳定以前，不优先：
+在 Foundation 2.0、能力叠加和 Windows 发行稳定以前，不优先：
 
-- 继续增加大量岗位；
-- 做复杂职业测评；
-- 做更多 AI Agent 名称；
-- 继续堆 Dashboard；
+- 大量新增岗位；
+- 复杂职业测评；
+- 更多 AI Agent 名称；
+- Dashboard 堆叠；
 - 大规模课程库；
 - 社交社区；
 - 排行榜；
@@ -311,27 +276,27 @@ Fixed WebView2
 
 # 推荐版本节奏
 
-## v1.9.x — Production Integration
+## StepIn 2.0 Beta — 当前
 
-目标：结束 production / Foundation 两条线并行。
+目标：production Foundation 主线统一。**已完成。**
 
-## v2.0 — Foundation 2.0
+## 2.1 — Foundation 2.0
 
 目标：可配置基础任务、脚手架、Task Chain、Mini Project。
 
-## v2.1 — Capability Accumulation
+## 2.2 — Capability Accumulation
 
 目标：多任务能力聚合与长期能力档案。
 
-## v2.2 — Expression & Portfolio
+## 2.3 — Expression & Portfolio
 
 目标：复盘、简历、面试表达、真实作品输出。
 
-## v2.3 — Practice Studio 2.0
+## 2.4 — Practice Studio 2.0
 
 目标：老师不用改源码即可创建 Foundation + Professional Practice。
 
-## v2.4 — Windows Offline Release
+## 2.5 — Windows Offline Release
 
 目标：正式 Windows 安装包、升级、备份恢复、完全断网发行认证。
 
