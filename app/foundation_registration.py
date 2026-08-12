@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from .domain.roles import canonical_role
 from .foundation_progress import FoundationError, FoundationProgressService
 from .foundation_production import ExplorationRequest, ProductionFoundationFacade
+from .learner_agent.registration import register_learner_agent_routes
 from .routers.foundation import build_foundation_router
 from .unified_runtime_store import RuntimeVersionConflict
 
@@ -183,6 +184,18 @@ def register_foundation_production_routes(app) -> None:
                         },
                     )
         return await call_next(request)
+
+    register_learner_agent_routes(
+        app,
+        foundation=service,
+        repository=main.unified_runtime_store,
+        collaboration=main.collaboration_store,
+        career_agents=main.agents,
+        sessions=main.store,
+        identity=main.auth_store,
+        current_principal=main.current_principal,
+        canonical_role=main.canonical_role,
+    )
 
     app.state.stepin_foundation_service = service
     app.state.stepin_foundation_registered = True
