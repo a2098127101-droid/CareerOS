@@ -3,12 +3,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from fastapi.routing import APIRoute
-
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from app.api_versioning import _api_routes
 from app.main import app
 
 
@@ -28,9 +27,7 @@ REQUIRED = {
 
 def routes() -> set[tuple[str, str]]:
     out: set[tuple[str, str]] = set()
-    for route in app.routes:
-        if not isinstance(route, APIRoute):
-            continue
+    for route in _api_routes(app.router.routes):
         for method in route.methods or set():
             out.add((method, route.path))
     return out
