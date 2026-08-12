@@ -5,7 +5,7 @@ import sys
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
 from .capability_verification import CapabilityVerificationService
 from .domain.roles import canonical_role
@@ -248,6 +248,19 @@ def register_foundation_production_routes(app) -> None:
             canonical_role=main.canonical_role,
         )
     )
+
+    @app.get("/app", include_in_schema=False)
+    @app.get("/app/{spa_path:path}", include_in_schema=False)
+    def spatial_student_shell(spa_path: str = "", principal=Depends(main.current_principal)):
+        if not principal.authenticated:
+            return RedirectResponse(url=f"/login?next=/app/{spa_path}" if spa_path else "/login?next=/app", status_code=302)
+        if canonical_role(principal.role) != "participant":
+            return RedirectResponse(url=main.role_home(principal.role), status_code=302)
+        index = main.STATIC_DIR / "app" / "index.html"
+        if index.exists():
+            return FileResponse(index)
+        # Source checkout without a frontend build remains fully usable through the old UI.
+        return RedirectResponse(url="/static/foundation.html", status_code=302)
 
     app.state.stepin_foundation_service = service
     app.state.stepin_learner_agent_event_bridge = agent_bridge
