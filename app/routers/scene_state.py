@@ -51,7 +51,7 @@ def build_scene_state_router(
             session_id=sid,
             identity={
                 "userId": uid,
-                "displayName": principal.display_name,
+                "displayName": str(getattr(principal, "display_name", "") or getattr(principal, "name", "") or ""),
                 "role": canonical_role(principal.role),
                 "tenantId": principal.tenant_id,
             },
