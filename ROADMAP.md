@@ -8,6 +8,8 @@ StepIn 当前不是课程平台或普通 Career Coach，而是以 **Learner Agen
 
 **开始做 → 跟着做 → 自己做 → 失败时诊断 → 根据反馈改 → 换场景再做 → 小任务组成项目 → 多任务叠加能力 → 把做过的事情讲出来。**
 
+当前 production `main` 已完成 StepIn 2.2 合并（PR #19）。最终 PR head 通过 **204 / 204** 锁定回归、Learner Agent 13-route contract、Foundation 10-route contract、Project Library v2.2 audit、供应链安全扫描和 production release package。当前版本为 `2.2.0-beta-agent-trajectory`。
+
 ---
 
 ## 已完成 P0：Production Foundation
@@ -51,7 +53,7 @@ WAIT
 
 LLM 只作为语言层，不能选择 Tool、生成最终交付物、直接标记掌握或绕过 Gate。
 
-## 本版本完成 P0：Real Trajectory + Calibration
+## 已完成 P0：Real Trajectory + Calibration
 
 真实业务事件现在直接进入 Learner Trajectory：
 
@@ -91,7 +93,7 @@ Policy Calibration 当前只允许调整：
 
 候选 Policy 需要最小真实样本量，并且必须由组织管理员显式激活。安全边界不参与学习。
 
-## 本版本完成 P0：Project Library v2.2
+## 已完成 P0：Project Library v2.2
 
 旧默认“个人职业发展规划”升级为 **真实任务综合实践**。默认项目不再先问目标岗位，而是围绕：
 
@@ -109,7 +111,7 @@ Policy Calibration 当前只允许调整：
 → 实践复盘
 ```
 
-项目模板使用 immutable version。系统通过 `library_version` + content hash 自动识别旧默认模板并创建最新版本；旧项目继续绑定历史版本。
+项目模板使用 immutable version。系统通过 `library_version` + content hash 自动识别旧默认模板并创建最新版本；所有新项目使用当前最新 v2.2 模板，旧项目继续绑定历史版本，避免改写既有学生过程证据。
 
 ---
 
