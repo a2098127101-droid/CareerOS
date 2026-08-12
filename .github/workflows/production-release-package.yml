@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version, for example v1.5.0-rc1
+        description: Release version, for example v2.2.0-rc1
         required: true
-        default: v1.5.0-rc1
+        default: v2.2.0-rc1
   push:
     tags:
       - 'v*'
@@ -51,7 +51,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            value="v1.5.0-pr${PR_NUMBER}"
+            value="v2.2.0-pr${PR_NUMBER}"
           elif [[ -n "$INPUT_VERSION" ]]; then
             value="$INPUT_VERSION"
           else
