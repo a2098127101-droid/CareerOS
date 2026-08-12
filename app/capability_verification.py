@@ -83,12 +83,13 @@ class CapabilityVerificationService:
         revision_tasks: dict[str, set[str]] = defaultdict(set)
         event_sources: dict[str, list[dict[str, Any]]] = defaultdict(list)
 
+        # V1 is intentionally excluded: a first draft is an observation/signal, not a
+        # second successful context. V2 and transfer may contribute after server checks.
         successful_event_types = {
             "task_completed",
             "revision_submitted",
             "transfer_completed",
             "project_completed",
-            "work_sample_v1_submitted",
             "work_sample_v2_submitted",
             "work_sample_transfer_completed",
         }
@@ -151,7 +152,14 @@ class CapabilityVerificationService:
             combined = int(foundation.get("combined") or 0)
             later_practice = int(foundation.get("laterPracticeCount") or 0)
 
-            distinct_task_count = max(len(success_tasks[capability_id]), attempts + later_practice)
+            # Foundation attempts correspond to completed immutable Foundation tasks.
+            # Later evidence rows may be multiple versions of one task, so they are only
+            # allowed to establish observation here; they cannot inflate task contexts.
+            distinct_task_count = max(
+                len(success_tasks[capability_id]),
+                attempts,
+                1 if later_practice > 0 else 0,
+            )
             independent_count = max(len(independent_tasks[capability_id]), independent)
             transfer_count = max(len(transfer_tasks[capability_id]), transfer)
             revision_count = len(revision_tasks[capability_id])
