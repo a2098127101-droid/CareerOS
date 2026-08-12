@@ -48,7 +48,7 @@ def register_v1_compatibility_aliases(app: FastAPI) -> int:
     security middleware, legacy routes, and the project runtime. This keeps the
     integration additive and avoids replacing the hardened production main.
     """
-    from .foundation_production import register_foundation_production_routes
+    from .foundation_registration import register_foundation_production_routes
 
     register_foundation_production_routes(app)
 
