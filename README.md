@@ -4,75 +4,82 @@
 
 **Start with one simple, real task. Build practical capability by doing, revising, transferring, and combining work into projects.**
 
-[中文说明](README.zh-CN.md) · [StepIn Foundation v1.9 Draft PR](../../pull/16) · [v1.9 integration branch](../../tree/agent/stepin-foundation-v1.9.0)
+[中文说明](README.zh-CN.md) · [开发路线图](ROADMAP.md) · [Foundation v1.9 PR #16](../../pull/16)
 
-> **当前仓库状态 / Repository status**  
-> `main` 仍然是经过生产化强化的 **CareerOS v1.5 production baseline**。StepIn Foundation v1.9 正在通过 [PR #16](../../pull/16) 安全集成，尚未直接覆盖主线。当前首页已经按照新的产品方向更新，但下文明确区分“产品方向”和“已合并主线代码”。
+## StepIn 是什么
 
-## 为什么做 StepIn
+StepIn 面向零基础、零实习经验，甚至不知道真实工作每天具体在做什么的学生。
 
-很多零基础、零实习经验的学生，并不是缺少更多课程，而是不知道真实工作每天到底在做什么，也不知道第一步该从哪里开始。
-
-StepIn 不把“选专业、选岗位、学课程、堆项目”作为起点。它先给学生一件**足够简单、但具有真实工作逻辑的小任务**，让学生先动手，再在实践中逐渐学会：看懂任务、找重点、整理信息、作出判断、说明理由、按要求交付、根据反馈修改、换一个场景再做，以及把自己做过的事情讲清楚。
-
-核心路径：
+它不要求学生一开始就选专业、选岗位、学一堆课程或做职业测评，而是先给一件**真实、简单、马上能动手的小任务**。学生在不断做、修改、换场景再做和组合任务的过程中，逐渐形成真正能够独立完成、能够迁移、最后能够说清楚的实践能力。
 
 **开始做 → 跟着做 → 自己做 → 根据反馈改 → 换场景再做 → 小任务组成项目 → 多任务叠加能力 → 把做过的事情讲出来。**
 
-专业、课程和知识不是产品本身，而是在学生真正需要时为当前任务提供帮助。职业方向也不要求学生一开始就选择，而是在完成多种真实任务以后逐渐出现。
+专业、课程和知识不是产品本身。它们只在学生当前任务需要时提供帮助。职业方向也不会要求学生一开始就决定，而是在完成多种真实任务以后逐渐出现。
 
-## StepIn Foundation v1.9
+## 从零基础开始
 
-当前 v1.9 开发线重点实现：
+Foundation 当前围绕 10 项跨专业公共实践能力组织入门任务：
 
-- **10 项跨专业公共实践能力**：看懂任务、找重点、整理信息、比较判断、发现问题、说明理由、清楚交付、根据反馈修改、换场景再做、把做过的事情讲出来；
-- **8 个连续零基础小任务**，从“4 件事先做哪件”开始，而不是从专业项目开始；
-- **逐步减少提示**：跟着做 → 少提示 → 自己做 → 修改 → 换场景做；
-- **Task → Mini Project**：分散的小任务会组合成第一份真实小项目；
-- **跨任务 Evidence 聚合**：不是做对一道题就宣布“掌握能力”，而是观察同一种能力是否在不同任务中重复出现；
-- **表达训练**：把真实做过的项目转成复盘、简历表达和面试表达；
-- **延迟专业分化**：完成基础阶段后先体验表格、访谈、排序等不同材料，再逐渐开放职业路径；
-- **服务器级 Gate**：学生不能通过直接调用专业 Practice API 绕过 Foundation；
-- **教师基础成长视图**：教师看到的是学生从“需要提示”到“能够独立完成”的变化，而不只是最终答案。
+- 看懂任务；
+- 找出关键信息；
+- 整理信息；
+- 比较与判断；
+- 发现问题；
+- 说明理由；
+- 按要求清楚交付；
+- 根据反馈修改；
+- 换一个场景再做；
+- 把自己做过的事情讲清楚。
 
-完整 v1.9 代码目前位于：
+学生先完成一组足够简单的小任务。提示会逐渐减少，再进入独立完成、换场景练习、小项目组合和表达训练。专业化工作台放在这之后。
 
-- [StepIn Foundation integration branch](../../tree/agent/stepin-foundation-v1.9.0)
-- [Draft PR #16](../../pull/16)
-- [中文项目介绍](../../blob/agent/stepin-foundation-v1.9.0/stepin-foundation-v1.9.0/PROJECT_DESCRIPTION.zh-CN.md)
-- [English project overview](../../blob/agent/stepin-foundation-v1.9.0/stepin-foundation-v1.9.0/PROJECT_DESCRIPTION.en.md)
+## 已形成的实践工作环境
 
-## 已形成的 Practice OS 能力
+StepIn 持续开发线已经形成：
 
-StepIn 开发线已经形成一套以实践为中心的工作环境，而不是“AI 聊天 + 项目列表”：
+- **Focus Workspace**：打开后只处理今天真正要做的一件事；
+- **Foundation Runtime**：零基础任务、逐步减少提示、基础成长记录；
+- **Practice Runtime**：做 → 改 → 再做一次 → 成果；
+- **Job-native Workbenches**：Spreadsheet、ATS、CRM、访谈编码、Issue Tracker、Research Board、Prioritization Board；
+- **Contextual Help**：提示附着在当前工作对象旁边，而不是单独占一个聊天页面；
+- **Evidence / Artifact**：保存操作记录、版本、反馈和作品；
+- **Simulation**：换一批材料、减少提示，再做一次；
+- **Teacher View**：既看需要人工判断的事项，也看学生从“需要提示”到“能够独立完成”的变化；
+- **Practice Studio**：受控地创建、审核、试跑和发布练习；
+- **Local-first / Offline**：核心练习以本机 FastAPI + SQLite 为基础，可在无互联网情况下继续运行；
+- **Desktop Workbench**：Windows Portable / pywebview / WebView2 / Inno Setup 构建链；
+- **Real Outputs**：支持 DOCX、XLSX、PPTX、PDF 和 Markdown 输出。
 
-- Focus Workspace：打开后只看到今天真正要做的一件事；
-- Contextual Help：AI/规则提示附着在当前工作对象旁边，而不是占据独立聊天窗口；
-- Job-native Workbenches：Spreadsheet、ATS、CRM、访谈编码、Issue Tracker、Research Board、Prioritization Board；
-- Practice Runtime：做 → 改 → 再做一次 → 成果；
-- Evidence / Artifact：保存操作证据、版本历史、教师反馈和作品；
-- Simulation：换一批材料、减少提示，再验证一次；
-- Teacher Triage：教师只处理真正需要人工判断的事项；
-- Content Ops / Practice Studio：内容来源、审核、试跑、发布与受控无代码练习编辑；
-- Local-first / Offline：本机 FastAPI + SQLite，断互联网后核心练习仍可继续；
-- Desktop Workbench：Windows Portable / pywebview / WebView2 / Inno Setup 构建链；
-- Real Outputs：支持将成果导出为 DOCX、XLSX、PPTX、PDF 和 Markdown。
+## English overview
 
-> 上述 StepIn 能力来自持续开发线。v1.9 Foundation 尚在 PR #16 中与当前 production `main` 做受控集成，不能把未合并能力误认为已经全部进入主分支。
+StepIn is a **practice-first capability development system** for students with little or no internship experience.
 
-## 当前 production `main`
+Instead of beginning with courses, job labels, or career tests, StepIn begins with one simple but realistic work task that a beginner can actually complete. Support gradually fades as the learner moves from following a scaffold to working independently, revising from feedback, transferring the skill to a new situation, combining small tasks into projects, and explaining what they can actually do.
 
-GitHub 主分支目前仍保留 CareerOS v1.5 production-final 的生产化能力，包括：
+**Start doing → Follow a scaffold → Work independently → Revise from feedback → Try again in a new context → Build projects from small tasks → Accumulate capability across tasks → Explain what you can actually do.**
 
-- Domain Intelligence：Claim → Capability → Job Requirement → Gap；
-- Evidence Trust 与版本化能力评估；
-- Tenant / RLS / 权限与安全强化；
-- SQLite / PostgreSQL Repository；
-- Unified Runtime 与 Canonical API；
-- 多模型 Gateway；
-- 生产部署、发布包、安全扫描与锁定 CI。
+Specialization comes later. Courses and knowledge are support resources for the work in front of the learner, not the product itself.
 
-StepIn v1.9 不会用旧基线整仓覆盖这些能力。PR #16 的目标是把 Foundation、Practice-first 学习路径和学生/教师工作流逐步移植到当前 production 基座上。
+## 开发路线 / Development
+
+当前开发重点不是继续堆更多岗位，而是先把三件事做扎实：
+
+1. 把 Foundation 正式接入 production 主线，结束两条代码线并行；
+2. 把基础任务、脚手架撤离、Task Chain、Mini Project 和跨任务能力聚合做成可配置底层能力；
+3. 在 Windows 真机完成桌面安装、完全断网、备份恢复和升级验证。
+
+完整计划见 [ROADMAP.md](ROADMAP.md)。
+
+<details>
+<summary>工程集成状态 / Engineering integration status</summary>
+
+当前 GitHub `main` 保留 CareerOS 的生产化技术基座，包括 Domain Intelligence、权限与安全、Repository、Canonical API、模型路由、部署与 CI。StepIn Foundation v1.9 正在 [PR #16](../../pull/16) 中做受控集成。
+
+PR #16 当前是 staging/integration PR，不应通过整仓覆盖的方式替换 production 主线。下一步应从最新 `main` 建立 production integration 分支，把 Foundation domain、Today Next、Practice Gate、学生/教师工作流和测试逐段接入，再执行完整 CI、安全和 Windows 发行验证。
+
+The current production `main` remains the technical baseline. StepIn Foundation v1.9 is being integrated through [PR #16](../../pull/16). The integration should preserve the existing production security, deployment, Domain Intelligence and CI layers rather than replacing the repository wholesale.
+
+</details>
 
 ## Quick start — current `main`
 
@@ -92,45 +99,4 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Default local demo accounts are documented in `.env.example`. Never enable demo seeding in production.
-
-## English overview
-
-StepIn is a **practice-first capability development system** for students with little or no internship experience. Instead of beginning with courses, job labels, or career tests, it begins with one simple but realistic work task that a beginner can actually complete.
-
-The system gradually reduces support as the learner moves from following a scaffold to working independently, revising from feedback, transferring the skill to new situations, combining small tasks into projects, and explaining what they can actually do.
-
-**Start doing → Follow a scaffold → Work independently → Revise from feedback → Try again in a new context → Build a project from small tasks → Accumulate capability across tasks → Explain what you can actually do.**
-
-Specialization comes later. Courses and knowledge are support resources for the work in front of the learner, not the product itself.
-
-### v1.9 integration status
-
-The current GitHub `main` is still the CareerOS v1.5 production baseline. StepIn Foundation v1.9 is staged in [Draft PR #16](../../pull/16) because the Foundation development line evolved from an older source baseline. The integration intentionally preserves the existing Domain Intelligence, security, deployment, RLS, and CI capabilities on `main` instead of replacing them wholesale.
-
-## Validation notes
-
-The StepIn v1.9 development line reports the following targeted validation before production-main integration:
-
-- Foundation: **7/7 passed**
-- Key targeted regressions: **51/51 passed**
-- Foundation API contract: **8/8**
-- Practice contract: **19/19**
-- Interaction / Content contract: **18/18**
-- localhost four-role HTTP smoke: passed
-- Chromium DOM + FastAPI bridge: **0 pageerror / 0 console error**
-
-These are development-line results, **not yet the final production-main integration CI result**.
-
-## Documentation
-
-For the current production baseline:
-
-- `ARCHITECTURE_v1.5.md`
-- `DOMAIN_INTELLIGENCE_MODEL.md`
-- `API_DOMAIN_INTELLIGENCE_GUIDE.md`
-- `PRODUCTION_READINESS_v1.5.md`
-- `REMAINING_GAPS_v1.5.md`
-- `SOURCE_PROVENANCE_v1.5.md`
-
-For StepIn Foundation v1.9, use [PR #16](../../pull/16) and the `stepin-foundation-v1.9.0/` integration directory on its branch.
+Local demo account settings are documented in `.env.example`. Do not enable demo seeding in production.
