@@ -1,16 +1,16 @@
-# StepIn / CareerOS
+# StepIn 2.0 Beta
 
 **从一件简单真实的工作开始，在做、改、再做和项目积累中形成真正会做的能力。**
 
 **Start with one simple, real task. Build practical capability by doing, revising, transferring, and combining work into projects.**
 
-[中文说明](README.zh-CN.md) · [开发路线图](ROADMAP.md) · [Foundation v1.9 PR #16](../../pull/16)
+[中文说明](README.zh-CN.md) · [开发路线图](ROADMAP.md) · [Production integration PR #17](../../pull/17)
 
 ## StepIn 是什么
 
 StepIn 面向零基础、零实习经验，甚至不知道真实工作每天具体在做什么的学生。
 
-它不要求学生一开始就选专业、选岗位、学一堆课程或做职业测评，而是先给一件**真实、简单、马上能动手的小任务**。学生在不断做、修改、换场景再做和组合任务的过程中，逐渐形成真正能够独立完成、能够迁移、最后能够说清楚的实践能力。
+它不要求学生一开始就选专业、选岗位、学一堆课程或做职业测评，而是先给一件**真实、简单、马上能动手的小任务**。学生在不断做、修改、换场景再做和组合任务的过程中，逐渐形成能够独立完成、能够迁移、最后能够说清楚的实践能力。
 
 **开始做 → 跟着做 → 自己做 → 根据反馈改 → 换场景再做 → 小任务组成项目 → 多任务叠加能力 → 把做过的事情讲出来。**
 
@@ -18,70 +18,98 @@ StepIn 面向零基础、零实习经验，甚至不知道真实工作每天具�
 
 ## 从零基础开始
 
-Foundation 当前围绕 10 项跨专业公共实践能力组织入门任务：
+StepIn Foundation 已经进入 production `main`。新手阶段围绕 10 项跨专业公共实践能力展开：
 
-- 看懂任务；
-- 找出关键信息；
-- 整理信息；
-- 比较与判断；
-- 发现问题；
-- 说明理由；
-- 按要求清楚交付；
-- 根据反馈修改；
-- 换一个场景再做；
-- 把自己做过的事情讲清楚。
+- 看懂任务
+- 找出关键信息
+- 整理信息
+- 比较与判断
+- 发现问题
+- 说明理由
+- 按要求清楚交付
+- 根据反馈修改
+- 换一个场景再做
+- 把自己做过的事情讲清楚
 
-学生先完成一组足够简单的小任务。提示会逐渐减少，再进入独立完成、换场景练习、小项目组合和表达训练。专业化工作台放在这之后。
+学生先完成 8 个足够简单的小任务。提示会逐渐减少；随后完成一次真实表达，再使用信息、判断、表达三种不同材料独立做一次，之后才进入更完整的职业实践。
 
-## 已形成的实践工作环境
+## 当前 production 已具备
 
-StepIn 持续开发线已经形成：
+- **Foundation Runtime**：零基础任务、渐退式提示、基础成长记录
+- **Beginner Gate**：production 新手不能绕过基础阶段直接创建职业项目
+- **Task → Mini Project**：基础小任务组合成第一份真实小项目
+- **Evidence / Artifact**：操作记录、版本、反馈和作品进入现有生产证据链
+- **Teacher Growth View**：教师查看提示次数、独立完成、换场景表现和成长轨迹
+- **Domain Intelligence**：CareerOS Core 原有 Claim → Capability → Job Requirement → Gap 生产能力继续保留
+- **Tenant / RLS / Security**：现有租户隔离、权限、安全、审计和生产部署能力继续保留
+- **SQLite / PostgreSQL**：Foundation 跟随 production Repository Container，不另建数据库路径
+- **Local / Offline foundation**：现有本地 FastAPI + SQLite 能力继续作为离线桌面方向的基础
 
-- **Focus Workspace**：打开后只处理今天真正要做的一件事；
-- **Foundation Runtime**：零基础任务、逐步减少提示、基础成长记录；
-- **Practice Runtime**：做 → 改 → 再做一次 → 成果；
-- **Job-native Workbenches**：Spreadsheet、ATS、CRM、访谈编码、Issue Tracker、Research Board、Prioritization Board；
-- **Contextual Help**：提示附着在当前工作对象旁边，而不是单独占一个聊天页面；
-- **Evidence / Artifact**：保存操作记录、版本、反馈和作品；
-- **Simulation**：换一批材料、减少提示，再做一次；
-- **Teacher View**：既看需要人工判断的事项，也看学生从“需要提示”到“能够独立完成”的变化；
-- **Practice Studio**：受控地创建、审核、试跑和发布练习；
-- **Local-first / Offline**：核心练习以本机 FastAPI + SQLite 为基础，可在无互联网情况下继续运行；
-- **Desktop Workbench**：Windows Portable / pywebview / WebView2 / Inno Setup 构建链；
-- **Real Outputs**：支持 DOCX、XLSX、PPTX、PDF 和 Markdown 输出。
+## 为什么不是课程平台
+
+StepIn 的起点不是“先学完再实践”。知识、课程和 AI 只在当前任务需要时出现：学生先遇到真实问题，再得到足够的解释、示范或提示，随后继续自己完成。
+
+因此产品关注的不是“看了多少课”，而是：
+
+> **现在到底能不能把一件事情做出来、改好，并在换一种材料以后仍然会做。**
 
 ## English overview
 
 StepIn is a **practice-first capability development system** for students with little or no internship experience.
 
-Instead of beginning with courses, job labels, or career tests, StepIn begins with one simple but realistic work task that a beginner can actually complete. Support gradually fades as the learner moves from following a scaffold to working independently, revising from feedback, transferring the skill to a new situation, combining small tasks into projects, and explaining what they can actually do.
+Instead of beginning with courses, job labels, or career tests, it begins with one simple but realistic task. Support gradually fades as learners move from following a scaffold to working independently, revising from feedback, transferring the skill to a new context, combining small tasks into projects, and explaining what they can actually do.
 
 **Start doing → Follow a scaffold → Work independently → Revise from feedback → Try again in a new context → Build projects from small tasks → Accumulate capability across tasks → Explain what you can actually do.**
 
-Specialization comes later. Courses and knowledge are support resources for the work in front of the learner, not the product itself.
+Foundation is now integrated into the production codebase. The existing CareerOS Core — Domain Intelligence, tenant isolation, security, repositories, model routing, deployment, and CI — remains the production foundation underneath StepIn.
 
-## 开发路线 / Development
+## Production validation
 
-当前开发重点不是继续堆更多岗位，而是先把三件事做扎实：
+The production integration completed through [PR #17](../../pull/17) with the following GitHub Actions gates:
 
-1. 把 Foundation 正式接入 production 主线，结束两条代码线并行；
-2. 把基础任务、脚手架撤离、Task Chain、Mini Project 和跨任务能力聚合做成可配置底层能力；
-3. 在 Windows 真机完成桌面安装、完全断网、备份恢复和升级验证。
+- locked regression matrix: **189/189 passed**
+- Foundation production API contract: **10/10**
+- database access audit: passed
+- repository contract audit: passed
+- Python dependency audit: passed
+- repository vulnerability / secret / misconfiguration scan: passed
+- release container vulnerability scan: passed
+- Python and image CycloneDX SBOM: generated
+- deterministic production ZIP + checksum verification: passed
+
+During integration, known dependency vulnerabilities were removed by updating `cryptography` to `50.0.0` and `pypdf` to `6.15.0`, with the full hash-locked dependency file regenerated.
+
+## Rollout behavior
+
+- production participants with no existing professional project enter Foundation first;
+- students with an existing professional project are not forced backwards;
+- Demo / historical compatibility mode keeps the previous project flow by default;
+- set `STEPIN_FOUNDATION_DEMO_GATE=true` only when Foundation needs to be exercised in Demo mode;
+- `STEPIN_FOUNDATION_DISABLED=true` is an emergency operational rollback switch for the beginner gate.
+
+## 下一步
+
+Production integration 已完成。接下来不再维护两条源码主线，开发重点转为：
+
+1. **Foundation 2.0**：把能力、脚手架等级、任务链和 Mini Project 从硬编码进一步数据化、可配置化；
+2. **Capability Accumulation**：让不同任务共同形成“我已经会做什么”的长期能力档案；
+3. **Practice Studio 2.0**：让教师不用改 Python 就能创建基础练习和任务链；
+4. **Windows x64 Release Gate**：真正构建 `StepIn.exe` / Installer，并完成安装、断网、备份、升级、恢复的桌面 E2E。
 
 完整计划见 [ROADMAP.md](ROADMAP.md)。
 
 <details>
-<summary>工程集成状态 / Engineering integration status</summary>
+<summary>技术底座 / Engineering foundation</summary>
 
-当前 GitHub `main` 保留 CareerOS 的生产化技术基座，包括 Domain Intelligence、权限与安全、Repository、Canonical API、模型路由、部署与 CI。StepIn Foundation v1.9 正在 [PR #16](../../pull/16) 中做受控集成。
+StepIn 2.0 Beta 运行在 CareerOS Core 上。Core 继续提供 Domain Intelligence、Evidence Trust、Canonical API、Tenant / RLS、安全策略、SQLite / PostgreSQL Repository、模型网关、生产部署、SBOM、安全扫描和锁定 CI。
 
-PR #16 当前是 staging/integration PR，不应通过整仓覆盖的方式替换 production 主线。下一步应从最新 `main` 建立 production integration 分支，把 Foundation domain、Today Next、Practice Gate、学生/教师工作流和测试逐段接入，再执行完整 CI、安全和 Windows 发行验证。
+旧 PR #16 保留为 v1.9 Foundation 的历史 staging 资料；正式 production integration 由已合并的 [PR #17](../../pull/17) 完成。
 
-The current production `main` remains the technical baseline. StepIn Foundation v1.9 is being integrated through [PR #16](../../pull/16). The integration should preserve the existing production security, deployment, Domain Intelligence and CI layers rather than replacing the repository wholesale.
+Windows x64 的最终桌面安装包与完全断网 E2E 仍是独立发行 Gate，尚不能因为 Linux GitHub Actions 通过就视为已完成 Windows 真机认证。
 
 </details>
 
-## Quick start — current `main`
+## Quick start
 
 ### Windows
 
