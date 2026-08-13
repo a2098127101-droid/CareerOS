@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   lockfile:
@@ -22,6 +22,8 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: '22.12.0'
@@ -43,12 +45,23 @@ jobs:
           path: frontend/package-lock.json
           if-no-files-found: error
           retention-days: 7
-      - name: Enforce committed lockfile
-        if: steps.lock.outputs.dirty == 'true'
+      - name: Commit generated lockfile to PR head
+        if: github.event_name == 'pull_request' && steps.lock.outputs.dirty == 'true'
+        working-directory: .
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add frontend/package-lock.json
+          git commit -m 'chore: lock spatial frontend dependencies'
+          git push origin "HEAD:${HEAD_REF}"
+      - name: Enforce clean lockfile outside PR repair
+        if: github.event_name != 'pull_request' && steps.lock.outputs.dirty == 'true'
         run: |
           echo 'frontend/package-lock.json is missing or out of date.' >&2
           git status --short -- package-lock.json
           exit 1
       - name: Verify deterministic install
-        if: steps.lock.outputs.dirty == 'false'
         run: npm ci --ignore-scripts --no-audit --no-fund
