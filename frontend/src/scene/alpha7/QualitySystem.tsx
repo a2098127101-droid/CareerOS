@@ -48,9 +48,19 @@ export const QUALITY_PROFILES: Record<QualityTier, QualityProfile> = {
 
 const ORDER: QualityTier[] = ['safe', 'balanced', 'high', 'ultra']
 const SESSION_KEY = 'stepin.spatial.quality.auto'
+const CONTEXT_LOST_KEY = 'stepin.spatial.context_lost'
 
 function isTier(value: string | null): value is QualityTier {
   return value === 'ultra' || value === 'high' || value === 'balanced' || value === 'safe'
+}
+
+function persistSafeContext() {
+  try {
+    window.sessionStorage.setItem(SESSION_KEY, 'safe')
+    window.sessionStorage.setItem(CONTEXT_LOST_KEY, String(Date.now()))
+  } catch {
+    // Storage can be unavailable in hardened WebView environments.
+  }
 }
 
 export function getQualityRequest(): QualityRequest {
@@ -98,6 +108,21 @@ export function useQualityState() {
   useEffect(() => {
     if (!locked && typeof window !== 'undefined') window.sessionStorage.setItem(SESSION_KEY, tier)
   }, [tier, locked])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const forceSafe = (event: Event) => {
+      if (event.type === 'webglcontextlost' && 'preventDefault' in event) event.preventDefault()
+      persistSafeContext()
+      setTier('safe')
+    }
+    document.addEventListener('webglcontextlost', forceSafe, true)
+    document.addEventListener('webglcontextrestored', forceSafe, true)
+    return () => {
+      document.removeEventListener('webglcontextlost', forceSafe, true)
+      document.removeEventListener('webglcontextrestored', forceSafe, true)
+    }
+  }, [])
 
   return { request, tier, setTier, fps, setFps, locked, profile: QUALITY_PROFILES[tier] }
 }
