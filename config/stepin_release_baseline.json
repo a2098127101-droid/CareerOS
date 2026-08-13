@@ -1,0 +1,13 @@
+{
+  "product": "StepIn",
+  "product_version": "2.2.0",
+  "release_status": "pre-production",
+  "spatial_runtime": "alpha7",
+  "spatial_label": "Spatial Practice Alpha 7 · Adaptive Showcase",
+  "locked_tests": 208,
+  "python_version": "3.11.9",
+  "node_version": "22.12.0",
+  "capability_verification": "2.0-min",
+  "target_environment_certified": false,
+  "windows_webview2_certified": false
+}
