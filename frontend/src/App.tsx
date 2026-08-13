@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-
 import type { SpatialNode } from './api/types'
 import { FoundationPanel } from './features/FoundationPanel'
 import { WorkSamplePanel } from './features/WorkSamplePanel'
-import { PremiumWorkLab } from './scene/PremiumWorkLab'
+import { CinematicWorkLab } from './scene/CinematicWorkLab'
 import { useSceneState } from './state/SceneStateProvider'
 
 function levelLabel(value: string) {
@@ -69,7 +69,7 @@ function SpatialShell() {
   return (
     <main className="spatial-shell">
       <div className="scene-layer">
-        <PremiumWorkLab
+        <CinematicWorkLab
           nodes={nodes}
           connections={connections}
           focus={focus}
@@ -79,7 +79,7 @@ function SpatialShell() {
       </div>
 
       <header className="topbar glass">
-        <button className="brand-button" onClick={() => navigate('/')}><span>S</span><div><strong>StepIn</strong><small>Spatial Practice Alpha 2 · Ultra</small></div></button>
+        <button className="brand-button" onClick={() => navigate('/')}><span>S</span><div><strong>StepIn</strong><small>Spatial Practice Alpha 3 · Cinematic</small></div></button>
         <div className="now-context"><span>现在只做这一件事</span><strong>{headline}</strong></div>
         <div className="sync-state"><span className={refreshing ? 'sync-dot active' : 'sync-dot'} />{refreshing ? '同步中' : '服务器已同步'}<small>{lastSyncedAt ? new Date(lastSyncedAt).toLocaleTimeString() : ''}</small></div>
       </header>
@@ -109,7 +109,7 @@ function SpatialShell() {
       </Routes>
 
       {inspected && <Inspector node={inspected} onClose={() => setInspected(null)} />}
-      <div className="authority-badge">3D READS STATE · IT DOES NOT AWARD GROWTH</div>
+      <div className="authority-badge">CINEMATIC UI READS SERVER STATE · IT DOES NOT AWARD GROWTH</div>
     </main>
   )
 }
