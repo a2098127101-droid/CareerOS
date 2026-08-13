@@ -1,4 +1,4 @@
-name: StepIn CI (locked 208-test matrix + spatial UI)
+name: StepIn CI (canonical baseline + spatial UI)
 
 on:
   push:
@@ -25,6 +25,8 @@ jobs:
         run: python -m pip check
       - name: Compile application, migrations and tests
         run: python -m compileall -q app scripts tests alembic
+      - name: Audit canonical StepIn release baseline
+        run: python scripts/audit_release_baseline.py
       - name: Validate deployment shell scripts
         run: bash -n deploy/postgres/init-app-role.sh deploy/scripts/*.sh
       - name: Validate production Compose model
@@ -44,8 +46,17 @@ jobs:
         run: python scripts/audit_stepin_project_library.py
       - name: Run isolated regression matrix
         run: python scripts/run_test_matrix.py --timeout 180 --json-out docs/CI_TEST_MATRIX.json
-      - name: Enforce locked test count
-        run: python -c "import json; report=json.load(open('docs/CI_TEST_MATRIX.json', encoding='utf-8')); assert report['ok'] and report['passed_tests'] == 208, report"
+      - name: Enforce canonical locked test count
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          baseline = json.load(open('config/stepin_release_baseline.json', encoding='utf-8'))
+          report = json.load(open('docs/CI_TEST_MATRIX.json', encoding='utf-8'))
+          expected = int(baseline['locked_tests'])
+          assert report['ok'] and report['passed_tests'] == expected, {'expected': expected, 'report': report}
+          print({'locked_tests': expected, 'passed_tests': report['passed_tests']})
+          PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

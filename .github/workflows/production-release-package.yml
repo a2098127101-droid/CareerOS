@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version, for example v2.2.0-rc1
-        required: true
-        default: v2.2.0-rc1
+        description: Optional release version override, for example v2.2.0-rc1
+        required: false
+        default: ''
   push:
     tags:
       - 'v*'
@@ -39,6 +39,8 @@ jobs:
         run: pip install --require-hashes -r requirements.lock
       - name: Validate dependency consistency
         run: python -m pip check
+      - name: Audit canonical StepIn release baseline
+        run: python scripts/audit_release_baseline.py
       - name: Build spatial frontend for release
         working-directory: frontend
         run: |
@@ -65,12 +67,15 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          base_version="$(python -c "import json; print(json.load(open('config/stepin_release_baseline.json', encoding='utf-8'))['product_version'])")"
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            value="v2.2.0-pr${PR_NUMBER}"
+            value="v${base_version}-pr${PR_NUMBER}"
           elif [[ -n "$INPUT_VERSION" ]]; then
             value="$INPUT_VERSION"
-          else
+          elif [[ "$REF_NAME" == v* ]]; then
             value="$REF_NAME"
+          else
+            value="v${base_version}-rc"
           fi
           value="${value//\//-}"
           echo "value=$value" >> "$GITHUB_OUTPUT"
@@ -89,6 +94,8 @@ jobs:
           archives = list(Path('dist').glob('StepIn-*.zip'))
           assert len(manifests) == 1 and len(archives) == 1
           manifest = json.loads(manifests[0].read_text(encoding='utf-8'))
+          baseline = json.loads(Path('config/stepin_release_baseline.json').read_text(encoding='utf-8'))
+          assert manifest['stepin_baseline'] == baseline
           boundary = manifest['release_boundary']
           assert boundary['contains_secrets'] is False
           assert boundary['contains_runtime_database'] is False
@@ -101,8 +108,9 @@ jobs:
           assert not any(Path(name).name in forbidden for name in names)
           assert any(name.endswith('/deploy/docker-compose.production.yml') for name in names)
           assert any(name.endswith('/app/static/app/index.html') for name in names)
+          assert any(name.endswith('/config/stepin_release_baseline.json') for name in names)
           assert any(name.endswith('/RELEASE_MANIFEST.json') for name in names)
-          print(json.dumps({'archive': str(archives[0]), 'files': manifest['file_count']}, ensure_ascii=False))
+          print(json.dumps({'archive': str(archives[0]), 'files': manifest['file_count'], 'baseline': baseline}, ensure_ascii=False))
           PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
