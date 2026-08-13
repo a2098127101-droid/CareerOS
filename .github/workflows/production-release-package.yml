@@ -41,6 +41,8 @@ jobs:
         run: python -m pip check
       - name: Audit canonical StepIn release baseline
         run: python scripts/audit_release_baseline.py
+      - name: Audit Alpha 8 spatial runtime telemetry contract
+        run: python scripts/audit_spatial_runtime_telemetry.py
       - name: Build spatial frontend for release
         working-directory: frontend
         run: |
@@ -109,6 +111,7 @@ jobs:
           assert any(name.endswith('/deploy/docker-compose.production.yml') for name in names)
           assert any(name.endswith('/app/static/app/index.html') for name in names)
           assert any(name.endswith('/config/stepin_release_baseline.json') for name in names)
+          assert any(name.endswith('/docs/SPATIAL_RUNTIME_TELEMETRY_ALPHA8.md') for name in names)
           assert any(name.endswith('/RELEASE_MANIFEST.json') for name in names)
           print(json.dumps({'archive': str(archives[0]), 'files': manifest['file_count'], 'baseline': baseline}, ensure_ascii=False))
           PY

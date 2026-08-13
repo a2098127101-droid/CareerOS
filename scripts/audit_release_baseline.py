@@ -73,6 +73,15 @@ def main() -> None:
     if missing_docker:
         fail(f"Dockerfile does not enforce source-to-spatial build parity: {missing_docker}")
 
+    runtime_metadata = read("app/release_baseline.py")
+    if "config" not in runtime_metadata or "stepin_release_baseline.json" not in runtime_metadata:
+        fail("runtime release metadata does not load the canonical baseline")
+    registration = read("app/foundation_registration.py")
+    if "app.version = str(STEPIN_RELEASE_BASELINE[\"product_version\"])" not in registration:
+        fail("effective FastAPI runtime version is not derived from canonical baseline")
+    if "stepin_release_baseline" not in registration:
+        fail("canonical release metadata is not exposed on app.state")
+
     print(
         json.dumps(
             {

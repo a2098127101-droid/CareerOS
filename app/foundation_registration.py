@@ -14,10 +14,13 @@ from .foundation_production import ExplorationRequest, ProductionFoundationFacad
 from .learner_agent.bridge import LearnerAgentEventBridge
 from .learner_agent.registration import register_learner_agent_routes
 from .real_work_sample import RealWorkSampleService
+from .release_baseline import STEPIN_RELEASE_BASELINE
 from .routers.foundation import build_foundation_router
 from .routers.scene_state import build_scene_state_router
+from .routers.spatial_telemetry import build_spatial_runtime_router
 from .routers.work_samples import build_work_sample_router
 from .scene_state import SceneStateService
+from .spatial_telemetry import SpatialRuntimeTelemetryService
 from .unified_runtime_store import RuntimeVersionConflict
 
 
@@ -39,6 +42,12 @@ def register_foundation_production_routes(app) -> None:
     main = sys.modules.get("app.main")
     if main is None:
         raise RuntimeError("app.main must be initialized before Foundation registration")
+
+    # The effective OpenAPI/runtime identity is derived from the same canonical release
+    # metadata used by CI and Production Release packaging. This replaces the historical
+    # literal version that may still exist in the compatibility bootstrap constructor.
+    app.version = str(STEPIN_RELEASE_BASELINE["product_version"])
+    app.state.stepin_release_baseline = dict(STEPIN_RELEASE_BASELINE)
 
     base_service = FoundationProgressService(
         repository=main.unified_runtime_store,
@@ -230,6 +239,7 @@ def register_foundation_production_routes(app) -> None:
         capability_verification=capability_verification,
         work_samples=work_samples,
     )
+    spatial_telemetry = SpatialRuntimeTelemetryService(main.commercial_store)
     app.include_router(
         build_work_sample_router(
             service=work_samples,
@@ -244,6 +254,13 @@ def register_foundation_production_routes(app) -> None:
             service=scene_state,
             sessions=main.store,
             identity=main.auth_store,
+            current_principal=main.current_principal,
+            canonical_role=main.canonical_role,
+        )
+    )
+    app.include_router(
+        build_spatial_runtime_router(
+            service=spatial_telemetry,
             current_principal=main.current_principal,
             canonical_role=main.canonical_role,
         )
@@ -267,4 +284,5 @@ def register_foundation_production_routes(app) -> None:
     app.state.stepin_capability_verification = capability_verification
     app.state.stepin_real_work_samples = work_samples
     app.state.stepin_scene_state = scene_state
+    app.state.stepin_spatial_telemetry = spatial_telemetry
     app.state.stepin_foundation_registered = True

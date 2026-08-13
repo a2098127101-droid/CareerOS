@@ -27,6 +27,8 @@ jobs:
         run: python -m compileall -q app scripts tests alembic
       - name: Audit canonical StepIn release baseline
         run: python scripts/audit_release_baseline.py
+      - name: Audit Alpha 8 spatial runtime telemetry contract
+        run: python scripts/audit_spatial_runtime_telemetry.py
       - name: Validate deployment shell scripts
         run: bash -n deploy/postgres/init-app-role.sh deploy/scripts/*.sh
       - name: Validate production Compose model
