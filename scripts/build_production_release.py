@@ -10,11 +10,15 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
+BASELINE_PATH = ROOT / "config" / "stepin_release_baseline.json"
 DEFAULT_REQUIRED = (
     "Dockerfile",
     "requirements.lock",
+    "frontend/package-lock.json",
+    "config/stepin_release_baseline.json",
     "alembic.ini",
     "app/main.py",
+    "app/static/app/index.html",
     "app/static/projects.html",
     "app/static/student.html",
     "app/static/teacher.html",
@@ -93,6 +97,29 @@ def sha256_bytes(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
+def load_baseline() -> dict[str, object]:
+    if not BASELINE_PATH.is_file():
+        raise SystemExit("Canonical StepIn release baseline is missing")
+    baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+    required = {
+        "product",
+        "product_version",
+        "release_status",
+        "spatial_runtime",
+        "spatial_label",
+        "locked_tests",
+        "python_version",
+        "node_version",
+        "capability_verification",
+        "target_environment_certified",
+        "windows_webview2_certified",
+    }
+    missing = sorted(required.difference(baseline))
+    if missing:
+        raise SystemExit(f"Canonical StepIn release baseline is incomplete: {missing}")
+    return baseline
+
+
 def validate_required() -> None:
     missing = [item for item in DEFAULT_REQUIRED if not (ROOT / item).is_file()]
     if missing:
@@ -108,6 +135,7 @@ def validate_no_runtime_secrets(paths: list[Path]) -> None:
 
 def build(version: str, out_dir: Path) -> tuple[Path, Path]:
     validate_required()
+    baseline = load_baseline()
     paths = sorted((path for path in ROOT.rglob("*") if should_include(path)), key=lambda item: item.as_posix())
     validate_no_runtime_secrets(paths)
 
@@ -136,14 +164,16 @@ def build(version: str, out_dir: Path) -> tuple[Path, Path]:
         "generated_at": generated_at,
         "git_commit": commit,
         "git_ref": ref,
+        "stepin_baseline": baseline,
         "file_count": len(files),
         "files": files,
         "release_boundary": {
             "contains_secrets": False,
             "contains_runtime_database": False,
             "contains_student_data": False,
-            "runtime_verified": False,
-            "verification_required_after_deployment": True,
+            "runtime_verified": bool(baseline["target_environment_certified"]),
+            "verification_required_after_deployment": not bool(baseline["target_environment_certified"]),
+            "windows_webview2_certified": bool(baseline["windows_webview2_certified"]),
         },
     }
     manifest_bytes = json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8") + b"\n"
