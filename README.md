@@ -4,7 +4,7 @@
 
 **从一件简单真实的工作开始，让每次尝试、失败、修改、反馈和迁移都成为下一步教学决策的依据。**
 
-[中文说明](README.zh-CN.md) · [Architecture](ARCHITECTURE.md) · [Roadmap](ROADMAP.md) · [Test status](TEST_REPORT.md) · [Learner Agent Runtime](docs/LEARNER_AGENT_RUNTIME_v2.1.md) · [Trajectory & Calibration](docs/LEARNER_TRAJECTORY_AND_CALIBRATION_v2.2.md)
+[中文说明](README.zh-CN.md) · [Architecture](ARCHITECTURE.md) · [Roadmap](ROADMAP.md) · [Test status](TEST_REPORT.md) · [Runtime Telemetry](docs/SPATIAL_RUNTIME_TELEMETRY_ALPHA8.md) · [Learner Agent Runtime](docs/LEARNER_AGENT_RUNTIME_v2.1.md) · [Trajectory & Calibration](docs/LEARNER_TRAJECTORY_AND_CALIBRATION_v2.2.md)
 
 ## Product definition
 
@@ -49,7 +49,7 @@ V1 creates an Artifact/Evidence record and deterministic supervisor feedback. V2
 
 ## Spatial Practice Alpha 7 · Adaptive Showcase
 
-`/app` now uses the **Alpha 7 Adaptive Showcase** spatial runtime. It is a high-fidelity, server-driven 3D presentation layer built with React 19, React Three Fiber, Drei and Three.js.
+`/app` uses the **Alpha 7 Adaptive Showcase** visual runtime, now surrounded by the **Alpha 8 Runtime Telemetry** certification layer. The high-fidelity 3D presentation remains server-driven and is built with React 19, React Three Fiber, Drei and Three.js.
 
 The current visual system includes:
 
@@ -85,7 +85,7 @@ Alpha 7 keeps the full Alpha 6 visual path as `ultra`, while adding production-o
 /app?qualitydebug=1
 ```
 
-`auto` evaluates hardware concurrency, device memory, pixel load, reduced-motion preference, WebView indicators and WebGL capabilities, then samples runtime FPS. Automatic quality only moves downward when performance remains below budget; it does not oscillate back upward during the session.
+`auto` evaluates hardware concurrency, device memory, pixel load, WebView indicators and WebGL capabilities, then samples runtime FPS. Automatic quality only moves downward when performance remains below budget; it does not oscillate back upward during the session.
 
 - **Ultra**: SSR + volumetric + Bloom, 48×48 GPGPU topology, 1,800 instanced data points.
 - **High**: SSR + volumetric + Bloom, 40×40 topology, 1,200 data points.
@@ -93,6 +93,30 @@ Alpha 7 keeps the full Alpha 6 visual path as `ultra`, while adding production-o
 - **Safe**: DPR capped at 1, 24×24 topology, 320 data points, SSR/volumetric/Bloom and realtime shadows disabled.
 
 WebGL context loss forces the current session to Safe and remains Safe after restoration rather than immediately restarting the highest-cost GPU path.
+
+## Motion accessibility
+
+Render quality and motion are independent. A user may retain Ultra materials while disabling continuous animation:
+
+```text
+/app?motion=full
+/app?motion=reduced
+/app?motion=off
+```
+
+Without an explicit motion parameter, `prefers-reduced-motion: reduce` selects reduced motion. Reduced/off modes move React Three Fiber from a perpetual animation loop to demand rendering, so state and pointer invalidations can still render a fresh frame without continuous camera, particle or room motion.
+
+## Alpha 8 runtime telemetry
+
+The certification layer records only render/runtime information through:
+
+```text
+GET  /api/spatial-runtime/v1/telemetry/contract
+POST /api/spatial-runtime/v1/telemetry
+GET  /api/spatial-runtime/v1/telemetry/summary
+```
+
+Accepted fields are allow-listed: quality tier/request, motion mode, FPS, P50/P95/P99 frametime, bucketed viewport/device characteristics, WebView flag, WebGL capability limits and a coarse renderer class. Raw User-Agent strings, raw GPU renderer strings, learner answers, task material, Evidence text, user IDs and session IDs are not accepted. Telemetry is certification evidence only and never mutates learning state.
 
 ## Server authority boundary
 
@@ -106,12 +130,14 @@ clientMayVerifyEvidence = false
 clientMayRewriteTrajectory = false
 ```
 
-Camera movement, shaders, lighting, particles, quality tiers and cinematic sequences never award learning progress.
+Camera movement, shaders, lighting, particles, quality tiers, motion policy, telemetry and cinematic sequences never award learning progress.
 
 ## Production validation
 
-The current production `main` baseline enforces **208 / 208 automated regression tests**. The release gates also include:
+The current production baseline enforces **208 / 208 automated regression tests**. The release gates also include:
 
+- canonical StepIn release-baseline audit;
+- Alpha 8 spatial-runtime telemetry/privacy audit;
 - frontend lockfile zero-drift validation;
 - deterministic `npm ci` installation;
 - TypeScript typecheck and Vite production build;
@@ -120,12 +146,10 @@ The current production `main` baseline enforces **208 / 208 automated regression
 - database-access and repository-contract audits;
 - dependency audit and CycloneDX SBOM generation;
 - repository vulnerability / secret / misconfiguration scanning;
-- release-container build and vulnerability scan;
+- source multi-stage release-container build and vulnerability scan;
 - deterministic production ZIP and archive-boundary validation.
 
-The frontend now commits `frontend/package-lock.json` and CI/Production Release use `npm ci`; the former package-resolution determinism gap is closed.
-
-The latest validated Alpha 7 release candidate was produced from PR #25. Engineering gates establish code and release-contract consistency, not pedagogical effectiveness or universal GPU compatibility. Real Windows WebView2 / Intel / AMD / NVIDIA hardware certification remains a separate release-certification task.
+The frontend commits `frontend/package-lock.json`, CI/Production Release use `npm ci`, and the source Dockerfile builds the Spatial bundle from the same lockfile. Engineering gates establish code and release-contract consistency; they do not establish pedagogical effectiveness or universal GPU compatibility. Real pilot-environment and Windows WebView2 / Intel / AMD / NVIDIA hardware certification remain separate evidence tasks tracked in Issue #20.
 
 ## Quick start
 
