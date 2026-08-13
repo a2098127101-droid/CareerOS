@@ -79,13 +79,13 @@ function SpatialShell() {
       </div>
 
       <header className="topbar glass">
-        <button className="brand-button" onClick={() => navigate('/')}><span>S</span><div><strong>StepIn</strong><small>Spatial Practice Alpha 6 · Showcase CG Demo</small></div></button>
+        <button className="brand-button" onClick={() => navigate('/')}><span>S</span><div><strong>StepIn</strong><small>Spatial Practice Alpha 7 · Adaptive Showcase</small></div></button>
         <div className="now-context"><span>现在只做这一件事</span><strong>{headline}</strong></div>
         <div className="sync-state"><span className={refreshing ? 'sync-dot active' : 'sync-dot'} />{refreshing ? '同步中' : '服务器已同步'}<small>{lastSyncedAt ? new Date(lastSyncedAt).toLocaleTimeString() : ''}</small></div>
       </header>
 
       <nav className="dock glass" aria-label="Work Lab navigation">
-        <button className={focus === 'hub' ? 'active' : ''} onClick={() => navigate('/')}><span>◫</span><small>Showcase Room</small></button>
+        <button className={focus === 'hub' ? 'active' : ''} onClick={() => navigate('/')}><span>◫</span><small>Adaptive Showcase</small></button>
         <button className={focus === 'foundation' ? 'active' : ''} onClick={() => navigate('/foundation')}><span>01</span><small>Foundation</small></button>
         <button className={focus === 'work-sample' ? 'active' : ''} onClick={() => navigate('/work-sample')}><span>02</span><small>Work Sample</small></button>
         <button onClick={() => setInspected(nodes.find((node) => node.kind === 'capability') || null)}><span>{verified}</span><small>Verified</small></button>
@@ -109,7 +109,7 @@ function SpatialShell() {
       </Routes>
 
       {inspected && <Inspector node={inspected} onClose={() => setInspected(null)} />}
-      <div className="authority-badge">SHOWCASE CG DEMO READS SERVER STATE · IT DOES NOT AWARD GROWTH</div>
+      <div className="authority-badge">ADAPTIVE SHOWCASE READS SERVER STATE · RENDER QUALITY DOES NOT AWARD GROWTH</div>
     </main>
   )
 }
