@@ -12,3 +12,6 @@ data/*certification*.json
 data/staging_gate_report.json
 data/email_outbox.jsonl
 backups
+dist
+frontend/node_modules
+app/static/app
