@@ -1,6 +1,6 @@
 import { Html, Sparkles } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import type { Alpha5Theme } from '../alpha5/ThemeSystem'
 import { SHOWCASE_CLIPS, sampleTrack, smooth01 } from './ShowcaseSequenceConfig'
@@ -17,6 +17,16 @@ function isArtifactClip(runtime: ShowcaseRuntimeState) {
 export function ArtifactChoreography({ runtime, theme }: { runtime: ShowcaseRuntimeState; theme: Alpha5Theme }) {
   const mesh = useRef<THREE.InstancedMesh>(null)
   const feedback = useRef<THREE.Group>(null)
+  const geometry = useMemo(() => new THREE.BoxGeometry(1, 1, 1), [])
+  const material = useMemo(() => new THREE.MeshPhysicalMaterial({
+    color: theme.accent,
+    metalness: .58,
+    roughness: .12,
+    clearcoat: 1,
+    clearcoatRoughness: .05,
+    emissive: new THREE.Color(theme.accent),
+    emissiveIntensity: .22,
+  }), [theme.accent])
   const body = useMemo(() => {
     const items = Array.from({ length: PARTS }, (_, index) => {
       const row = Math.floor(index / 6)
@@ -81,21 +91,23 @@ export function ArtifactChoreography({ runtime, theme }: { runtime: ShowcaseRunt
     }
   })
 
+  useEffect(() => () => {
+    geometry.dispose()
+    material.dispose()
+  }, [geometry, material])
+
   if (!isArtifactClip(runtime)) return null
 
   return (
     <group>
-      <instancedMesh ref={mesh} args={[undefined, undefined, PARTS]} castShadow>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshPhysicalMaterial color={theme.accent} metalness={.58} roughness={.12} clearcoat={1} clearcoatRoughness={.05} emissive={theme.accent} emissiveIntensity={.22} />
-      </instancedMesh>
+      <instancedMesh ref={mesh} args={[geometry, material, PARTS]} castShadow />
       <group ref={feedback} position={[3.35, 1.65, 1.75]}>
         <mesh><icosahedronGeometry args={[.22, 2]} /><meshPhysicalMaterial color={theme.secondary} emissive={theme.secondary} emissiveIntensity={3.5} metalness={.4} roughness={.04} clearcoat={1} toneMapped={false} /></mesh>
         <mesh rotation={[Math.PI / 2, 0, 0]}><torusGeometry args={[.42, .014, 10, 90]} /><meshBasicMaterial color={theme.secondary} transparent opacity={.68} toneMapped={false} /></mesh>
         <Sparkles count={28} scale={[1.5, 1.5, 1.5]} size={2.8} speed={.65} opacity={.8} color={theme.secondary} />
       </group>
       <Html transform center distanceFactor={7} position={[3.35, 3.15, 1.75]} pointerEvents="none">
-        <div className="presentation-event-label"><span>ARTIFACT CHOREOGRAPHY</span><strong>{runtime.clip?.replaceAll('_', ' ').toUpperCase()}</strong><small>visual clip · server artifact state unchanged</small></div>
+        <div className="presentation-event-label"><span>ARTIFACT CHOREOGRAPHY</span><strong>{runtime.clip?.replace(/_/g, ' ').toUpperCase()}</strong><small>visual clip · server artifact state unchanged</small></div>
       </Html>
     </group>
   )
