@@ -65,9 +65,14 @@ jobs:
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: '22.12.0'
-          package-manager-cache: false
-      - name: Install spatial frontend dependencies
-        run: npm install --no-audit --no-fund --package-lock=false
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install spatial frontend dependencies from lockfile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify lockfile integrity
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          git diff --exit-code -- package-lock.json
       - name: Type-check spatial frontend
         run: npm run typecheck
       - name: Build spatial frontend
