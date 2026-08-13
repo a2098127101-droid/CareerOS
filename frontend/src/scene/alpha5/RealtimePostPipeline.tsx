@@ -8,6 +8,100 @@ import { SSRPass } from 'three/examples/jsm/postprocessing/SSRPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import type { Alpha5Theme } from './ThemeSystem'
 
+const volumetricShader = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    tDepth: { value: null as THREE.Texture | null },
+    uTime: { value: 0 },
+    uDensity: { value: .7 },
+    uAccent: { value: new THREE.Color('#66f2e4') },
+    uSecondary: { value: new THREE.Color('#f0ba76') },
+    uInverseProjection: { value: new THREE.Matrix4() },
+    uCameraWorld: { value: new THREE.Matrix4() },
+  },
+  vertexShader: /* glsl */`
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */`
+    uniform sampler2D tDiffuse;
+    uniform sampler2D tDepth;
+    uniform float uTime;
+    uniform float uDensity;
+    uniform vec3 uAccent;
+    uniform vec3 uSecondary;
+    uniform mat4 uInverseProjection;
+    uniform mat4 uCameraWorld;
+    varying vec2 vUv;
+
+    float hash31(vec3 p) {
+      p = fract(p * .1031);
+      p += dot(p, p.yzx + 33.33);
+      return fract((p.x + p.y) * p.z);
+    }
+
+    float noise3(vec3 p) {
+      vec3 i = floor(p);
+      vec3 f = fract(p);
+      f = f * f * (3.0 - 2.0 * f);
+      float a = hash31(i);
+      float b = hash31(i + vec3(1,0,0));
+      float c = hash31(i + vec3(0,1,0));
+      float d = hash31(i + vec3(1,1,0));
+      float e = hash31(i + vec3(0,0,1));
+      float f1 = hash31(i + vec3(1,0,1));
+      float g = hash31(i + vec3(0,1,1));
+      float h = hash31(i + vec3(1,1,1));
+      return mix(mix(mix(a,b,f.x), mix(c,d,f.x), f.y), mix(mix(e,f1,f.x), mix(g,h,f.x), f.y), f.z);
+    }
+
+    float roomMask(vec3 p) {
+      return step(abs(p.x), 9.5) * step(.0, p.y) * step(p.y, 6.7) * step(-7.3, p.z) * step(p.z, 6.8);
+    }
+
+    vec3 reconstructWorld(vec2 uv, float depth) {
+      vec4 clip = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+      vec4 view = uInverseProjection * clip;
+      view /= max(.0001, view.w);
+      return (uCameraWorld * vec4(view.xyz, 1.0)).xyz;
+    }
+
+    void main() {
+      vec4 base = texture2D(tDiffuse, vUv);
+      float depth = texture2D(tDepth, vUv).x;
+      vec3 cameraWorld = (uCameraWorld * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+      vec3 world = reconstructWorld(vUv, min(depth, .99995));
+      vec3 ray = world - cameraWorld;
+      float maxDistance = min(length(ray), 24.0);
+      vec3 direction = normalize(ray + vec3(.000001));
+      vec3 scattering = vec3(0.0);
+      float transmittance = 1.0;
+
+      const int STEPS = 20;
+      for (int i = 0; i < STEPS; i++) {
+        float t = (float(i) + .5) / float(STEPS);
+        vec3 p = cameraWorld + direction * maxDistance * t;
+        float mask = roomMask(p);
+        float n = noise3(p * .5 + vec3(0.0, uTime * .03, uTime * .017));
+        float mist = smoothstep(.48, .88, n) * .13;
+        float leftBeam = exp(-pow(length(p.xz - vec2(-3.0, -.65)), 2.0) * .4) * smoothstep(.1, 5.6, p.y);
+        float rightBeam = exp(-pow(length(p.xz - vec2(3.0, -.65)), 2.0) * .4) * smoothstep(.1, 5.6, p.y);
+        float reactor = exp(-length(p - vec3(0.0, 2.45, .65)) * 1.25);
+        float density = mask * (mist + leftBeam * .07 + rightBeam * .062 + reactor * .078) * uDensity;
+        vec3 lightColor = mix(uAccent, uSecondary, clamp((p.x + 7.5) / 15.0, 0.0, 1.0));
+        scattering += lightColor * density * transmittance * .11;
+        transmittance *= exp(-density * .14);
+      }
+
+      vec3 color = base.rgb * mix(.94, 1.0, transmittance) + scattering * 1.45;
+      gl_FragColor = vec4(color, base.a);
+    }
+  `,
+}
+
 const transitionShader = {
   uniforms: {
     tDiffuse: { value: null as THREE.Texture | null },
@@ -70,13 +164,7 @@ export function RealtimePostPipeline({ theme, transitionKey }: { theme: Alpha5Th
     const composer = new EffectComposer(gl)
     composer.setPixelRatio(Math.min(gl.getPixelRatio(), 1.35))
 
-    const ssr = new SSRPass({
-      renderer: gl,
-      scene,
-      camera,
-      width: Math.max(1, size.width),
-      height: Math.max(1, size.height),
-    })
+    const ssr = new SSRPass({ renderer: gl, scene, camera, width: Math.max(1, size.width), height: Math.max(1, size.height) })
     ssr.opacity = .46
     ssr.maxDistance = 4.2
     ssr.thickness = .075
@@ -85,16 +173,19 @@ export function RealtimePostPipeline({ theme, transitionKey }: { theme: Alpha5Th
     ssr.fresnel = true
     ssr.infiniteThick = false
 
+    const volumetric = new ShaderPass(volumetricShader)
+    volumetric.uniforms.tDepth.value = ssr.beautyRenderTarget.depthTexture
     const bloom = new UnrealBloomPass(new THREE.Vector2(size.width, size.height), 1.15, .5, .78)
     const transition = new ShaderPass(transitionShader)
     const output = new OutputPass()
 
     composer.addPass(ssr)
+    composer.addPass(volumetric)
     composer.addPass(bloom)
     composer.addPass(transition)
     composer.addPass(output)
 
-    return { composer, ssr, bloom, transition, output }
+    return { composer, ssr, volumetric, bloom, transition, output }
   }, [gl, scene, camera])
 
   useEffect(() => {
@@ -110,9 +201,19 @@ export function RealtimePostPipeline({ theme, transitionKey }: { theme: Alpha5Th
 
   useFrame((state, delta) => {
     age.current = Math.min(1, age.current + delta / .95)
+    camera.updateMatrixWorld()
+
+    pipeline.volumetric.uniforms.uTime.value = state.clock.elapsedTime
+    pipeline.volumetric.uniforms.uDensity.value = THREE.MathUtils.damp(pipeline.volumetric.uniforms.uDensity.value, theme.volumeDensity, 2.6, delta)
+    pipeline.volumetric.uniforms.uInverseProjection.value.copy((camera as THREE.PerspectiveCamera).projectionMatrixInverse)
+    pipeline.volumetric.uniforms.uCameraWorld.value.copy(camera.matrixWorld)
+    ;(pipeline.volumetric.uniforms.uAccent.value as THREE.Color).lerp(new THREE.Color(theme.accent), 1 - Math.exp(-delta * 2.8))
+    ;(pipeline.volumetric.uniforms.uSecondary.value as THREE.Color).lerp(new THREE.Color(theme.secondary), 1 - Math.exp(-delta * 2.8))
+
     pipeline.transition.uniforms.uProgress.value = age.current
     pipeline.transition.uniforms.uTime.value = state.clock.elapsedTime
     ;(pipeline.transition.uniforms.uAccent.value as THREE.Color).lerp(new THREE.Color(theme.accent), 1 - Math.exp(-delta * 3.2))
+
     pipeline.bloom.strength = THREE.MathUtils.damp(pipeline.bloom.strength, theme.bloom, 3, delta)
     pipeline.ssr.opacity = THREE.MathUtils.damp(pipeline.ssr.opacity, .34 + theme.dataEnergy * .12, 2.8, delta)
     pipeline.ssr.maxDistance = THREE.MathUtils.damp(pipeline.ssr.maxDistance, 3.6 + theme.dataEnergy * .8, 2.4, delta)
@@ -121,6 +222,7 @@ export function RealtimePostPipeline({ theme, transitionKey }: { theme: Alpha5Th
 
   useEffect(() => () => {
     pipeline.ssr.dispose()
+    pipeline.volumetric.dispose()
     pipeline.bloom.dispose()
     pipeline.transition.dispose()
     pipeline.output.dispose()
