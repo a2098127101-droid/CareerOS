@@ -100,8 +100,8 @@ export function GPGPUCapabilityNetwork({ capabilities, theme }: { capabilities: 
     const gpu = new GPUComputationRenderer(SIZE, SIZE, gl)
     const positionTexture = gpu.createTexture()
     const velocityTexture = gpu.createTexture()
-    const posData = positionTexture.image.data as Float32Array
-    const velData = velocityTexture.image.data as Float32Array
+    const posData = positionTexture.image.data as unknown as Float32Array
+    const velData = velocityTexture.image.data as unknown as Float32Array
     const random = (index: number, salt: number) => {
       const x = Math.sin(index * 91.17 + salt * 17.31) * 43758.5453
       return x - Math.floor(x)
