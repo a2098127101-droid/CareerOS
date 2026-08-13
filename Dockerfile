@@ -1,3 +1,13 @@
+FROM node:22.12.0-bookworm-slim@sha256:35531c52ce27b6575d69755c73e65d4468dba93a25644eed56dc12879cae9213 AS spatial-build
+WORKDIR /workspace
+COPY frontend/package.json frontend/package-lock.json ./frontend/
+RUN cd frontend \
+    && npm ci --ignore-scripts --no-audit --no-fund
+COPY frontend ./frontend
+RUN cd frontend \
+    && npm run build \
+    && test -f /workspace/app/static/app/index.html
+
 FROM python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -16,6 +26,7 @@ RUN groupadd --gid 10001 careeros \
     && useradd --uid 10001 --gid careeros --home-dir /app --no-create-home \
        --shell /usr/sbin/nologin careeros
 COPY --chown=careeros:careeros . .
+COPY --from=spatial-build --chown=careeros:careeros /workspace/app/static/app ./app/static/app
 USER 10001:10001
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
