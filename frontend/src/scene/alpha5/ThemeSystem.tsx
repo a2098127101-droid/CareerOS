@@ -1,5 +1,5 @@
 import { useFrame, useThree } from '@react-three/fiber'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import type { SpatialNode } from '../../api/types'
 
@@ -79,15 +79,14 @@ const THEMES: Record<Alpha5ThemeName, Alpha5Theme> = {
 
 export function useAlpha5Event(nodes: SpatialNode[]) {
   const previous = useRef<Map<string, string> | null>(null)
-  const eventRef = useRef<Alpha5Event | null>(null)
-  const version = nodes.map((node) => `${node.id}:${node.state}`).join('|')
+  const [event, setEvent] = useState<Alpha5Event | null>(null)
+  const version = nodes.map((node) => `${node.id}:${node.state}:${String(node.data?.verificationStatus || '')}`).join('|')
 
-  return useMemo(() => {
+  useEffect(() => {
     const current = new Map(nodes.map((node) => [node.id, String(node.state || '')]))
     if (!previous.current) {
       previous.current = current
-      eventRef.current = null
-      return null
+      return
     }
 
     let next: Alpha5Event | null = null
@@ -107,10 +106,15 @@ export function useAlpha5Event(nodes: SpatialNode[]) {
       }
     }
     previous.current = current
-    eventRef.current = next
-    return next
+    if (!next) return
+    setEvent(next)
+    const timer = window.setTimeout(() => setEvent((value) => value?.id === next?.id ? null : value), 6500)
+    return () => window.clearTimeout(timer)
+  // the compact version string intentionally gates this diff detector.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version])
+
+  return event
 }
 
 export function resolveAlpha5Theme(nodes: SpatialNode[], focus: 'hub' | 'foundation' | 'work-sample', event: Alpha5Event | null): Alpha5Theme {
