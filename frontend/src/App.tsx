@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-
 import type { SpatialNode } from './api/types'
 import { FoundationPanel } from './features/FoundationPanel'
 import { WorkSamplePanel } from './features/WorkSamplePanel'
-import { ControlRoomWorkLab } from './scene/ControlRoomWorkLab'
+import { RealtimeCGWorkLab } from './scene/RealtimeCGWorkLab'
 import { useSceneState } from './state/SceneStateProvider'
 
 function levelLabel(value: string) {
@@ -69,7 +69,7 @@ function SpatialShell() {
   return (
     <main className="spatial-shell">
       <div className="scene-layer">
-        <ControlRoomWorkLab
+        <RealtimeCGWorkLab
           nodes={nodes}
           connections={connections}
           focus={focus}
@@ -79,13 +79,13 @@ function SpatialShell() {
       </div>
 
       <header className="topbar glass">
-        <button className="brand-button" onClick={() => navigate('/')}><span>S</span><div><strong>StepIn</strong><small>Spatial Practice Alpha 4 · Control Room</small></div></button>
+        <button className="brand-button" onClick={() => navigate('/')}><span>S</span><div><strong>StepIn</strong><small>Spatial Practice Alpha 5 · Real-time CG Demo</small></div></button>
         <div className="now-context"><span>现在只做这一件事</span><strong>{headline}</strong></div>
         <div className="sync-state"><span className={refreshing ? 'sync-dot active' : 'sync-dot'} />{refreshing ? '同步中' : '服务器已同步'}<small>{lastSyncedAt ? new Date(lastSyncedAt).toLocaleTimeString() : ''}</small></div>
       </header>
 
       <nav className="dock glass" aria-label="Work Lab navigation">
-        <button className={focus === 'hub' ? 'active' : ''} onClick={() => navigate('/')}><span>◫</span><small>Control Room</small></button>
+        <button className={focus === 'hub' ? 'active' : ''} onClick={() => navigate('/')}><span>◫</span><small>CG Control Room</small></button>
         <button className={focus === 'foundation' ? 'active' : ''} onClick={() => navigate('/foundation')}><span>01</span><small>Foundation</small></button>
         <button className={focus === 'work-sample' ? 'active' : ''} onClick={() => navigate('/work-sample')}><span>02</span><small>Work Sample</small></button>
         <button onClick={() => setInspected(nodes.find((node) => node.kind === 'capability') || null)}><span>{verified}</span><small>Verified</small></button>
@@ -109,7 +109,7 @@ function SpatialShell() {
       </Routes>
 
       {inspected && <Inspector node={inspected} onClose={() => setInspected(null)} />}
-      <div className="authority-badge">CONTROL ROOM READS SERVER STATE · IT DOES NOT AWARD GROWTH</div>
+      <div className="authority-badge">REAL-TIME CG DEMO READS SERVER STATE · IT DOES NOT AWARD GROWTH</div>
     </main>
   )
 }
