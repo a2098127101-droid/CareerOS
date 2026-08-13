@@ -5,14 +5,19 @@ import sys
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
+from .capability_verification import CapabilityVerificationService
 from .domain.roles import canonical_role
 from .foundation_progress import FoundationError, FoundationProgressService
 from .foundation_production import ExplorationRequest, ProductionFoundationFacade
 from .learner_agent.bridge import LearnerAgentEventBridge
 from .learner_agent.registration import register_learner_agent_routes
+from .real_work_sample import RealWorkSampleService
 from .routers.foundation import build_foundation_router
+from .routers.scene_state import build_scene_state_router
+from .routers.work_samples import build_work_sample_router
+from .scene_state import SceneStateService
 from .unified_runtime_store import RuntimeVersionConflict
 
 
@@ -196,7 +201,7 @@ def register_foundation_production_routes(app) -> None:
                     )
         return await call_next(request)
 
-    register_learner_agent_routes(
+    learner_agent = register_learner_agent_routes(
         app,
         foundation=service,
         repository=main.unified_runtime_store,
@@ -208,6 +213,58 @@ def register_foundation_production_routes(app) -> None:
         canonical_role=main.canonical_role,
     )
 
+    capability_verification = CapabilityVerificationService()
+    work_samples = RealWorkSampleService(
+        repository=main.unified_runtime_store,
+        foundation=service,
+        evidence=main.evidence_store,
+        artifacts=main.artifact_store,
+        observation_sink=agent_bridge.emit,
+    )
+    scene_state = SceneStateService(
+        foundation=service,
+        learner_agent=learner_agent,
+        projects=main.project_repository,
+        evidence=main.evidence_store,
+        artifacts=main.artifact_store,
+        capability_verification=capability_verification,
+        work_samples=work_samples,
+    )
+    app.include_router(
+        build_work_sample_router(
+            service=work_samples,
+            sessions=main.store,
+            identity=main.auth_store,
+            current_principal=main.current_principal,
+            canonical_role=main.canonical_role,
+        )
+    )
+    app.include_router(
+        build_scene_state_router(
+            service=scene_state,
+            sessions=main.store,
+            identity=main.auth_store,
+            current_principal=main.current_principal,
+            canonical_role=main.canonical_role,
+        )
+    )
+
+    @app.get("/app", include_in_schema=False)
+    @app.get("/app/{spa_path:path}", include_in_schema=False)
+    def spatial_student_shell(spa_path: str = "", principal=Depends(main.current_principal)):
+        if not principal.authenticated:
+            return RedirectResponse(url=f"/login?next=/app/{spa_path}" if spa_path else "/login?next=/app", status_code=302)
+        if canonical_role(principal.role) != "participant":
+            return RedirectResponse(url="/", status_code=302)
+        index = main.STATIC_DIR / "app" / "index.html"
+        if index.exists():
+            return FileResponse(index)
+        # Source checkout without a frontend build remains fully usable through the old UI.
+        return RedirectResponse(url="/static/foundation.html", status_code=302)
+
     app.state.stepin_foundation_service = service
     app.state.stepin_learner_agent_event_bridge = agent_bridge
+    app.state.stepin_capability_verification = capability_verification
+    app.state.stepin_real_work_samples = work_samples
+    app.state.stepin_scene_state = scene_state
     app.state.stepin_foundation_registered = True
