@@ -4,8 +4,6 @@ import * as THREE from 'three'
 import type { SpatialNode } from '../../api/types'
 import type { Alpha5Theme } from './ThemeSystem'
 
-const COUNT = 1800
-
 function hash(seed: number) {
   let value = seed | 0
   return () => {
@@ -22,7 +20,7 @@ function kindColor(kind: string, theme: Alpha5Theme) {
   return new THREE.Color('#50636f')
 }
 
-export function InstancedDataField({ nodes, theme }: { nodes: SpatialNode[]; theme: Alpha5Theme }) {
+export function InstancedDataField({ nodes, theme, count = 1800 }: { nodes: SpatialNode[]; theme: Alpha5Theme; count?: number }) {
   const mesh = useRef<THREE.InstancedMesh>(null)
   const group = useRef<THREE.Group>(null)
   const shader = useRef<THREE.WebGLProgramParametersWithUniforms['uniforms'] | null>(null)
@@ -49,10 +47,10 @@ export function InstancedDataField({ nodes, theme }: { nodes: SpatialNode[]; the
 
   useEffect(() => {
     if (!mesh.current) return
-    const random = hash(7391 + nodes.length * 97)
+    const random = hash(7391 + nodes.length * 97 + count)
     const dummy = new THREE.Object3D()
     const source = nodes.length ? nodes : [{ kind: 'trajectory_event' } as SpatialNode]
-    for (let i = 0; i < COUNT; i += 1) {
+    for (let i = 0; i < count; i += 1) {
       const node = source[i % source.length]
       const ring = 5.7 + random() * 6.6
       const angle = random() * Math.PI * 2
@@ -70,8 +68,7 @@ export function InstancedDataField({ nodes, theme }: { nodes: SpatialNode[]; the
     }
     mesh.current.instanceMatrix.needsUpdate = true
     if (mesh.current.instanceColor) mesh.current.instanceColor.needsUpdate = true
-  // theme is intentionally included: whole field recolors with the control-room state.
-  }, [nodeSignature, theme, nodes])
+  }, [nodeSignature, theme, nodes, count])
 
   useFrame((state, delta) => {
     if (group.current) {
@@ -92,7 +89,7 @@ export function InstancedDataField({ nodes, theme }: { nodes: SpatialNode[]; the
 
   return (
     <group ref={group}>
-      <instancedMesh ref={mesh} args={[geometry, material, COUNT]} frustumCulled={false} />
+      <instancedMesh key={count} ref={mesh} args={[geometry, material, count]} frustumCulled={false} />
     </group>
   )
 }
