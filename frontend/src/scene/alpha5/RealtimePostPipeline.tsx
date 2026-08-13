@@ -164,7 +164,15 @@ export function RealtimePostPipeline({ theme, transitionKey }: { theme: Alpha5Th
     const composer = new EffectComposer(gl)
     composer.setPixelRatio(Math.min(gl.getPixelRatio(), 1.35))
 
-    const ssr = new SSRPass({ renderer: gl, scene, camera, width: Math.max(1, size.width), height: Math.max(1, size.height) })
+    const ssr = new SSRPass({
+      renderer: gl,
+      scene,
+      camera,
+      width: Math.max(1, size.width),
+      height: Math.max(1, size.height),
+      selects: null,
+      groundReflector: null,
+    })
     ssr.opacity = .46
     ssr.maxDistance = 4.2
     ssr.thickness = .075
