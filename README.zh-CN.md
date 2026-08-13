@@ -2,7 +2,7 @@
 
 **从一件简单真实的工作开始，让每次尝试、失败、修改、反馈和迁移都成为下一步教学决策的依据。**
 
-[返回英文首页](README.md) · [架构](ARCHITECTURE.md) · [开发路线图](ROADMAP.md) · [测试状态](TEST_REPORT.md) · [Learner Agent Runtime](docs/LEARNER_AGENT_RUNTIME_v2.1.md) · [真实轨迹与校准](docs/LEARNER_TRAJECTORY_AND_CALIBRATION_v2.2.md)
+[返回英文首页](README.md) · [架构](ARCHITECTURE.md) · [开发路线图](ROADMAP.md) · [测试状态](TEST_REPORT.md) · [Runtime Telemetry](docs/SPATIAL_RUNTIME_TELEMETRY_ALPHA8.md) · [Learner Agent Runtime](docs/LEARNER_AGENT_RUNTIME_v2.1.md) · [真实轨迹与校准](docs/LEARNER_TRAJECTORY_AND_CALIBRATION_v2.2.md)
 
 ## 当前产品定义
 
@@ -47,7 +47,7 @@ V1 会形成 Artifact/Evidence，并生成确定性的 supervisor feedback；V2 
 
 ## Spatial Practice Alpha 7 · Adaptive Showcase
 
-当前 `/app` 主入口运行 **Alpha 7 Adaptive Showcase**。它不是独立的成长判定系统，而是建立在服务器 SceneState 上的高保真 3D 表现层，技术栈包括 React 19、React Three Fiber、Drei 与 Three.js。
+当前 `/app` 主入口继续运行 **Alpha 7 Adaptive Showcase** 高保真视觉系统，并在外层加入 **Alpha 8 Runtime Telemetry** 认证基础设施。3D 场景仍然只是建立在服务器 SceneState 上的表现层，技术栈包括 React 19、React Three Fiber、Drei 与 Three.js。
 
 当前已经实现：
 
@@ -72,7 +72,7 @@ V1 会形成 Artifact/Evidence，并生成确定性的 supervisor feedback；V2 
 
 ## 自适应渲染预算
 
-Alpha 7 保留 Alpha 6 的全效果路径作为 Ultra，同时增加生产环境所需的质量分档：
+Alpha 7 保留 Alpha 6 的全效果路径作为 Ultra，同时提供生产环境质量分档：
 
 ```text
 /app?quality=auto
@@ -83,7 +83,7 @@ Alpha 7 保留 Alpha 6 的全效果路径作为 Ultra，同时增加生产环境
 /app?qualitydebug=1
 ```
 
-`auto` 会综合 CPU 核数、device memory、屏幕像素负载、reduced-motion、WebView 特征和 WebGL capability 选择初始档位，运行时继续采样 FPS。自动模式只在持续低于预算时向下降档，不会在同一 session 内反复自动升降。
+`auto` 会综合 CPU 核数、device memory、屏幕像素负载、WebView 特征和 WebGL capability 选择初始档位，并持续采样 FPS。自动模式只在性能持续低于预算时向下降档，不会在同一 session 内反复自动升降。
 
 - **Ultra**：SSR + volumetric + Bloom，48×48 即 2,304 个 GPGPU topology particles，1,800 个 instanced data；
 - **High**：保留 SSR/volumetric/Bloom，40×40 topology，1,200 个 data instances；
@@ -91,6 +91,30 @@ Alpha 7 保留 Alpha 6 的全效果路径作为 Ultra，同时增加生产环境
 - **Safe**：DPR 固定为 1，24×24 topology、320 个 data instances，同时关闭 SSR、volumetric、Bloom 和实时阴影。
 
 如果 WebView2 或显卡驱动发生 WebGL context loss，当前 session 会直接进入 Safe；context restored 后仍保持 Safe，不会立即重新启动最高负载路径。
+
+## 动态效果无障碍策略
+
+现在“画质”和“持续动态”已经分离。用户可以保留 Ultra 材质和光照，同时关闭连续动画：
+
+```text
+/app?motion=full
+/app?motion=reduced
+/app?motion=off
+```
+
+未显式指定时，系统会尊重 `prefers-reduced-motion: reduce`，进入 reduced 模式。Reduced/Off 不再通过强制 Safe 来实现，而是把 React Three Fiber 从持续 animation loop 切换为 demand rendering；状态变化和交互仍能生成新画面，但不会持续执行镜头、粒子和空间运动。
+
+## Alpha 8 Runtime Telemetry
+
+当前增加三条认证遥测接口：
+
+```text
+GET  /api/spatial-runtime/v1/telemetry/contract
+POST /api/spatial-runtime/v1/telemetry
+GET  /api/spatial-runtime/v1/telemetry/summary
+```
+
+遥测只接受白名单字段：quality tier/request、motion mode、FPS、P50/P95/P99 frametime、分桶后的 viewport/device 特征、WebView 标志、WebGL capability limits 和粗粒度 GPU 厂商类别。系统不接受 raw User-Agent、raw GPU renderer、学生答案、任务材料、Evidence 文本、user ID 或 session ID。持久 analytics 记录使用空 user/session 标识，遥测结果也不会写入 Capability、Evidence、Artifact 或 Learner Trajectory。
 
 ## 服务器权威边界
 
@@ -104,12 +128,14 @@ clientMayVerifyEvidence = false
 clientMayRewriteTrajectory = false
 ```
 
-镜头、Shader、灯光、粒子、质量档位和 cinematic sequence 都只能改变视觉执行成本与表现，不会给学生增加任何成长记录。
+镜头、Shader、灯光、粒子、质量档位、motion policy、telemetry 和 cinematic sequence 都只能改变视觉执行与认证证据，不会给学生增加任何成长记录。
 
 ## 当前生产验证
 
-当前 production `main` 的自动回归合同已经锁定为 **208 / 208**。生产 Gate 同时包括：
+当前 production baseline 的自动回归合同锁定为 **208 / 208**。生产 Gate 同时包括：
 
+- canonical StepIn release baseline audit；
+- Alpha 8 spatial runtime telemetry/privacy audit；
 - 前端 package-lock 零漂移校验；
 - deterministic `npm ci`；
 - TypeScript typecheck 与 Vite production build；
@@ -118,12 +144,10 @@ clientMayRewriteTrajectory = false
 - 数据库访问与 Repository contract audit；
 - dependency audit 与 CycloneDX SBOM；
 - repository vulnerability / secret / misconfiguration scan；
-- release container build / vulnerability scan；
+- source multi-stage release container build / vulnerability scan；
 - deterministic production ZIP 与 archive boundary 校验。
 
-`frontend/package-lock.json` 已正式进入仓库，Spatial CI 与 Production Release 已统一切换到 `npm ci`，此前前端依赖解析不完全可复现的问题已经关闭。
-
-最近一次完整验证对应 PR #25 的 Alpha 7 发布候选。以上工程结果说明代码和发布合同一致，但不等于教育效果已经验证，也不等于所有 GPU 都完成兼容认证。Windows WebView2、Intel 核显、AMD APU 与 NVIDIA 多机型性能认证仍属于独立 Release Certification Gate。
+前端依赖和 Docker/Release 构建已经统一使用同一 lockfile。以上工程结果说明代码和发布合同一致，但不等于教育效果已经验证，也不等于所有 GPU 或目标部署环境已经认证。真实 pilot 环境以及 Windows WebView2、Intel 核显、AMD APU、NVIDIA 多机型性能认证仍由 Issue #20 单独记录证据。
 
 ## 快速启动
 
