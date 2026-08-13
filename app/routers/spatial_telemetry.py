@@ -38,8 +38,8 @@ def build_spatial_runtime_router(
     def telemetry_summary(principal=Depends(current_principal)):
         authenticated(principal)
         role = canonical_role(principal.role)
-        if not getattr(principal, "is_super_admin", False) and role not in {"advisor", "organization_admin"}:
-            raise HTTPException(status_code=403, detail="advisor or organization administrator required")
+        if role not in {"advisor", "organization_admin", "platform_admin"}:
+            raise HTTPException(status_code=403, detail="advisor or administrator account required")
         return service.summary(tenant_id=principal.tenant_id)
 
     return router
