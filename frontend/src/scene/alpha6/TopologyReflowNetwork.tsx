@@ -7,9 +7,6 @@ import type { Alpha5Theme } from '../alpha5/ThemeSystem'
 import { SHOWCASE_CLIPS, sampleTrack, smooth01 } from './ShowcaseSequenceConfig'
 import { showcaseProgress, type ShowcaseRuntimeState } from './ShowcaseRuntime'
 
-const SIZE = 48
-const COUNT = SIZE * SIZE
-
 const positionShader = /* glsl */`
 uniform float delta;
 void main() {
@@ -121,11 +118,19 @@ function graphLayout(capabilities: SpatialNode[], connections: SpatialConnection
   })
 }
 
-export function TopologyReflowNetwork({ capabilities, connections, theme, runtime }: { capabilities: SpatialNode[]; connections: SpatialConnection[]; theme: Alpha5Theme; runtime: ShowcaseRuntimeState }) {
+export function TopologyReflowNetwork({ capabilities, connections, theme, runtime, size = 48 }: {
+  capabilities: SpatialNode[]
+  connections: SpatialConnection[]
+  theme: Alpha5Theme
+  runtime: ShowcaseRuntimeState
+  size?: number
+}) {
   const { gl } = useThree()
+  const normalizedSize = Math.max(16, Math.min(64, Math.round(size)))
+  const count = normalizedSize * normalizedSize
 
   const system = useMemo(() => {
-    const gpu = new GPUComputationRenderer(SIZE, SIZE, gl)
+    const gpu = new GPUComputationRenderer(normalizedSize, normalizedSize, gl)
     const positionTexture = gpu.createTexture()
     const velocityTexture = gpu.createTexture()
     const posData = positionTexture.image.data as unknown as Float32Array
@@ -135,8 +140,8 @@ export function TopologyReflowNetwork({ capabilities, connections, theme, runtim
       return x - Math.floor(x)
     }
 
-    for (let i = 0; i < COUNT; i += 1) {
-      const angle = i / COUNT * Math.PI * 2 * 9.0
+    for (let i = 0; i < count; i += 1) {
+      const angle = i / count * Math.PI * 2 * 9.0
       const radius = 1.6 + random(i, 1) * 2.0
       const offset = i * 4
       posData[offset] = Math.cos(angle) * radius
@@ -149,12 +154,12 @@ export function TopologyReflowNetwork({ capabilities, connections, theme, runtim
       velData[offset + 3] = 1
     }
 
-    const anchorAData = new Float32Array(COUNT * 4)
-    const anchorBData = new Float32Array(COUNT * 4)
-    const colorData = new Float32Array(COUNT * 4)
-    const anchorA = new THREE.DataTexture(anchorAData, SIZE, SIZE, THREE.RGBAFormat, THREE.FloatType)
-    const anchorB = new THREE.DataTexture(anchorBData, SIZE, SIZE, THREE.RGBAFormat, THREE.FloatType)
-    const colorTexture = new THREE.DataTexture(colorData, SIZE, SIZE, THREE.RGBAFormat, THREE.FloatType)
+    const anchorAData = new Float32Array(count * 4)
+    const anchorBData = new Float32Array(count * 4)
+    const colorData = new Float32Array(count * 4)
+    const anchorA = new THREE.DataTexture(anchorAData, normalizedSize, normalizedSize, THREE.RGBAFormat, THREE.FloatType)
+    const anchorB = new THREE.DataTexture(anchorBData, normalizedSize, normalizedSize, THREE.RGBAFormat, THREE.FloatType)
+    const colorTexture = new THREE.DataTexture(colorData, normalizedSize, normalizedSize, THREE.RGBAFormat, THREE.FloatType)
     anchorA.needsUpdate = true
     anchorB.needsUpdate = true
     colorTexture.needsUpdate = true
@@ -176,13 +181,13 @@ export function TopologyReflowNetwork({ capabilities, connections, theme, runtim
     if (error) console.error(`Alpha6 topology GPGPU init failed: ${error}`)
 
     const geometry = new THREE.BufferGeometry()
-    const references = new Float32Array(COUNT * 2)
-    for (let y = 0; y < SIZE; y += 1) for (let x = 0; x < SIZE; x += 1) {
-      const i = y * SIZE + x
-      references[i * 2] = (x + .5) / SIZE
-      references[i * 2 + 1] = (y + .5) / SIZE
+    const references = new Float32Array(count * 2)
+    for (let y = 0; y < normalizedSize; y += 1) for (let x = 0; x < normalizedSize; x += 1) {
+      const i = y * normalizedSize + x
+      references[i * 2] = (x + .5) / normalizedSize
+      references[i * 2 + 1] = (y + .5) / normalizedSize
     }
-    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(COUNT * 3), 3))
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3))
     geometry.setAttribute('reference', new THREE.BufferAttribute(references, 2))
 
     const material = new THREE.ShaderMaterial({
@@ -195,14 +200,14 @@ export function TopologyReflowNetwork({ capabilities, connections, theme, runtim
       toneMapped: false,
     })
 
-    return { gpu, positionVariable, velocityVariable, anchorA, anchorB, colorTexture, anchorAData, anchorBData, colorData, geometry, material }
-  }, [gl])
+    return { gpu, positionVariable, velocityVariable, anchorA, anchorB, colorTexture, anchorAData, anchorBData, colorData, geometry, material, count }
+  }, [gl, normalizedSize, count])
 
-  const topologySignature = `${capabilities.map((node) => `${node.id}:${String(node.data?.verificationLevel || node.state)}`).join('|')}::${connections.map((edge) => `${edge.from}>${edge.to}:${edge.relation}`).join('|')}::${theme.name}`
+  const topologySignature = `${capabilities.map((node) => `${node.id}:${String(node.data?.verificationLevel || node.state)}`).join('|')}::${connections.map((edge) => `${edge.from}>${edge.to}:${edge.relation}`).join('|')}::${theme.name}::${normalizedSize}`
   useEffect(() => {
     const source = capabilities.length ? capabilities : [{ id: 'placeholder', kind: 'capability', label: 'Capability', zone: 'capability', state: 'unobserved', refId: 'placeholder', data: {}, authority: 'server', readOnly: true } as SpatialNode]
     const layout = graphLayout(source, connections)
-    for (let i = 0; i < COUNT; i += 1) {
+    for (let i = 0; i < system.count; i += 1) {
       const nodeIndex = i % source.length
       const node = source[nodeIndex]
       const item = layout[nodeIndex]
