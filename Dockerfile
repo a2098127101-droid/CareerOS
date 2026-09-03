@@ -1,4 +1,4 @@
-FROM node:22.12.0-bookworm-slim@sha256:35531c52ce27b6575d69755c73e65d4468dba93a25644eed56dc12879cae9213 AS spatial-build
+FROM node:26.8.1-bookworm-slim@sha256:367679cf9792759492a486e4aa4b421764d71a9546a6dae8aab81a99eb797b3e AS spatial-build
 WORKDIR /workspace
 COPY frontend/package.json frontend/package-lock.json ./frontend/
 RUN cd frontend \
